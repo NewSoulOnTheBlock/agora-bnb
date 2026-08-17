@@ -88,43 +88,43 @@ export const CURVE_FEE_BPS = 100; // 1% — curve feeBps()
 // ---------------------------------------------------------------------------
 /**
  * ---------------------------------------------------------------------------
- * RELAUNCH PENDING. Every address below is intentionally the zero address.
+ * v2 — LIVE on chain 4663. Verified 2026-08-17, 18/18 checks.
  * ---------------------------------------------------------------------------
  *
- * The v1 token (`0x6853618673D952Fe602616F6f896cC7be8e25fCc`) and its contracts
- * are **dead and must not be wired back in.** `transferCreatorFeeRecipient` was
- * pointed at the Treasury rather than the FeeSink; because that call reassigns
- * the curve's `deployer` — the only address permitted to call `sweepFees` — the
- * fee stream became collectable only by a contract structurally incapable of
- * collecting it, and the change is not reversible.
+ * The v1 token (`0x6853618673D952Fe602616F6f896cC7be8e25fCc`) is **dead and must
+ * never be wired back in.** `transferCreatorFeeRecipient` was pointed at the
+ * Treasury rather than the FeeSink; because that call reassigns the curve's
+ * `deployer` — the only address permitted to call `sweepFees` — the fee stream
+ * became collectable only by a contract structurally incapable of collecting it,
+ * and the change was not reversible.
  *
- * v2 fixes this by ORDERING: the contracts deploy first, then the token is
- * launched with `params.creatorFeeRecipient` already set to the FeeSink, so no
- * post-launch transfer step exists to get wrong.
+ * v2 fixed it by ORDERING: contracts deployed first, then the token launched
+ * with `params.creatorFeeRecipient` already set to the FeeSink, so no
+ * post-launch transfer step ever existed to get wrong.
  *
- * Fill these in from the output of `contracts/scripts/bind.ts`. Nothing else in
- * the app needs to change — every page is already written against these fields
- * and renders an honest "not deployed" until they are set.
+ * Confirmed on chain rather than assumed:
+ *   curve.deployer()          == feeSink   (the check v1 failed)
+ *   sweepFees from feeSink    ALLOWED
+ *   sweepFees from the EOA    BLOCKED      (rights genuinely moved)
+ *   FeeSink.owner()           == 0x0       (renounced by setCurve)
+ *   Treasury.agora/redeemer/distributor all bound
  */
 export const AGORA: {
   token: string; curve: string; deployer: string;
   feeSink: string; treasury: string; stakedAgora: string; redeemer: string;
   stakedSuits: string; distributor: string;
 } = {
-  // Step 2 output (launch.ts) —
-  token: ZERO,
-  curve: ZERO,
+  token: "0x286b4b456Bd10FD1745A7b7B33f25a804DDf5F04",
+  curve: "0x05CDABCA3e464e00a91B81021dc881e2e8238fEE",
   deployer: "0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19",
 
-  // Step 1 output (deploy.ts) —
-  feeSink: ZERO,
-  treasury: ZERO,
+  feeSink: "0xb8Bc3E208cAA463b96c0A62c23E88905a7CEbB7E",
+  treasury: "0x7A3B8322dd85C6e9F24D3A0a8D66514ad0E26C5c",
 
-  // Step 3 output (bind.ts) —
-  stakedAgora: ZERO,
-  redeemer: ZERO,
-  stakedSuits: ZERO,
-  distributor: ZERO,
+  stakedAgora: "0x92dEbC6a1A8afE872EEb6aBac05DC3Fb1347D463",
+  redeemer: "0x6315505083eBB08ABf26CC70123D2af6D49184C0",
+  stakedSuits: "0xE76Cb0cc3EcA2959a8384A5a0Fe00A3EA0E5e1A3",
+  distributor: "0xf422916f139CB003B0FDC36edC73a816D17B914b",
 };
 
 /**
