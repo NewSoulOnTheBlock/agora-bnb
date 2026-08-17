@@ -157,12 +157,28 @@ body {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
   font-size: 26px;
   letter-spacing: 0.34em;
   text-transform: uppercase;
   color: var(--marble-100);
   font-weight: 400;
+  text-decoration: none;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.9), 0 0 22px rgba(224, 196, 124, 0.12);
+}
+
+/* The medallion. A faint gold ring picks up its own border so it reads as a
+   struck coin rather than a pasted-on image. */
+.brand .mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow:
+    0 0 0 1px rgba(201, 162, 39, 0.34),
+    0 2px 12px -2px rgba(0, 0, 0, 0.8);
 }
 .brand span {
   font-size: 11px;
@@ -650,6 +666,50 @@ a.rv:hover, .link:hover { color: var(--gold-100); }
 }
 
 /* --------------------------------------------------------------------------
+   The frieze — full-bleed footer band
+   -------------------------------------------------------------------------- */
+
+.frieze {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  line-height: 0; /* kill the inline-image descender gap */
+  border-top: 1px solid var(--rule);
+}
+
+.frieze img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* The art is already dark; this seats it against the page ground so the
+     seam at the top edge does not read as a hard cut. */
+  filter: saturate(0.92) brightness(0.86);
+}
+
+/* Fade the top edge into the page rather than butting it against the content,
+   and darken the very bottom so the meander rail sits on solid ground. */
+.frieze::before,
+.frieze::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.frieze::before {
+  top: 0;
+  height: 34%;
+  background: linear-gradient(180deg, #05070a 0%, rgba(5, 7, 10, 0.55) 45%, transparent 100%);
+}
+.frieze::after {
+  bottom: 0;
+  height: 22%;
+  background: linear-gradient(0deg, rgba(5, 7, 10, 0.9) 0%, transparent 100%);
+}
+
+/* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 
@@ -662,7 +722,8 @@ a.rv:hover, .link:hover { color: var(--gold-100); }
 @media (max-width: 620px) {
   .shell { padding: 22px 15px 54px; }
   .grid.c2, .grid.c3, .grid.c4 { grid-template-columns: 1fr; }
-  .brand { font-size: 20px; letter-spacing: 0.24em; }
+  .brand { font-size: 20px; letter-spacing: 0.24em; gap: 9px; }
+  .brand .mark { width: 30px; height: 30px; }
   .hero .v { font-size: 34px; }
   .rk { min-width: 0; }
   .row { flex-direction: column; gap: 2px; align-items: flex-start; }

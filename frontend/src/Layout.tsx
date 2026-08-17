@@ -29,7 +29,18 @@ export default function Layout({
       <div className="shell">
         <nav className="nav">
           <div className="nav-inner">
-            <span className="brand">AGORA <span>/ reserve</span></span>
+            <a className="brand" href="#floor" aria-label="AGORA — home">
+              <img
+                className="mark"
+                src="/logo.png"
+                srcSet="/logo.png 1x, /logo-2x.png 2x"
+                width={38}
+                height={38}
+                alt=""
+                decoding="async"
+              />
+              AGORA <span>/ reserve</span>
+            </a>
             <div className="nav-spacer" />
             <div className="tabs">
               {TABS.map((t) => (
@@ -64,6 +75,16 @@ export default function Layout({
           <span>addresses verified 2026-08-17 · spec §14</span>
         </div>
       </div>
+
+      {/* The frieze runs full-bleed beneath everything, outside `.shell` so it
+          is not constrained by the content width. Decorative only — it carries
+          no information, so it is empty-alt and aria-hidden. */}
+      <footer className="frieze" aria-hidden="true">
+        <picture>
+          <source media="(max-width: 900px)" srcSet="/frieze-sm.jpg" />
+          <img src="/frieze.jpg" alt="" loading="lazy" decoding="async" />
+        </picture>
+      </footer>
     </>
   );
 }
