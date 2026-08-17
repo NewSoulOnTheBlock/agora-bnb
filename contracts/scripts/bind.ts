@@ -111,6 +111,50 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------
+  // Staking + redemption. Deployed here rather than in step 1 because both
+  // take the token address as a constructor arg.
+  // ---------------------------------------------------------------------
+  const owner = (await treasury.owner()) as string;
+  const ownerIsSigner = owner.toLowerCase() === signer.address.toLowerCase();
+
+  line();
+  console.log("DEPLOYING StakedAgora + Redeemer");
+  line();
+
+  const staking = await (
+    await ethers.getContractFactory("StakedAgora")
+  ).deploy(TOKEN, owner);
+  await staking.waitForDeployment();
+  const stakingAddr = await staking.getAddress();
+  console.log(`StakedAgora  ${stakingAddr}  (${await staking.symbol()})`);
+
+  const redeemer = await (
+    await ethers.getContractFactory("Redeemer")
+  ).deploy(TOKEN, TREASURY, owner);
+  await redeemer.waitForDeployment();
+  const redeemerAddr = await redeemer.getAddress();
+  console.log(`Redeemer     ${redeemerAddr}`);
+  console.log(`  haircut ${await redeemer.haircutBps()} bps · delay ${await redeemer.redeemDelay()}s · epoch cap ${await redeemer.epochCapBps()} bps`);
+
+  // The Redeemer is the ONLY address the Treasury will ever pay.
+  if (ownerIsSigner) {
+    const tx = await treasury.setRedeemer(redeemerAddr);
+    await tx.wait();
+    console.log(`Treasury.setRedeemer ✓ ${tx.hash}`);
+  } else {
+    const data = treasury.interface.encodeFunctionData("setRedeemer", [redeemerAddr]);
+    console.log("ACTION REQUIRED — setRedeemer is onlyOwner. From governance:");
+    console.log(`  to:   ${TREASURY}`);
+    console.log(`  data: ${data}`);
+  }
+
+  // Staked AGORA is CUSTODIED, not owned — it must stay in eligibleSupply so
+  // stakers keep their floor backing. Deliberately NOT added to the exclusions.
+  console.log(`\nnote: StakedAgora is intentionally NOT added to Treasury exclusions —`);
+  console.log(`      it custodies user AGORA rather than owning it, so stakers`);
+  console.log(`      must keep their floor backing.`);
+
+  // ---------------------------------------------------------------------
   line();
   console.log("FINAL STATE");
   line();
@@ -127,10 +171,12 @@ async function main() {
 
   line();
   console.log("Wire the frontend — frontend/src/chain.ts:");
-  console.log(`  token:    "${TOKEN}",`);
-  console.log(`  curve:    "${curveAddr}",`);
-  console.log(`  feeSink:  "${FEE_SINK}",`);
-  console.log(`  treasury: "${TREASURY}",`);
+  console.log(`  token:       "${TOKEN}",`);
+  console.log(`  curve:       "${curveAddr}",`);
+  console.log(`  feeSink:     "${FEE_SINK}",`);
+  console.log(`  treasury:    "${TREASURY}",`);
+  console.log(`  stakedAgora: "${stakingAddr}",`);
+  console.log(`  redeemer:    "${redeemerAddr}",`);
   console.log("");
   console.log("Then make ONE small trade and run FeeSink.collect() to prove ETH");
   console.log("reaches the Treasury end to end before anything real depends on it.");

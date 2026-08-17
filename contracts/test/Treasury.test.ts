@@ -1,7 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { time, setBalance } from "@nomicfoundation/hardhat-network-helpers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+
+/// One network is shared across test FILES, so accounts that fund the corpus in
+/// every `beforeEach` drain. Top them up rather than trusting the start balance.
+const RICH = 10_000_000n * 10n ** 18n;
 
 const WAD = 10n ** 18n;
 const SUPPLY = 1_000_000_000n * WAD; // 1B, matching the live AGORA
@@ -22,6 +26,7 @@ describe("Treasury (ETH-denominated corpus)", () => {
   // Mirrors the real relaunch order: contracts first, token last.
   beforeEach(async () => {
     [owner, redeemer, holder, stranger] = await ethers.getSigners();
+    for (const s of [owner, redeemer, holder, stranger]) await setBalance(s.address, RICH);
 
     escrow = await (await ethers.getContractFactory("MockEscrow")).deploy();
     treasury = await (await ethers.getContractFactory("Treasury")).deploy(owner.address);

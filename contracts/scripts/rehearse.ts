@@ -87,7 +87,7 @@ async function main() {
   line();
   console.log("COLLECT — called by a stranger, proving it needs no privilege");
   line();
-  await (await feeSink.connect(stranger).collect()).wait();
+  await (await (feeSink.connect(stranger) as any).collect()).wait();
 
   const nav = await treasury.nav();
   console.log(`  Treasury.nav()                 ${ethers.formatEther(nav)} ETH`);

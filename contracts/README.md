@@ -147,12 +147,69 @@ AGORA_TOKEN=<printed> npx hardhat run scripts/deploy.ts --network localhost
 4. **Test with a small amount first.** The `sweepFees` destination has never been verified:
    the public RPC exposes no trace API, so where the ETH lands is inferred, not proven.
 
+## StakedAgora — the income side
+
+ERC-4626 vault over AGORA. Eligible supply for income is just `totalSupply()` of the vault,
+which is the whole reason the design stakes rather than reflects: no transfer-hook checkpoints
+on AGORA (which has none and can never gain any), no exclusion set to get wrong, no rebasing.
+
+**Rewards are ETH and deliberately stay OUT of `totalAssets()`.** Share price therefore never
+moves — shares are ~1:1 with deposits — and yield is tracked in a MasterChef-style accumulator
+claimed pull-wise via `claim()`. If ETH income inflated the share price, `convertToAssets`
+would report AGORA the vault does not hold and mislead every 4626 integrator downstream.
+
+`_update` settles both parties before any share transfer, so buying shares never buys
+someone else's unclaimed yield and selling never forfeits your own.
+
+**Deviation from spec §3.1:** the separate `Distributor` is folded in. With native-ETH income
+it would only forward value and re-derive per-share accounting the vault already keeps — an
+extra address to wire and fund for no benefit. `notifyReward()` takes ETH directly. Split it
+back out if income ever becomes multi-asset.
+
+`notifyReward()` **reverts when nobody is staked** rather than swallowing the ETH.
+
+## Redeemer — the floor mechanism
+
+```
+requestRedeem(amount):   snapshot floor → burn now → enqueue
+execute(id) after delay: pay amount × min(snapshot, current) × (1 − haircut)
+```
+
+**Snapshot before burn is load-bearing.** Burning shrinks `eligibleSupply` and raises
+`floorPerToken`. If a redeemer's own burn counted before their snapshot they would be paid at
+the floor their exit created, and early redeemers would drain more than their share. Snapshotting
+first pays exactly `amount × nav / supply`, so redeeming the entire supply drains the corpus to
+precisely zero — a test asserts this.
+
+**The haircut is what makes it a floor rather than a run.** The 5% stays while the supply
+leaves, so every redemption is accretive to everyone who stayed. Exits make the remaining
+position stronger.
+
+**The zero-supply exception.** Once the last holder redeems everything, `floorPerToken()`
+reports 0 — a per-token price over zero tokens is undefined, not worthless. Taking
+`min(snapshot, 0)` would pay the final redeemer nothing and strand the whole corpus, so
+`_payFloor` falls back to the snapshot when `eligibleSupply == 0`. The min rule exists to
+protect remaining holders; with none remaining there is nobody to protect. **A test caught
+this — the first implementation confiscated the last redemption.**
+
+**No cancel.** Tokens are destroyed at request time, which makes the benefit to holders
+immediate and abandoning the queue non-free. Re-minting is impossible: AGORA's supply is fixed
+by the Pons factory.
+
+Bounded governance: haircut ≤ 20%, delay ≤ 30 days, and `setRequestsPaused` blocks **new**
+requests but can never block `execute` — already-burned tokens must always be able to complete
+their claim, or an emergency stop becomes confiscation.
+
 ## Not written yet
 
-`BeefyAdapter`, `Distributor`, `StakedAgora` (ERC-4626) and `Redeemer` are specified in
-spec §3.1 but do not exist. Until `Redeemer` ships and is set via `setRedeemer()`, **no ETH
-can leave the Treasury at all** — `payout()` reverts with `NotRedeemer` because `redeemer`
-is the zero address.
+`BeefyAdapter` is specified in spec §3.1 but does not exist; `sleeveBps` stays 0 until it does.
+
+`StakedAgora` and `Redeemer` are deployed by **step 3** (`bind.ts`), not step 1, because both
+take the token address as a constructor argument. Until `Redeemer` is set via `setRedeemer()`,
+**no ETH can leave the Treasury at all** — `payout()` reverts with `NotRedeemer`.
+
+**Do not add StakedAgora to the Treasury's exclusion list.** It custodies user AGORA rather
+than owning it, so stakers must keep their floor backing.
 
 ## Layout
 
