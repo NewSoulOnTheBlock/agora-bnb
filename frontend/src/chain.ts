@@ -95,22 +95,22 @@ export const AGORA: {
   curve: "0xfDE832b62dc27782619260E2579fF07EebAEc6DD",
   deployer: "0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19",
 
-  // The deployer EOA is ALREADY the on-chain creator-fee recipient (verified via
-  // factory.getLaunchedToken field [2] and curve.buybackCreatorRecipient), so no
-  // transferCreatorFeeRecipient call was needed to point the fee path here.
+  // LIVE on chain 4663. Verified 2026-08-17: bytecode present, Treasury.agora()
+  // == the token above, Treasury.feeSink() == feeSink, and FeeSink.treasury()
+  // == treasury (immutable, no setter). All eight TREASURY_ABI reads answer.
   //
-  // As feeSink this is fully functional: V2FeeEscrow.balanceOf(feeSink) is a real
-  // read, so "Claimable in escrow" now shows live data.
+  // Corpus is ETH-denominated, so nav() = ETH balance + sleeve and NO price
+  // oracle is involved — which is why ETH_USD_FEED below can stay null without
+  // breaking the floor.
   //
-  // As treasury it is a PLACEHOLDER. An EOA implements none of TREASURY_ABI
-  // (nav/eligibleSupply/floorPerToken/...), so readReserve() clears the
-  // `deployed` guard but every inner read returns null — NAV, floor and corpus
-  // render "—" (unknown) rather than "not deployed". Replace with the real
-  // Treasury contract address once it ships.
-  feeSink: "0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19",
-  treasury: "0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19",
+  // Posture at deploy: owner = the deployer EOA (not yet a multisig),
+  // redeemer = ZERO so payout() reverts and no ETH can leave, sleeveBps = 0,
+  // no adapters.
+  feeSink: "0x5dfb0A3c5A3a1fF4E108B0E5618AAB24b91A9720",
+  treasury: "0x14Ece6486e9C041547598813A7Dc40B13AFF6e93",
 
-  // Not deployed yet.
+  // Not deployed yet. Until `redeemer` is set on the Treasury AND filled in
+  // here, the corpus is one-way: tax accrues, nothing is claimable.
   stakedAgora: ZERO,
   redeemer: ZERO,
 };
