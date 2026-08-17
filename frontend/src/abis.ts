@@ -39,29 +39,107 @@ export const PONS_TOKEN_ABI = [
 // is written against, so wiring them up later is a one-line address change.
 // ---------------------------------------------------------------------------
 export const TREASURY_ABI = [
-  // NAV excluding TITH (TITH is always marked at zero — spec §6).
+  // NAV excludes AGORA (marked at zero, spec §6) AND pendingIncome, which is
+  // owed to stakers and therefore never backs the floor.
   "function nav() view returns (uint256)",
   "function eligibleSupply() view returns (uint256)",
   "function floorPerToken() view returns (uint256)",
+  "function floorHighWaterMark() view returns (uint256)",
   "function usdgBalance() view returns (uint256)",
   "function ethBuffer() view returns (uint256)",
+  "function liquidEth() view returns (uint256)",
   "function sleeveAssets() view returns (uint256)",
+  "function sleeveCorpus() view returns (uint256)",
+  "function unrealizedSurplus() view returns (uint256)",
   "function sleeveCapBps() view returns (uint256)",
   "function cumulativeTaxReceived() view returns (uint256)",
+  "function cumulativeDonated() view returns (uint256)",
+  "function cumulativePaidOut() view returns (uint256)",
+  "function pendingIncome() view returns (uint256)",
+  "function incomeShareBps() view returns (uint16)",
+  "function cumulativeIncomeDistributed() view returns (uint256)",
+  "function redeemer() view returns (address)",
+  "function distributor() view returns (address)",
+  "function feeSink() view returns (address)",
+  "function owner() view returns (address)",
+  "function distributeIncome() returns (uint256)",
+  "function poke()",
   // Emitted on every state change so the floor chart needs no indexer (§13.2).
   "event FloorUpdated(uint256 nav, uint256 eligibleSupply, uint256 timestamp)",
+  "event FloorRegression(uint256 highWaterMark, uint256 current, uint256 timestamp)",
+];
+
+export const FEE_SINK_ABI = [
+  "function collectable() view returns (uint256 inEscrow, uint256 onCurve, uint256 held)",
+  "function collect() returns (uint256)",
+  "function sweep() returns (uint256)",
+  "function curve() view returns (address)",
+  "function treasury() view returns (address)",
 ];
 
 export const STAKED_AGORA_ABI = [
   "function totalAssets() view returns (uint256)",
   "function totalSupply() view returns (uint256)",
   "function convertToAssets(uint256 shares) view returns (uint256)",
+  "function convertToShares(uint256 assets) view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
   "function pendingYield(address account) view returns (uint256)",
+  "function cumulativeRewards() view returns (uint256)",
+  "function cumulativeClaimed() view returns (uint256)",
+  "function asset() view returns (address)",
+  "function deposit(uint256 assets, address receiver) returns (uint256)",
+  "function redeem(uint256 shares, address receiver, address owner) returns (uint256)",
+  "function claim() returns (uint256)",
 ];
 
 export const REDEEMER_ABI = [
   "function haircutBps() view returns (uint256)",
   "function redeemDelay() view returns (uint256)",
   "function totalBurned() view returns (uint256)",
+  "function totalPaidOut() view returns (uint256)",
   "function queueLength() view returns (uint256)",
+  "function epochCapBps() view returns (uint16)",
+  "function epochRemaining() view returns (uint256)",
+  "function requestsPaused() view returns (bool)",
+  "function quote(uint256 amount) view returns (uint256)",
+  "function requests(uint256 id) view returns (tuple(address owner, uint128 amount, uint128 snapshotFloor, uint64 requestedAt, bool executed))",
+  "function preview(uint256 id) view returns (uint256 paid, uint256 executableAt, bool ready)",
+  "function requestRedeem(uint256 amount) returns (uint256)",
+  "function execute(uint256 id) returns (uint256)",
+  "event RedeemRequested(uint256 indexed id, address indexed owner, uint256 amount, uint256 snapshotFloor, uint256 executableAt)",
+  "event RedeemExecuted(uint256 indexed id, address indexed owner, uint256 amount, uint256 payFloor, uint256 paid)",
+];
+
+export const STAKED_SUITS_ABI = [
+  "function totalStaked() view returns (uint256)",
+  "function stakedCount(address) view returns (uint256)",
+  "function stakerOf(uint256 tokenId) view returns (address)",
+  "function pendingYield(address account) view returns (uint256)",
+  "function cumulativeRewards() view returns (uint256)",
+  "function cumulativeClaimed() view returns (uint256)",
+  "function suits() view returns (address)",
+  "function stake(uint256[] tokenIds)",
+  "function unstake(uint256[] tokenIds)",
+  "function claim() returns (uint256)",
+];
+
+export const DISTRIBUTOR_ABI = [
+  "function suitsBps() view returns (uint16)",
+  "function cumulativeToSuits() view returns (uint256)",
+  "function cumulativeToAgora() view returns (uint256)",
+  "function preview(uint256 amount) view returns (uint256 toSuits, uint256 toAgora)",
+  "function distribute() payable",
+];
+
+/** Suits ERC-721. NOT Enumerable — there is no tokenOfOwnerByIndex. */
+export const SUITS_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function totalSupply() view returns (uint256)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function getTransferValidator() view returns (address)",
+  "function setApprovalForAll(address operator, bool approved)",
 ];

@@ -86,34 +86,66 @@ export const CURVE_FEE_BPS = 100; // 1% — curve feeBps()
 // written yet, so they stay at the zero address and every read against them
 // resolves to `null` — the UI renders an honest "not deployed" instead of zeros.
 // ---------------------------------------------------------------------------
+/**
+ * ---------------------------------------------------------------------------
+ * RELAUNCH PENDING. Every address below is intentionally the zero address.
+ * ---------------------------------------------------------------------------
+ *
+ * The v1 token (`0x6853618673D952Fe602616F6f896cC7be8e25fCc`) and its contracts
+ * are **dead and must not be wired back in.** `transferCreatorFeeRecipient` was
+ * pointed at the Treasury rather than the FeeSink; because that call reassigns
+ * the curve's `deployer` — the only address permitted to call `sweepFees` — the
+ * fee stream became collectable only by a contract structurally incapable of
+ * collecting it, and the change is not reversible.
+ *
+ * v2 fixes this by ORDERING: the contracts deploy first, then the token is
+ * launched with `params.creatorFeeRecipient` already set to the FeeSink, so no
+ * post-launch transfer step exists to get wrong.
+ *
+ * Fill these in from the output of `contracts/scripts/bind.ts`. Nothing else in
+ * the app needs to change — every page is already written against these fields
+ * and renders an honest "not deployed" until they are set.
+ */
 export const AGORA: {
   token: string; curve: string; deployer: string;
   feeSink: string; treasury: string; stakedAgora: string; redeemer: string;
+  stakedSuits: string; distributor: string;
 } = {
-  // Live: launched via PonsV2LaunchFactory, verified on-chain 2026-08-17.
-  token: "0x6853618673D952Fe602616F6f896cC7be8e25fCc",
-  curve: "0xfDE832b62dc27782619260E2579fF07EebAEc6DD",
+  // Step 2 output (launch.ts) —
+  token: ZERO,
+  curve: ZERO,
   deployer: "0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19",
 
-  // LIVE on chain 4663. Verified 2026-08-17: bytecode present, Treasury.agora()
-  // == the token above, Treasury.feeSink() == feeSink, and FeeSink.treasury()
-  // == treasury (immutable, no setter). All eight TREASURY_ABI reads answer.
-  //
-  // Corpus is ETH-denominated, so nav() = ETH balance + sleeve and NO price
-  // oracle is involved — which is why ETH_USD_FEED below can stay null without
-  // breaking the floor.
-  //
-  // Posture at deploy: owner = the deployer EOA (not yet a multisig),
-  // redeemer = ZERO so payout() reverts and no ETH can leave, sleeveBps = 0,
-  // no adapters.
-  feeSink: "0x5dfb0A3c5A3a1fF4E108B0E5618AAB24b91A9720",
-  treasury: "0x14Ece6486e9C041547598813A7Dc40B13AFF6e93",
+  // Step 1 output (deploy.ts) —
+  feeSink: ZERO,
+  treasury: ZERO,
 
-  // Not deployed yet. Until `redeemer` is set on the Treasury AND filled in
-  // here, the corpus is one-way: tax accrues, nothing is claimable.
+  // Step 3 output (bind.ts) —
   stakedAgora: ZERO,
   redeemer: ZERO,
+  stakedSuits: ZERO,
+  distributor: ZERO,
 };
+
+/**
+ * The Suits ERC-721 — LIVE and independent of the relaunch.
+ * SeaDrop clone, fully minted 1111/1111, chain 4663.
+ *
+ * Note it is NOT ERC721Enumerable, so the UI cannot list a wallet's token IDs
+ * from the chain alone; holders enter IDs manually and the app verifies
+ * ownership before offering to stake them.
+ *
+ * A Limit Break transfer validator is active at
+ * `0xA000027A9B2802E1ddf7000061001e5c005A0000`. Its current policy permits
+ * transfers into a contract, which is what staking needs, but the collection
+ * owner can tighten it at any time.
+ */
+export const SUITS_NFT = "0x3ac7beb099c560f5a09bd822621327d8768f0625";
+export const SUITS_SUPPLY = 1111;
+export const SUITS_VALIDATOR = "0xA000027A9B2802E1ddf7000061001e5c005A0000";
+
+/** Share of yield routed to staked Suits. Mirrors Distributor.suitsBps default. */
+export const SUITS_SHARE_BPS = 1000;
 
 // A REAL, already-GRADUATED, ETH-paired Pons v2 pool, used only to prove the
 // read layer works against live chain data before TITHE exists. Override with

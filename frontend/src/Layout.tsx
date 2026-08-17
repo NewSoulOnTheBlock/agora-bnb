@@ -3,12 +3,13 @@ import { Dot, Pill } from "./components";
 import { shortAddr } from "./format";
 import type { Wallet } from "./eth";
 
-export type Tab = "floor" | "trade" | "stake" | "redeem";
+export type Tab = "floor" | "trade" | "stake" | "suits" | "redeem";
 
 export const TABS: { id: Tab; label: string }[] = [
   { id: "floor", label: "Floor" },
   { id: "trade", label: "Trade" },
   { id: "stake", label: "Stake" },
+  { id: "suits", label: "Suits" },
   { id: "redeem", label: "Redeem" },
 ];
 
@@ -59,6 +60,7 @@ export default function Layout({
         <div className="foot">
           <span>chain 4663 · robinhood</span>
           <span>rpc rpc.mainnet.chain.robinhood.com</span>
+          <span>treasury allocation is manual · no keeper moves corpus funds</span>
           <span>addresses verified 2026-08-17 · spec §14</span>
         </div>
       </div>

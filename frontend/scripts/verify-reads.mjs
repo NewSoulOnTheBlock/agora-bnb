@@ -187,8 +187,12 @@ try {
 // ---------------------------------------------------------------------------
 console.log("\n=== 8. AGORA curve (live trade path) ===");
 {
-  const CURVE = "0xfDE832b62dc27782619260E2579fF07EebAEc6DD";
-  const AGORA_T = "0x6853618673D952Fe602616F6f896cC7be8e25fCc";
+  // Set these from bind.ts output after the relaunch. They are NOT defaulted to
+  // the v1 addresses: that token's fee recipient was misdirected to a contract
+  // that cannot sweep, the change is irreversible, and checking it here would
+  // report a dead launch as a healthy trade path.
+  const CURVE = process.env.AGORA_CURVE ?? "";
+  const AGORA_T = process.env.AGORA_TOKEN ?? "";
   const RICH = "0x8366a39CC670B4001A1121B8F6A443A643e40951";
   const abi = [
     "function buy(uint256,uint256,address) payable returns (uint256)",
@@ -201,6 +205,10 @@ console.log("\n=== 8. AGORA curve (live trade path) ===");
     "function token() view returns (address)",
     "function isNativeQuote() view returns (bool)",
   ];
+  if (!CURVE || !AGORA_T) {
+    console.log("  \x1b[33mSKIP\x1b[0m  relaunch pending — set AGORA_CURVE and AGORA_TOKEN to run");
+    console.log("        e.g. AGORA_TOKEN=0x… AGORA_CURVE=0x… npm run verify");
+  } else {
   const c = new Contract(CURVE, abi, p);
   try {
     getAddress(await c.token()) === getAddress(AGORA_T)
@@ -222,6 +230,50 @@ console.log("\n=== 8. AGORA curve (live trade path) ===");
       : no("buy simulation returned 0");
   } catch (e) {
     no("curve checks failed", String(e.shortMessage ?? e.message).slice(0, 90));
+  }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 9. Suits NFT — live and independent of the relaunch
+// ---------------------------------------------------------------------------
+console.log("\n=== 9. Suits collection (staking target) ===");
+{
+  const SUITS = "0x3ac7beb099c560f5a09bd822621327d8768f0625";
+  const c = new Contract(SUITS, [
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function totalSupply() view returns (uint256)",
+    "function maxSupply() view returns (uint256)",
+    "function supportsInterface(bytes4) view returns (bool)",
+    "function getTransferValidator() view returns (address)",
+    "function ownerOf(uint256) view returns (address)",
+  ], p);
+  try {
+    const [name, supply, max] = await Promise.all([c.name(), c.totalSupply(), c.maxSupply()]);
+    name === "Suits" ? ok("name", name) : no(`name is ${name}, expected Suits`);
+    supply === max
+      ? ok("fully minted", `${supply} / ${max}`)
+      : no(`not fully minted: ${supply} / ${max}`);
+
+    (await c.supportsInterface("0x80ac58cd"))
+      ? ok("is ERC-721")
+      : no("does not report ERC-721 support");
+
+    // The UI depends on this being FALSE — it is why token IDs are typed in.
+    (await c.supportsInterface("0x780e9d63"))
+      ? no("reports Enumerable — the UI assumes it is not")
+      : ok("NOT Enumerable", "confirms IDs must be entered by hand");
+
+    const v = await c.getTransferValidator();
+    if (v === "0x0000000000000000000000000000000000000000") {
+      ok("no transfer validator", "staking transfers unrestricted");
+    } else {
+      ok("transfer validator present", `${v.slice(0, 12)}… — policy can change`);
+    }
+    ok("ownerOf(1) reachable", (await c.ownerOf(1)).slice(0, 12) + "…");
+  } catch (e) {
+    no("suits checks failed", String(e.shortMessage ?? e.message).slice(0, 90));
   }
 }
 

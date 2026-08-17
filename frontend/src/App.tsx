@@ -3,10 +3,11 @@ import Layout, { type Tab } from "./Layout";
 import Floor from "./Floor";
 import Trade from "./Trade";
 import Stake from "./Stake";
+import Suits from "./Suits";
 import Redeem from "./Redeem";
 import { useWallet } from "./eth";
 
-const VALID: Tab[] = ["floor", "trade", "stake", "redeem"];
+const VALID: Tab[] = ["floor", "trade", "stake", "suits", "redeem"];
 
 function initialTab(): Tab {
   const h = window.location.hash.replace("#", "") as Tab;
@@ -28,6 +29,7 @@ export default function App() {
       {tab === "floor" && <Floor />}
       {tab === "trade" && <Trade wallet={wallet} />}
       {tab === "stake" && <Stake wallet={wallet} />}
+      {tab === "suits" && <Suits wallet={wallet} />}
       {tab === "redeem" && <Redeem wallet={wallet} />}
     </Layout>
   );
