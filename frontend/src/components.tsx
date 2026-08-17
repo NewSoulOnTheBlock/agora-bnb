@@ -45,7 +45,7 @@ export function Stat({
       <div className="stat">
         <div className="k">{k}</div>
         <div className={`v${na ? " na" : ""}`}>
-          {na ? "not deployed" : value}
+          {na ? "unavailable" : value}
           {!na && unit && <span className="unit">{unit}</span>}
         </div>
         {note && <div className="note">{note}</div>}

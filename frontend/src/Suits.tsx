@@ -101,7 +101,7 @@ export default function Suits({ wallet }: { wallet: Wallet }) {
           right={
             <Pill warn={!deployed}>
               <Dot kind={deployed ? "ok" : "off"} />
-              {deployed ? "live" : "not deployed"}
+              {deployed ? "live" : "unavailable"}
             </Pill>
           }
         >
@@ -259,12 +259,12 @@ export default function Suits({ wallet }: { wallet: Wallet }) {
               <Row k="Delivered to date" na={suitsInfo?.cumulativeRewards == null}>
                 {suitsInfo?.cumulativeRewards != null
                   ? `${formatEther(suitsInfo.cumulativeRewards)} ETH`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="Claimed" na={suitsInfo?.cumulativeClaimed == null}>
                 {suitsInfo?.cumulativeClaimed != null
                   ? `${formatEther(suitsInfo.cumulativeClaimed)} ETH`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="If none staked">Rerouted to stAGORA — never stranded</Row>
             </div>

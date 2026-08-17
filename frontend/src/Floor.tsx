@@ -40,8 +40,8 @@ export default function Floor() {
             graduation figures below are read from the curve at{" "}
             <a className="link" href={explorerAddr(AGORA.curve)} target="_blank" rel="noreferrer">
               {AGORA.curve.slice(0, 10)}…
-            </a>. Reserve, floor, staking and redemption read as <b>not deployed</b> because those
-            contracts do not exist yet — shown as gaps rather than zeros that would look like measurements.
+            </a>. The reserve contracts are deployed and wired; the reserve reads <b>0</b> because no
+            taxed trade has settled yet. A zero here is a measurement, not a gap.
           </div>
         )}
 
@@ -54,14 +54,25 @@ export default function Floor() {
 
         {/* ---- hero: the two numbers the whole product is about ---- */}
         <div className="hero">
-          <Panel label="Floor per token" id="nav ÷ eligible supply" right={<Pill warn>awaiting Treasury</Pill>}>
-            <div className="big muted">
-              {s?.reserve.floorPerTokenWad ? fmtSig(s.reserve.floorPerTokenWad) : "—"}
+          <Panel
+            label="Floor per token"
+            id="nav ÷ eligible supply"
+            right={
+              <Pill warn={!s?.reserve.deployed}>
+                <Dot kind={s?.reserve.deployed ? "live" : "off"} />
+                {s?.reserve.deployed ? "live" : "not deployed"}
+              </Pill>
+            }
+          >
+            <div className={`big${s?.reserve.floorPerTokenWad ? "" : " muted"}`}>
+              {s?.reserve.floorPerTokenWad != null ? fmtSig(s.reserve.floorPerTokenWad) : DASH}
               <span className="unit">ETH</span>
             </div>
             <p className="sub">
-              The redemption floor. Ratchets up on every taxed swap and every redemption, because the
-              5% haircut stays in the corpus. Live once <code>Treasury</code> ships.
+              Reported backing per token. Ratchets up on every taxed swap and every redemption, since
+              the 5% haircut stays in the corpus. It is <b>not</b> a guaranteed floor — the operator can
+              withdraw corpus ETH to deploy into yield, so this reports what backs each token right now
+              rather than a level the contract can hold.
             </p>
           </Panel>
 
@@ -91,15 +102,31 @@ export default function Floor() {
 
         {/* ---- corpus ---- */}
         <div className="section">
-          <p className="label">Corpus <span className="id">§4 · USDG core + capped Beefy sleeve</span></p>
+          <p className="label">Corpus <span className="id">ETH-denominated · no oracle</span></p>
           <div className="grid c4">
-            <Stat k="NAV" value={s?.reserve.navWad ? fmtGrouped(s.reserve.navWad) : null} unit="USDG"
-              note="AGORA always marked at zero (§6)" />
-            <Stat k="USDG core" value={s?.reserve.usdgBalance ? fmtGrouped(s.reserve.usdgBalance) : null} unit="USDG" />
-            <Stat k="Beefy sleeve" value={s?.reserve.sleeveAssets ? fmtGrouped(s.reserve.sleeveAssets) : null} unit="USDG"
-              note="double-capped; starts at 0" />
-            <Stat k="Eligible supply" value={s?.reserve.eligibleSupply ? fmtGrouped(s.reserve.eligibleSupply, 0) : null}
+            {/* `!= null` throughout, NOT truthiness: 0n is falsy in JS, and a
+                real zero must render as a measurement, never as "not deployed". */}
+            <Stat k="NAV" value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null} unit="ETH"
+              note="AGORA marked at zero; excludes staker income" />
+            <Stat k="Liquid corpus" value={s?.reserve.ethBuffer != null ? fmtSig(s.reserve.ethBuffer) : null} unit="ETH"
+              note="spendable on redemption" />
+            <Stat k="Owed to stakers" value={s?.reserve.pendingIncome != null ? fmtSig(s.reserve.pendingIncome) : null} unit="ETH"
+              note="earmarked; not part of NAV" />
+            <Stat k="Eligible supply" value={s?.reserve.eligibleSupply != null ? fmtGrouped(s.reserve.eligibleSupply, 0) : null}
               unit="AGORA" note="excl. burned + protocol-held" />
+          </div>
+
+          <div style={{ height: 14 }} />
+
+          <div className="grid c4">
+            <Stat k="Tax to income" value={s?.reserve.incomeShareBps != null ? String(Number(s.reserve.incomeShareBps) / 100) : null}
+              unit="%" note="rest compounds into the floor" />
+            <Stat k="Yield sleeve" value={s?.reserve.sleeveAssets != null ? fmtSig(s.reserve.sleeveAssets) : null} unit="ETH"
+              note="manual allocation only" />
+            <Stat k="Withdrawn by operator" value={s?.reserve.cumulativeWithdrawn != null ? fmtSig(s.reserve.cumulativeWithdrawn) : null}
+              unit="ETH" note="deployed into yield off-contract" />
+            <Stat k="Income distributed" value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
+              unit="ETH" note="90% stAGORA · 10% staked Suits" />
           </div>
         </div>
 

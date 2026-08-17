@@ -99,7 +99,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
           right={
             <Pill warn={!deployed || rd?.requestsPaused === true}>
               <Dot kind={rd?.requestsPaused ? "warn" : deployed ? "ok" : "off"} />
-              {rd?.requestsPaused ? "paused" : deployed ? "live" : "not deployed"}
+              {rd?.requestsPaused ? "paused" : deployed ? "live" : "unavailable"}
             </Pill>
           }
         >
@@ -229,26 +229,26 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
           <Panel label="Terms">
             <div className="rows">
               <Row k="Haircut" na={rd?.haircutBps == null}>
-                {rd?.haircutBps != null ? `${Number(rd.haircutBps) / 100}% — stays in the corpus` : "not deployed"}
+                {rd?.haircutBps != null ? `${Number(rd.haircutBps) / 100}% — stays in the corpus` : "unavailable"}
               </Row>
               <Row k="Delay" na={rd?.redeemDelay == null}>
-                {rd?.redeemDelay != null ? `${Number(rd.redeemDelay) / 3600} hours` : "not deployed"}
+                {rd?.redeemDelay != null ? `${Number(rd.redeemDelay) / 3600} hours` : "unavailable"}
               </Row>
               <Row k="Per-epoch cap" na={rd?.epochCapBps == null}>
-                {rd?.epochCapBps != null ? `${Number(rd.epochCapBps) / 100}% of reserve` : "not deployed"}
+                {rd?.epochCapBps != null ? `${Number(rd.epochCapBps) / 100}% of reserve` : "unavailable"}
               </Row>
               <Row k="Capacity left this epoch" na={rd?.epochRemaining == null}>
-                {rd?.epochRemaining != null ? `${formatEther(rd.epochRemaining)} ETH` : "not deployed"}
+                {rd?.epochRemaining != null ? `${formatEther(rd.epochRemaining)} ETH` : "unavailable"}
               </Row>
               <Row k="Burned to date" na={rd?.totalBurned == null}>
-                {rd?.totalBurned != null ? `${fmtGrouped(rd.totalBurned, 0)} AGORA` : "not deployed"}
+                {rd?.totalBurned != null ? `${fmtGrouped(rd.totalBurned, 0)} AGORA` : "unavailable"}
               </Row>
               <Row k="Redeemer contract" na={!deployed}>
                 {deployed ? (
                   <a className="rv" href={explorerAddr(AGORA.redeemer)} target="_blank" rel="noreferrer">
                     {AGORA.redeemer.slice(0, 14)}…
                   </a>
-                ) : "not deployed"}
+                ) : "unavailable"}
               </Row>
             </div>
             <p className="sub">

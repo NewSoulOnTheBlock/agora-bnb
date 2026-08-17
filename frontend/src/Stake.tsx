@@ -79,7 +79,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           right={
             <Pill warn={!deployed}>
               <Dot kind={deployed ? "ok" : "off"} />
-              {deployed ? "live" : "not deployed"}
+              {deployed ? "live" : "unavailable"}
             </Pill>
           }
         >
@@ -193,12 +193,12 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               <Row k="Paid to stakers" na={s?.staking.cumulativeRewards == null}>
                 {s?.staking.cumulativeRewards != null
                   ? `${formatEther(s.staking.cumulativeRewards)} ETH`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="Claimed so far" na={s?.staking.cumulativeClaimed == null}>
                 {s?.staking.cumulativeClaimed != null
                   ? `${formatEther(s.staking.cumulativeClaimed)} ETH`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="Your share of income">
                 {(10000 - SUITS_SHARE_BPS) / 100}% — staked Suits take {SUITS_SHARE_BPS / 100}%
@@ -206,14 +206,14 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               <Row k="Awaiting distribution" na={s?.reserve.pendingIncome == null}>
                 {s?.reserve.pendingIncome != null
                   ? `${formatEther(s.reserve.pendingIncome)} ETH`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="stAGORA contract" na={!deployed}>
                 {deployed ? (
                   <a className="rv" href={explorerAddr(AGORA.stakedAgora)} target="_blank" rel="noreferrer">
                     {AGORA.stakedAgora.slice(0, 14)}…
                   </a>
-                ) : "not deployed"}
+                ) : "unavailable"}
               </Row>
             </div>
 
@@ -232,17 +232,17 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               <Row k="Tax routed to income" na={s?.reserve.incomeShareBps == null}>
                 {s?.reserve.incomeShareBps != null
                   ? `${Number(s.reserve.incomeShareBps) / 100}%`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="Yield sleeve" na={s?.reserve.sleeveCapBps == null}>
                 {s?.reserve.sleeveCapBps != null
                   ? `${Number(s.reserve.sleeveCapBps) / 100}% of NAV`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
               <Row k="Unrealised sleeve gain" na={s?.reserve.unrealizedSurplus == null}>
                 {s?.reserve.unrealizedSurplus != null
                   ? `${formatEther(s.reserve.unrealizedSurplus)} ETH`
-                  : "not deployed"}
+                  : "unavailable"}
               </Row>
             </div>
             <p className="sub">
