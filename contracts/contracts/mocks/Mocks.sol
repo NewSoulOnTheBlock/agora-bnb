@@ -68,6 +68,74 @@ contract MockAdapter is IYieldAdapter {
     }
 }
 
+/// @dev Stands in for Pons V2FeeEscrow: pull-based, pays msg.sender.
+contract MockEscrow {
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public balanceOfToken;
+
+    receive() external payable {}
+
+    /// @dev Credit a recipient, as the Pons fee sweep would.
+    function credit(address to) external payable {
+        balanceOf[to] += msg.value;
+    }
+
+    function creditToken(address to, address token, uint256 amount) external {
+        balanceOfToken[to][token] += amount;
+    }
+
+    function claim() external returns (uint256) {
+        uint256 amount = balanceOf[msg.sender];
+        balanceOf[msg.sender] = 0;
+        if (amount != 0) {
+            (bool ok, ) = msg.sender.call{value: amount}("");
+            require(ok, "MockEscrow: send failed");
+        }
+        return amount;
+    }
+
+    function claimToken(address token, uint256) external returns (uint256) {
+        uint256 amount = balanceOfToken[msg.sender][token];
+        balanceOfToken[msg.sender][token] = 0;
+        if (amount != 0) ERC20(token).transfer(msg.sender, amount);
+        return amount;
+    }
+
+    function claimToken(address token) external returns (uint256) {
+        uint256 amount = balanceOfToken[msg.sender][token];
+        balanceOfToken[msg.sender][token] = 0;
+        if (amount != 0) ERC20(token).transfer(msg.sender, amount);
+        return amount;
+    }
+}
+
+/// @dev Stands in for the Pons bonding curve: only `deployer` may sweepFees.
+contract MockCurve {
+    address public deployer;
+    uint256 public creatorTaxBalance;
+
+    error NotDeployer();
+
+    constructor(address deployer_) {
+        deployer = deployer_;
+    }
+
+    receive() external payable {}
+
+    /// @dev Accrue tax, as trading would.
+    function accrue() external payable {
+        creatorTaxBalance += msg.value;
+    }
+
+    function sweepFees(uint256 amount) external {
+        if (msg.sender != deployer) revert NotDeployer();
+        uint256 send = amount > creatorTaxBalance ? creatorTaxBalance : amount;
+        creatorTaxBalance -= send;
+        (bool ok, ) = msg.sender.call{value: send}("");
+        require(ok, "MockCurve: send failed");
+    }
+}
+
 /// @dev Forwards ETH using `transfer()`, i.e. with only a 2300-gas stipend.
 contract StipendSender {
     function send(address to, uint256 amount) external {

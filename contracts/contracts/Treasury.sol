@@ -91,11 +91,24 @@ contract Treasury is Ownable, ReentrancyGuard {
     address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     // -----------------------------------------------------------------------
-    // Immutable state
+    // Write-once state
     // -----------------------------------------------------------------------
 
-    /// @notice The AGORA token. Marked at zero in NAV, always.
-    IERC20 public immutable agora;
+    /**
+     * @notice The AGORA token. Marked at zero in NAV, always.
+     * @dev Set **once**, after launch, via `setAgora()` — not in the constructor.
+     *
+     *      This is what lets the entire contract set be deployed BEFORE the
+     *      token exists, which in turn lets the token be launched with
+     *      `params.creatorFeeRecipient` already pointing at the FeeSink. That
+     *      ordering removes the post-launch `transferCreatorFeeRecipient` step
+     *      entirely — and that step is exactly where the first deployment sent
+     *      the fee stream to an address that could not collect it.
+     *
+     *      Trading immutability for a one-shot setter is a deliberate, narrow
+     *      trade: `setAgora` reverts once set, so the window is a single call.
+     */
+    IERC20 public agora;
 
     // -----------------------------------------------------------------------
     // Mutable state
@@ -144,6 +157,7 @@ contract Treasury is Ownable, ReentrancyGuard {
 
     event Funded(address indexed from, uint256 amount, bool isTax);
     event PaidOut(address indexed to, uint256 amount);
+    event AgoraSet(address indexed agora);
     event FeeSinkSet(address indexed previous, address indexed current);
     event RedeemerSet(address indexed previous, address indexed current);
     event SleeveBpsSet(uint16 previous, uint16 current);
@@ -173,25 +187,43 @@ contract Treasury is Ownable, ReentrancyGuard {
     error AdapterStillFunded(uint256 assets);
     error EthTransferFailed();
     error CannotExcludeDead();
+    error AgoraAlreadySet(address current);
+    error NotAContract(address target);
 
     // -----------------------------------------------------------------------
     // Construction
     // -----------------------------------------------------------------------
 
     /**
-     * @param agora_ The AGORA token address.
      * @param owner_ Governance. Should be a multisig or timelock, NOT the
      *               deploying EOA — see spec §10/§11. The deploy script warns
      *               loudly if these are the same address.
+     * @dev Takes no token: this contract is deployed BEFORE the token exists.
+     *      Call `setAgora()` once after launch.
      */
-    constructor(address agora_, address owner_) Ownable(owner_) {
-        if (agora_ == address(0) || owner_ == address(0)) revert ZeroAddress();
-        agora = IERC20(agora_);
+    constructor(address owner_) Ownable(owner_) {
+        if (owner_ == address(0)) revert ZeroAddress();
 
         // The Treasury's own AGORA is never corpus, so exclude it from day one.
         _excluded.push(address(this));
         isExcluded[address(this)] = true;
         emit ExclusionSet(address(this), true);
+    }
+
+    /**
+     * @notice Bind this Treasury to the launched token. Callable exactly once.
+     * @dev Reverts if already set, so the binding cannot be swapped later — a
+     *      re-pointable `agora` would let governance rewrite `eligibleSupply()`
+     *      and therefore the floor.
+     */
+    function setAgora(address agora_) external onlyOwner {
+        if (agora_ == address(0)) revert ZeroAddress();
+        if (address(agora) != address(0)) revert AgoraAlreadySet(address(agora));
+        if (agora_.code.length == 0) revert NotAContract(agora_);
+
+        agora = IERC20(agora_);
+        emit AgoraSet(agora_);
+        _touch();
     }
 
     // -----------------------------------------------------------------------
@@ -296,6 +328,11 @@ contract Treasury is Ownable, ReentrancyGuard {
      *      backing. Exclude only AGORA the protocol itself owns.
      */
     function eligibleSupply() public view returns (uint256) {
+        // Before `setAgora`, there is no supply to spread the floor across.
+        // Returning 0 rather than reverting keeps every read — and therefore
+        // `payout()`, which touches them — alive during the pre-launch window.
+        if (address(agora) == address(0)) return 0;
+
         uint256 supply = agora.totalSupply();
         uint256 excluded = agora.balanceOf(DEAD);
 

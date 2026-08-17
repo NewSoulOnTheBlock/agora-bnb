@@ -1,101 +1,71 @@
 /**
- * Deploy the AGORA Treasury + FeeSink (ETH-denominated corpus).
+ * Step 1 of the relaunch: deploy the contracts BEFORE the token exists.
  *
  *   npm run deploy:robinhood
  *
- * Reads the signer from DEPLOYER_PRIVATE_KEY in .env — never from an argument,
- * so the key does not land in shell history.
+ * This ordering is the whole point. Because the FeeSink exists first, the token
+ * can be launched with `params.creatorFeeRecipient` already pointing at it —
+ * so there is never a post-launch `transferCreatorFeeRecipient` step to get
+ * wrong. That step is what sent the first deployment's fee stream to an address
+ * that could not collect it.
  *
- * Deployment order matters: Treasury first, then FeeSink (which takes the
- * Treasury address as an immutable constructor arg), then point the Treasury at
- * the FeeSink. That last step is `onlyOwner`, so when ownership is a multisig
- * this script prints the calldata for governance to execute instead of failing.
+ * Then: scripts/launch.ts (step 2), scripts/bind.ts (step 3).
  */
 import { ethers, network } from "hardhat";
 
-const AGORA_TOKEN =
-  process.env.AGORA_TOKEN ?? "0x6853618673D952Fe602616F6f896cC7be8e25fCc";
+/// Pons V2FeeEscrow — verified on chain 4663.
+const FEE_ESCROW = process.env.PONS_FEE_ESCROW ?? "0xd3AFEB2a57f70eF218Aa82451c51B2fb0416Ac9e";
 
-function line() {
-  console.log("─".repeat(72));
-}
+const line = () => console.log("─".repeat(72));
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  if (!deployer) {
-    throw new Error(
-      "No signer. Set DEPLOYER_PRIVATE_KEY in .env (see .env.example)."
-    );
-  }
+  if (!deployer) throw new Error("No signer. Set DEPLOYER_PRIVATE_KEY in .env.");
 
   const net = await ethers.provider.getNetwork();
   const balance = await ethers.provider.getBalance(deployer.address);
 
   line();
-  console.log("AGORA Treasury deployment — ETH-denominated corpus");
+  console.log("AGORA — step 1/3: deploy contracts (token does NOT exist yet)");
   line();
-  console.log(`network      ${network.name}  (chainId ${net.chainId})`);
-  console.log(`deployer     ${deployer.address}`);
-  console.log(`balance      ${ethers.formatEther(balance)} ETH`);
-  console.log(`AGORA token  ${AGORA_TOKEN}`);
+  console.log(`network   ${network.name}  (chainId ${net.chainId})`);
+  console.log(`deployer  ${deployer.address}`);
+  console.log(`balance   ${ethers.formatEther(balance)} ETH`);
+  console.log(`escrow    ${FEE_ESCROW}`);
+  if (balance === 0n) throw new Error("Deployer has no ETH.");
 
-  if (balance === 0n) {
-    throw new Error("Deployer has no ETH — fund it before deploying.");
+  const escrowCode = await ethers.provider.getCode(FEE_ESCROW);
+  if (escrowCode === "0x") {
+    throw new Error(`No contract at PONS_FEE_ESCROW ${FEE_ESCROW} on chain ${net.chainId}.`);
   }
+  console.log(`          ↳ escrow has ${(escrowCode.length - 2) / 2} bytes of code`);
 
-  // --- sanity: is AGORA_TOKEN actually an ERC-20 on this chain? -------------
-  const code = await ethers.provider.getCode(AGORA_TOKEN);
-  if (code === "0x") {
-    throw new Error(
-      `No contract at AGORA_TOKEN ${AGORA_TOKEN} on chainId ${net.chainId}. ` +
-        `Refusing to deploy a Treasury against a non-existent token.`
-    );
-  }
-  const erc20 = new ethers.Contract(
-    AGORA_TOKEN,
-    [
-      "function symbol() view returns (string)",
-      "function totalSupply() view returns (uint256)",
-    ],
-    ethers.provider
-  );
-  const [symbol, totalSupply] = await Promise.all([
-    erc20.symbol(),
-    erc20.totalSupply(),
-  ]);
-  console.log(`             ↳ ${symbol}, supply ${ethers.formatEther(totalSupply)}`);
-
-  // --- ownership ------------------------------------------------------------
   const owner = process.env.TREASURY_OWNER?.trim() || deployer.address;
   const ownerIsDeployer = owner.toLowerCase() === deployer.address.toLowerCase();
-
-  console.log(`owner        ${owner}`);
+  console.log(`owner     ${owner}`);
   if (ownerIsDeployer) {
     line();
-    console.log("⚠  TREASURY_OWNER is the deploying EOA.");
-    console.log("   A single EOA will control the collective balance sheet.");
-    console.log("   Spec §11's 'no discretionary management' lever and §10's");
-    console.log("   adapter-exploit risk both argue for a multisig or timelock.");
-    console.log("   Transfer ownership with transferOwnership() once one exists.");
+    console.log("⚠  TREASURY_OWNER is the deploying EOA — a single key will control");
+    console.log("   the collective balance sheet. It cannot withdraw ETH (only the");
+    console.log("   redeemer can), but it can set the redeemer. Move to a multisig");
+    console.log("   with transferOwnership() before the corpus holds real value.");
     line();
   }
 
-  // --- deploy ---------------------------------------------------------------
   console.log("\ndeploying Treasury…");
-  const Treasury = await ethers.getContractFactory("Treasury");
-  const treasury = await Treasury.deploy(AGORA_TOKEN, owner);
+  const treasury = await (await ethers.getContractFactory("Treasury")).deploy(owner);
   await treasury.waitForDeployment();
   const treasuryAddr = await treasury.getAddress();
   console.log(`  Treasury  ${treasuryAddr}`);
 
   console.log("deploying FeeSink…");
-  const FeeSink = await ethers.getContractFactory("FeeSink");
-  const feeSink = await FeeSink.deploy(treasuryAddr);
+  const feeSink = await (
+    await ethers.getContractFactory("FeeSink")
+  ).deploy(treasuryAddr, FEE_ESCROW, owner);
   await feeSink.waitForDeployment();
   const feeSinkAddr = await feeSink.getAddress();
   console.log(`  FeeSink   ${feeSinkAddr}`);
 
-  // --- wire ----------------------------------------------------------------
   if (ownerIsDeployer) {
     console.log("\nwiring Treasury.setFeeSink…");
     const tx = await treasury.setFeeSink(feeSinkAddr);
@@ -104,54 +74,41 @@ async function main() {
   } else {
     const data = treasury.interface.encodeFunctionData("setFeeSink", [feeSinkAddr]);
     line();
-    console.log("ACTION REQUIRED — setFeeSink is onlyOwner and the owner is not");
-    console.log("the deployer. Execute this from governance:");
+    console.log("ACTION REQUIRED — setFeeSink is onlyOwner. Execute from governance:");
     console.log(`  to:   ${treasuryAddr}`);
     console.log(`  data: ${data}`);
     line();
   }
 
-  // --- read back what we deployed, rather than assuming ---------------------
-  const [nav, eligible, floor, taxSeen] = await Promise.all([
-    treasury.nav(),
-    treasury.eligibleSupply(),
-    treasury.floorPerToken(),
-    treasury.cumulativeTaxReceived(),
-  ]);
-
+  // Read back rather than assume.
   line();
   console.log("post-deploy state (read from chain)");
   line();
-  console.log(`nav                   ${ethers.formatEther(nav)} ETH`);
-  console.log(`eligibleSupply        ${ethers.formatEther(eligible)} AGORA`);
-  console.log(`floorPerToken         ${ethers.formatEther(floor)} ETH`);
-  console.log(`cumulativeTaxReceived ${ethers.formatEther(taxSeen)} ETH`);
-  console.log(`feeSink               ${await treasury.feeSink()}`);
-  console.log(`redeemer              ${await treasury.redeemer()}  (unset until Redeemer ships)`);
-  console.log(`sleeveBps             ${await treasury.sleeveBps()}`);
+  console.log(`Treasury.agora()     ${await treasury.agora()}   <- ZERO until step 3`);
+  console.log(`Treasury.feeSink()   ${await treasury.feeSink()}`);
+  console.log(`Treasury.redeemer()  ${await treasury.redeemer()}   <- no ETH can leave`);
+  console.log(`Treasury.nav()       ${ethers.formatEther(await treasury.nav())} ETH`);
+  console.log(`FeeSink.treasury()   ${await feeSink.treasury()}`);
+  console.log(`FeeSink.escrow()     ${await feeSink.escrow()}`);
+  console.log(`FeeSink.curve()      ${await feeSink.curve()}   <- ZERO until step 3`);
+  console.log(`FeeSink.owner()      ${await feeSink.owner()}   <- auto-renounced by setCurve`);
 
   line();
-  console.log("NEXT STEPS");
+  console.log("NEXT — step 2: launch the token with the FeeSink baked in");
   line();
-  console.log("1. Wire the frontend — tithe/frontend/src/chain.ts:");
-  console.log(`     feeSink:  "${feeSinkAddr}",`);
-  console.log(`     treasury: "${treasuryAddr}",`);
+  console.log("Put this in .env, then run scripts/launch.ts:");
   console.log("");
-  console.log("2. Point AGORA's creator fees at the FeeSink. From the deployer");
-  console.log("   of the Pons launch, on PonsV2LaunchFactory:");
-  console.log(`     transferCreatorFeeRecipient(${AGORA_TOKEN}, ${feeSinkAddr})`);
-  console.log("   NOTE: 3-day timelock + 3-day execution window. A contract IS");
-  console.log("   an accepted recipient (probed and confirmed).");
+  console.log(`  TREASURY=${treasuryAddr}`);
+  console.log(`  FEE_SINK=${feeSinkAddr}`);
   console.log("");
-  console.log("3. Claim accrued fees as the FeeSink, then sweep:");
-  console.log("     V2FeeEscrow.claim()   // pays msg.sender — must be called BY the sink");
-  console.log("     FeeSink.sweep()       // permissionless");
-  console.log("   Step 1 of the Pons fee path (sweepPoolFees) is gated on Pons's");
-  console.log("   own feeSweepOperator and is not ours to trigger — spec §14.4.");
+  console.log("The launch params MUST carry:");
+  console.log(`  creatorFeeRecipient = ${feeSinkAddr}`);
+  console.log("  creatorTaxBps       = 400");
   console.log("");
-  console.log("4. Test the whole path with a SMALL amount first. The sweepFees");
-  console.log("   destination has never been verified — the public RPC exposes no");
-  console.log("   trace API, so where the ETH lands is inferred, not proven.");
+  console.log("Setting the recipient AT LAUNCH is what removes the failure mode");
+  console.log("from the first attempt: there is no transfer step to misaddress,");
+  console.log("and the FeeSink can reach both fee paths (escrow claim + curve");
+  console.log("sweep), which the previous sink could not.");
   line();
 }
 

@@ -8,7 +8,9 @@
     "test": "hardhat test",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:robinhood": "hardhat run scripts/deploy.ts --network robinhood",
-    "verify:robinhood": "hardhat run scripts/verify-deployment.ts --network robinhood"
+    "launch:robinhood": "hardhat run scripts/launch.ts --network robinhood",
+    "bind:robinhood": "hardhat run scripts/bind.ts --network robinhood",
+    "rehearse": "hardhat run scripts/rehearse.ts --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

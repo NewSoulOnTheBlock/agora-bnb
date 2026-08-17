@@ -17,20 +17,24 @@ describe("Treasury (ETH-denominated corpus)", () => {
   let agora: any;
   let treasury: any;
   let feeSink: any;
+  let escrow: any;
 
+  // Mirrors the real relaunch order: contracts first, token last.
   beforeEach(async () => {
     [owner, redeemer, holder, stranger] = await ethers.getSigners();
 
-    agora = await (await ethers.getContractFactory("MockAgora")).deploy(SUPPLY);
-    treasury = await (
-      await ethers.getContractFactory("Treasury")
-    ).deploy(await agora.getAddress(), owner.address);
+    escrow = await (await ethers.getContractFactory("MockEscrow")).deploy();
+    treasury = await (await ethers.getContractFactory("Treasury")).deploy(owner.address);
     feeSink = await (
       await ethers.getContractFactory("FeeSink")
-    ).deploy(await treasury.getAddress());
+    ).deploy(await treasury.getAddress(), await escrow.getAddress(), owner.address);
 
     await treasury.setFeeSink(await feeSink.getAddress());
     await treasury.setRedeemer(redeemer.address);
+
+    // ...and only now does the token exist.
+    agora = await (await ethers.getContractFactory("MockAgora")).deploy(SUPPLY);
+    await treasury.setAgora(await agora.getAddress());
   });
 
   // -------------------------------------------------------------------------
@@ -455,16 +459,214 @@ describe("Treasury (ETH-denominated corpus)", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("construction guards", () => {
-    it("rejects a zero token or owner", async () => {
-      const T = await ethers.getContractFactory("Treasury");
-      await expect(T.deploy(ZERO, owner.address)).to.be.reverted;
-      await expect(T.deploy(await agora.getAddress(), ZERO)).to.be.reverted;
+  describe("deploy-before-token ordering", () => {
+    let bare: any;
+
+    beforeEach(async () => {
+      bare = await (await ethers.getContractFactory("Treasury")).deploy(owner.address);
     });
 
-    it("rejects a FeeSink with no treasury", async () => {
+    it("every read survives with no token bound yet", async () => {
+      expect(await bare.agora()).to.equal(ZERO);
+      expect(await bare.eligibleSupply()).to.equal(0n);
+      expect(await bare.floorPerToken()).to.equal(0n);
+      expect(await bare.nav()).to.equal(0n);
+    });
+
+    it("accepts funding before the token exists", async () => {
+      await expect(bare.connect(stranger).fund({ value: ethers.parseEther("1") })).to.not.be
+        .reverted;
+      expect(await bare.nav()).to.equal(ethers.parseEther("1"));
+    });
+
+    it("binds the token exactly once", async () => {
+      await expect(bare.setAgora(await agora.getAddress())).to.emit(bare, "AgoraSet");
+      expect(await bare.eligibleSupply()).to.equal(SUPPLY);
+
+      await expect(
+        bare.setAgora(await agora.getAddress())
+      ).to.be.revertedWithCustomError(bare, "AgoraAlreadySet");
+    });
+
+    it("refuses a non-contract or zero token", async () => {
+      await expect(bare.setAgora(ZERO)).to.be.revertedWithCustomError(bare, "ZeroAddress");
+      await expect(bare.setAgora(holder.address)).to.be.revertedWithCustomError(
+        bare,
+        "NotAContract"
+      );
+    });
+
+    it("blocks non-owners from binding", async () => {
+      await expect(
+        bare.connect(stranger).setAgora(await agora.getAddress())
+      ).to.be.revertedWithCustomError(bare, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("FeeSink can actually collect (the v1 failure)", () => {
+    let curve: any;
+
+    beforeEach(async () => {
+      // Launching with creatorFeeRecipient = feeSink makes the sink the curve's
+      // deployer, which is what authorizes sweepFees.
+      curve = await (
+        await ethers.getContractFactory("MockCurve")
+      ).deploy(await feeSink.getAddress());
+      await treasury.setFeeSink(await feeSink.getAddress());
+    });
+
+    it("claims pull-based ETH from the escrow", async () => {
+      await escrow.credit(await feeSink.getAddress(), { value: ethers.parseEther("2") });
+      expect(await escrow.balanceOf(await feeSink.getAddress())).to.equal(
+        ethers.parseEther("2")
+      );
+
+      await feeSink.connect(stranger).claimFromEscrow();
+
+      expect(await ethers.provider.getBalance(await feeSink.getAddress())).to.equal(
+        ethers.parseEther("2")
+      );
+    });
+
+    it("sweeps creator tax off the bonding curve", async () => {
+      await feeSink.setCurve(await curve.getAddress());
+      await curve.accrue({ value: ethers.parseEther("3") });
+
+      await feeSink.connect(stranger).sweepCurve(0); // 0 = sweep everything
+
+      expect(await curve.creatorTaxBalance()).to.equal(0n);
+      expect(await ethers.provider.getBalance(await feeSink.getAddress())).to.equal(
+        ethers.parseEther("3")
+      );
+    });
+
+    it("cannot sweep a curve it is not the deployer of", async () => {
+      const foreign = await (
+        await ethers.getContractFactory("MockCurve")
+      ).deploy(stranger.address);
+      await feeSink.setCurve(await foreign.getAddress());
+      await foreign.accrue({ value: ethers.parseEther("1") });
+
+      await expect(feeSink.sweepCurve(0)).to.be.revertedWithCustomError(
+        foreign,
+        "NotDeployer"
+      );
+    });
+
+    it("runs the whole path end to end and lands ETH in the Treasury", async () => {
+      await feeSink.setCurve(await curve.getAddress());
+      await escrow.credit(await feeSink.getAddress(), { value: ethers.parseEther("2") });
+      await curve.accrue({ value: ethers.parseEther("3") });
+
+      await feeSink.connect(stranger).collect();
+
+      expect(await treasury.nav()).to.equal(ethers.parseEther("5"));
+      expect(await treasury.cumulativeTaxReceived()).to.equal(ethers.parseEther("5"));
+      expect(await ethers.provider.getBalance(await feeSink.getAddress())).to.equal(0n);
+    });
+
+    it("collect() does not lose one leg because the other is empty", async () => {
+      await feeSink.setCurve(await curve.getAddress());
+      await curve.accrue({ value: ethers.parseEther("3") }); // escrow stays empty
+
+      await expect(feeSink.collect()).to.not.be.reverted;
+      expect(await treasury.nav()).to.equal(ethers.parseEther("3"));
+    });
+
+    it("reverts collect() only when there is genuinely nothing anywhere", async () => {
+      await feeSink.setCurve(await curve.getAddress());
+      await expect(feeSink.collect()).to.be.revertedWithCustomError(
+        feeSink,
+        "NothingToSweep"
+      );
+    });
+
+    it("reports what is collectable without moving anything", async () => {
+      await feeSink.setCurve(await curve.getAddress());
+      await escrow.credit(await feeSink.getAddress(), { value: ethers.parseEther("2") });
+      await curve.accrue({ value: ethers.parseEther("3") });
+
+      const [inEscrow, onCurve, held] = await feeSink.collectable();
+      expect(inEscrow).to.equal(ethers.parseEther("2"));
+      expect(onCurve).to.equal(ethers.parseEther("3"));
+      expect(held).to.equal(0n);
+    });
+
+    it("forwards a claimed token leg to the Treasury", async () => {
+      await agora.transfer(await feeSink.getAddress(), 1000n);
+      await feeSink.connect(stranger).forwardToken(await agora.getAddress());
+
+      expect(await agora.balanceOf(await treasury.getAddress())).to.equal(1000n);
+      // ...and the Treasury still marks it at zero.
+      expect(await treasury.nav()).to.equal(0n);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("FeeSink trust model", () => {
+    it("renounces ownership the moment the curve is bound", async () => {
+      const curve = await (
+        await ethers.getContractFactory("MockCurve")
+      ).deploy(await feeSink.getAddress());
+
+      expect(await feeSink.owner()).to.equal(owner.address);
+      await feeSink.setCurve(await curve.getAddress());
+      expect(await feeSink.owner()).to.equal(ZERO);
+
+      // No second chance, for anyone.
+      await expect(
+        feeSink.setCurve(await curve.getAddress())
+      ).to.be.revertedWithCustomError(feeSink, "NotOwner");
+    });
+
+    it("blocks non-owners from binding the curve", async () => {
+      const curve = await (
+        await ethers.getContractFactory("MockCurve")
+      ).deploy(await feeSink.getAddress());
+      await expect(
+        feeSink.connect(stranger).setCurve(await curve.getAddress())
+      ).to.be.revertedWithCustomError(feeSink, "NotOwner");
+    });
+
+    it("refuses a non-contract curve", async () => {
+      await expect(feeSink.setCurve(holder.address)).to.be.revertedWithCustomError(
+        feeSink,
+        "NotAContract"
+      );
+    });
+
+    it("has no function that can send value to a caller-chosen address", () => {
+      for (const fn of ["setTreasury", "rescue", "withdraw", "execute", "call", "transferOwnership"]) {
+        expect(feeSink.interface.hasFunction(fn), `unexpected ${fn}()`).to.equal(false);
+      }
+    });
+
+    it("still survives a 2300-gas stipend after gaining logic", async () => {
+      const sender = await (await ethers.getContractFactory("StipendSender")).deploy();
+      await stranger.sendTransaction({
+        to: await sender.getAddress(),
+        value: ethers.parseEther("1"),
+      });
+      await expect(sender.send(await feeSink.getAddress(), ethers.parseEther("1"))).to.not.be
+        .reverted;
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("construction guards", () => {
+    it("rejects a zero owner", async () => {
+      const T = await ethers.getContractFactory("Treasury");
+      await expect(T.deploy(ZERO)).to.be.reverted;
+    });
+
+    it("rejects a FeeSink with any zero constructor arg", async () => {
       const F = await ethers.getContractFactory("FeeSink");
-      await expect(F.deploy(ZERO)).to.be.revertedWithCustomError(F, "ZeroTreasury");
+      const t = await treasury.getAddress();
+      const e = await escrow.getAddress();
+      await expect(F.deploy(ZERO, e, owner.address)).to.be.revertedWithCustomError(F, "ZeroAddress");
+      await expect(F.deploy(t, ZERO, owner.address)).to.be.revertedWithCustomError(F, "ZeroAddress");
+      await expect(F.deploy(t, e, ZERO)).to.be.revertedWithCustomError(F, "ZeroAddress");
     });
   });
 });

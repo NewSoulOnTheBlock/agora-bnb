@@ -78,15 +78,33 @@ against a donor — the Redeemer must price against a **lagged** NAV per spec §
 **Do not add the staking vault to the exclusion list.** It *custodies* user AGORA rather
 than owning it; stakers must keep their floor backing. Exclude only AGORA the protocol owns.
 
-## Deploying
+## Deploying — contracts BEFORE the token
 
-The signing key is read from `DEPLOYER_PRIVATE_KEY` in `.env` and nowhere else — never from
-a command argument, since shell history persists those.
+This ordering is not a preference, it is the fix for how the first deployment failed.
 
 ```bash
-cp .env.example .env      # fill in; .env is gitignored at the repo root
-npm run deploy:robinhood
+cp .env.example .env             # fill in; .env is gitignored at the repo root
+npm run rehearse                 # optional: full dry run vs. a local node
+npm run deploy:robinhood         # 1. Treasury + FeeSink (no token yet)
+npm run launch:robinhood         # 2. launch — DRY RUN unless LAUNCH_EXECUTE=1
+npm run bind:robinhood           # 3. setAgora + setCurve, after verifying
 ```
+
+**Why this order.** Pons lets you set `params.creatorFeeRecipient` **at launch**. Because the
+FeeSink already exists, the token is born with the correct recipient and there is no
+post-launch `transferCreatorFeeRecipient` step to misaddress. That call is instant — there is
+**no timelock on it**, contrary to what the factory's timelock constants suggest; those belong
+to the `setCreatorFeeRecipient` path, which reverts. In the first deployment that call went to
+the Treasury instead of the FeeSink, and because `sweepFees` is authorized on the curve's
+`deployer`, the only address allowed to collect became a contract with no way to do it.
+
+`scripts/launch.ts` is a **dry run by default** and resolves the undocumented
+`expectedEconomics` commitment by simulating candidates rather than guessing. `scripts/bind.ts`
+**aborts** if `curve.deployer()` is not the FeeSink, so a bad launch cannot be bound and traded
+into.
+
+The signing key is read from `DEPLOYER_PRIVATE_KEY` in `.env` and nowhere else — never from a
+command argument, since shell history persists those.
 
 Prefer a hardware wallet or an encrypted keystore. Failing that, generate a **fresh,
 disposable** deploy key funded with just enough gas — nothing here requires the deployer to
