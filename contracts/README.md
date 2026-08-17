@@ -200,6 +200,41 @@ Bounded governance: haircut ≤ 20%, delay ≤ 30 days, and `setRequestsPaused` 
 requests but can never block `execute` — already-burned tokens must always be able to complete
 their claim, or an emergency stop becomes confiscation.
 
+## StakedSuits + Distributor — the 10% NFT slice
+
+**10% of yield goes to staked Suits NFTs**, 90% to stAGORA stakers.
+
+Suits (`0x3ac7beb099c560f5a09bd822621327d8768f0625`, chain 4663) is a SeaDrop ERC-721 clone,
+fully minted at **1111/1111**, with **no staking functions of its own** — so `StakedSuits`
+provides them. One staked Suit earns one share; no rarity weighting or lockup multipliers,
+which on a fixed 1111-piece collection would only add governance surface and places for
+accounting to drift.
+
+**Custody is required, not chosen.** The collection is not `ERC721Enumerable`, so no contract
+can enumerate what an address holds. Paying on `ownerOf` at claim time would pay *holders*
+rather than *stakers*; letting users declare token IDs without custody would keep counting a
+Suit after it was sold. Tokens therefore move into the vault and only the original staker can
+withdraw them. Accrued rewards survive unstaking — the NFT leaves, the earned ETH does not.
+
+**⚠ Transfer-validator risk.** Suits has a Limit Break creator-token transfer validator at
+`0xA000027A9B2802E1ddf7000061001e5c005A0000`. Today's policy permits `transferFrom` into a
+contract — verified by simulating against a live holder — so staking works. But the
+**collection owner can tighten that policy at any time** and could block transfers *out* of the
+vault, stranding staked NFTs. Nothing here can prevent it; the collection is not ours. `unstake`
+uses plain `transferFrom` rather than `safeTransferFrom` so it does not additionally depend on
+the receiver hook, and rewards are tracked independently of custody so accrued ETH stays
+claimable even if an NFT were stuck. Anyone staking is trusting the Suits owner on this point.
+
+**The Distributor comes back.** It was folded into `StakedAgora` when there was a single sink;
+with two sinks a split has to live somewhere both sides can be reasoned about. `distribute()`
+is permissionless, both destinations are `immutable`, there is no withdrawal function, and the
+NFT slice is capped at **30%** so governance cannot redirect the income stream.
+
+**Empty-sink rerouting.** Either vault reverts on `notifyReward` when nobody is staked, so the
+Distributor checks first and sends the whole amount to whichever side has stakers. If neither
+does it reverts and the caller keeps its ETH — parking an undistributable balance would create
+a claim nobody could exercise in a contract with no exit.
+
 ## Not written yet
 
 `BeefyAdapter` is specified in spec §3.1 but does not exist; `sleeveBps` stays 0 until it does.

@@ -136,6 +136,46 @@ async function main() {
   console.log(`Redeemer     ${redeemerAddr}`);
   console.log(`  haircut ${await redeemer.haircutBps()} bps · delay ${await redeemer.redeemDelay()}s · epoch cap ${await redeemer.epochCapBps()} bps`);
 
+  // --- Suits NFT staking + the 10/90 yield split ---------------------------
+  const SUITS = process.env.SUITS_NFT?.trim() || "0x3ac7beb099c560f5a09bd822621327d8768f0625";
+  const suitsCode = await ethers.provider.getCode(SUITS);
+  if (suitsCode === "0x") throw new Error(`No contract at SUITS_NFT ${SUITS} on chain ${net.chainId}.`);
+
+  const suitsMeta = new ethers.Contract(
+    SUITS,
+    [
+      "function name() view returns (string)",
+      "function totalSupply() view returns (uint256)",
+      "function getTransferValidator() view returns (address)",
+    ],
+    ethers.provider
+  );
+  console.log(`\nSuits NFT    ${SUITS}`);
+  console.log(`  ${await suitsMeta.name()} · supply ${await suitsMeta.totalSupply()}`);
+  try {
+    const validator = await suitsMeta.getTransferValidator();
+    if (validator !== ethers.ZeroAddress) {
+      console.log(`  ⚠ transfer validator ${validator}`);
+      console.log(`    The Suits owner can tighten transfer policy and block`);
+      console.log(`    unstaking. That risk belongs to the collection, not to us.`);
+    }
+  } catch {}
+
+  const suitsVault = await (
+    await ethers.getContractFactory("StakedSuits")
+  ).deploy(SUITS, owner);
+  await suitsVault.waitForDeployment();
+  const suitsVaultAddr = await suitsVault.getAddress();
+  console.log(`StakedSuits  ${suitsVaultAddr}`);
+
+  const distributor = await (
+    await ethers.getContractFactory("Distributor")
+  ).deploy(stakingAddr, suitsVaultAddr, owner);
+  await distributor.waitForDeployment();
+  const distributorAddr = await distributor.getAddress();
+  console.log(`Distributor  ${distributorAddr}`);
+  console.log(`  split: ${await distributor.suitsBps()} bps to staked Suits, remainder to stAGORA`);
+
   // The Redeemer is the ONLY address the Treasury will ever pay.
   if (ownerIsSigner) {
     const tx = await treasury.setRedeemer(redeemerAddr);
@@ -177,6 +217,12 @@ async function main() {
   console.log(`  treasury:    "${TREASURY}",`);
   console.log(`  stakedAgora: "${stakingAddr}",`);
   console.log(`  redeemer:    "${redeemerAddr}",`);
+  console.log(`  stakedSuits: "${suitsVaultAddr}",`);
+  console.log(`  distributor: "${distributorAddr}",`);
+  console.log("");
+  console.log("Yield is distributed by calling Distributor.distribute() with ETH.");
+  console.log("It splits 10% to staked Suits and 90% to stAGORA, and reroutes the");
+  console.log("whole amount if one side has no stakers rather than stranding it.");
   console.log("");
   console.log("Then make ONE small trade and run FeeSink.collect() to prove ETH");
   console.log("reaches the Treasury end to end before anything real depends on it.");

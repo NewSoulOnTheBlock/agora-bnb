@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IYieldAdapter} from "../interfaces/IYieldAdapter.sol";
 
 /// @dev Stands in for the Pons-deployed AGORA: plain, fixed-supply, burnable.
@@ -133,6 +134,19 @@ contract MockCurve {
         creatorTaxBalance -= send;
         (bool ok, ) = msg.sender.call{value: send}("");
         require(ok, "MockCurve: send failed");
+    }
+}
+
+/// @dev Stands in for the Suits SeaDrop ERC-721: fixed supply, NOT enumerable.
+contract MockSuits is ERC721 {
+    constructor() ERC721("Suits", "SUITS") {}
+
+    function mint(address to, uint256 id) external {
+        _mint(to, id);
+    }
+
+    function mintMany(address to, uint256 from, uint256 count) external {
+        for (uint256 i; i < count; ++i) _mint(to, from + i);
     }
 }
 
