@@ -56,6 +56,14 @@
   --meander: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='14' viewBox='0 0 28 14'><path d='M0 12.5h3.5V3.5h9v6H7v-3h3' fill='none' stroke='%23c9a227' stroke-width='1.3' stroke-linecap='square' opacity='0.55'/><path d='M14 12.5h3.5V3.5h9v6H21v-3h3' fill='none' stroke='%23c9a227' stroke-width='1.3' stroke-linecap='square' opacity='0.55'/></svg>");
   /* Fine grain, used to age the marble and break up flat fills. */
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.5'/></svg>");
+  /* Moonlit vista behind the whole UI. Dimming is baked into the JPEG, so the
+     page never flashes a bright image before CSS filters would apply. */
+  --vista: url("/vista.jpg");
+}
+
+/* A fifth of the bytes for small screens, where it is cropped hard anyway. */
+@media (max-width: 900px) {
+  :root { --vista: url("/vista-sm.jpg"); }
 }
 
 * { box-sizing: border-box; }
@@ -78,16 +86,34 @@ body {
    the meander band that frames the whole page like a carved border.
    -------------------------------------------------------------------------- */
 
+/**
+ * Layer order, top to bottom: moonlight bloom, two gold corner glows, a
+ * near-opaque scrim, then the vista.
+ *
+ * The scrim is the load-bearing part. Panels are opaque so they are safe
+ * regardless, but `.sub`, `.label` and `.foot` text sits directly on this
+ * background — so the image is pushed far enough back that contrast never
+ * depends on which part of the artwork a paragraph happens to land on.
+ */
 .atmos {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(1100px 600px at 50% -10%, rgba(146, 163, 190, 0.16), transparent 62%),
+  background-color: var(--ink-900);
+  background-image:
+    radial-gradient(1100px 600px at 50% -10%, rgba(146, 163, 190, 0.14), transparent 62%),
     radial-gradient(700px 420px at 12% 8%, rgba(201, 162, 39, 0.07), transparent 60%),
     radial-gradient(760px 460px at 88% 4%, rgba(201, 162, 39, 0.06), transparent 60%),
-    linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 55%, #05070a 100%);
+    linear-gradient(180deg,
+      rgba(11, 15, 21, 0.80) 0%,
+      rgba(7, 10, 14, 0.90) 46%,
+      rgba(5, 7, 10, 0.97) 78%,
+      #05070a 100%),
+    var(--vista);
+  background-repeat: no-repeat;
+  background-position: center, center, center, center, top center;
+  background-size: auto, auto, auto, auto, cover;
 }
 
 /* Vignette + grain, kept separate so the grain can be very subtle. */
@@ -602,6 +628,43 @@ a.rv:hover, .link:hover { color: var(--gold-100); }
 }
 
 .blocked { opacity: 0.5; pointer-events: none; }
+
+/* --------------------------------------------------------------------------
+   Explainer page
+   -------------------------------------------------------------------------- */
+
+/* The opening statement. Larger and lighter than body copy, because it is the
+   one paragraph a first-time reader will actually finish. */
+.lede {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.72;
+  color: var(--marble-200);
+  letter-spacing: 0.005em;
+}
+.lede b { color: var(--gold-100); font-weight: 400; }
+
+/* Roman-numeralled steps, given room to breathe. */
+.big-steps .step {
+  padding: 14px 0 14px 46px;
+  font-size: 14.5px;
+  line-height: 1.68;
+  color: var(--marble-300);
+}
+.big-steps .step::before {
+  top: 15px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--gold-300);
+  width: 34px;
+}
+.big-steps .step b { color: var(--marble-100); font-weight: 400; }
+
+@media (max-width: 620px) {
+  .lede { font-size: 17px; }
+  .big-steps .step { padding-left: 34px; }
+  .big-steps .step::before { width: 26px; }
+}
 
 /* Numbered build steps */
 .steps { counter-reset: step; margin: 8px 0 0; padding: 0; list-style: none; }

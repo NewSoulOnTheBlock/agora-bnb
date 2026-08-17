@@ -3,10 +3,13 @@ import { Dot, Pill } from "./components";
 import { shortAddr } from "./format";
 import type { Wallet } from "./eth";
 
-export type Tab = "floor" | "trade" | "stake" | "suits" | "redeem";
+export type Tab = "about" | "floor" | "trade" | "stake" | "suits" | "redeem";
 
 export const TABS: { id: Tab; label: string }[] = [
-  { id: "floor", label: "Floor" },
+  // First, deliberately: a newcomer landing here should meet the explanation
+  // before the dashboard.
+  { id: "about", label: "What is this?" },
+  { id: "floor", label: "Reserve" },
   { id: "trade", label: "Trade" },
   { id: "stake", label: "Stake" },
   { id: "suits", label: "Suits" },
