@@ -58,6 +58,11 @@ contract MockAdapter is IYieldAdapter {
         return assets;
     }
 
+    /// @dev The high-water mark: moves only on principal in/out, never on price.
+    function principal() external view returns (uint256) {
+        return principalHighWaterMark;
+    }
+
     /// @dev Simulate yield accrual: value appears without a deposit.
     function simulateYield() external payable {
         assets += msg.value;
@@ -173,6 +178,10 @@ contract RevertingAdapter is IYieldAdapter {
     }
 
     function totalAssets() external pure returns (uint256) {
+        revert("adapter down");
+    }
+
+    function principal() external pure returns (uint256) {
         revert("adapter down");
     }
 }

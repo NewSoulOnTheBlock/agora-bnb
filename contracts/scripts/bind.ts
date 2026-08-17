@@ -178,14 +178,33 @@ async function main() {
 
   // The Redeemer is the ONLY address the Treasury will ever pay.
   if (ownerIsSigner) {
-    const tx = await treasury.setRedeemer(redeemerAddr);
+    let tx = await treasury.setRedeemer(redeemerAddr);
     await tx.wait();
-    console.log(`Treasury.setRedeemer ✓ ${tx.hash}`);
+    console.log(`Treasury.setRedeemer    ✓ ${tx.hash}`);
+    tx = await treasury.setDistributor(distributorAddr);
+    await tx.wait();
+    console.log(`Treasury.setDistributor ✓ ${tx.hash}`);
   } else {
-    const data = treasury.interface.encodeFunctionData("setRedeemer", [redeemerAddr]);
-    console.log("ACTION REQUIRED — setRedeemer is onlyOwner. From governance:");
-    console.log(`  to:   ${TREASURY}`);
-    console.log(`  data: ${data}`);
+    console.log("ACTION REQUIRED — both are onlyOwner. From governance:");
+    for (const [fn, arg] of [
+      ["setRedeemer", redeemerAddr],
+      ["setDistributor", distributorAddr],
+    ] as const) {
+      console.log(`  ${fn}:`);
+      console.log(`    to:   ${TREASURY}`);
+      console.log(`    data: ${treasury.interface.encodeFunctionData(fn, [arg])}`);
+    }
+  }
+
+  const incomeShare = await treasury.incomeShareBps();
+  console.log(`\nTreasury.incomeShareBps = ${incomeShare}`);
+  if (incomeShare === 0n) {
+    console.log("  → 0 means NO tax is routed to stakers (the specified behaviour:");
+    console.log("    tax is corpus, only realized yield is income). With no yield");
+    console.log("    adapter deployed there is no yield, so stakers and staked");
+    console.log("    Suits will earn NOTHING until either an adapter ships or you");
+    console.log("    call setIncomeShareBps(). That is an economic decision, so it");
+    console.log("    is left off by default.");
   }
 
   // Staked AGORA is CUSTODIED, not owned — it must stay in eligibleSupply so

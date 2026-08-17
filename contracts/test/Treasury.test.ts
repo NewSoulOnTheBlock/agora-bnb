@@ -373,15 +373,25 @@ describe("Treasury (ETH-denominated corpus)", () => {
       ).to.not.be.reverted;
     });
 
-    it("raises the floor when sleeve surplus is realized", async () => {
+    it("leaves the floor untouched when sleeve surplus is realized", async () => {
       await treasury.depositToAdapter(await adapter.getAddress(), ethers.parseEther("20"));
       await adapter.simulateYield({ value: ethers.parseEther("5") });
 
       const navBefore = await treasury.nav();
       await treasury.realizeSurplus(await adapter.getAddress());
 
+      // NAV is constant across the whole journey: the 5 ETH of yield was never
+      // corpus (it sat above the adapter's high-water mark), and realizing it
+      // just moves it into `pendingIncome`, which NAV also excludes.
       expect(await treasury.nav()).to.equal(navBefore);
-      expect(await treasury.ethBuffer()).to.equal(ethers.parseEther("85"));
+      expect(await treasury.pendingIncome()).to.equal(ethers.parseEther("5"));
+
+      // The raw balance is 85, but only 80 of it is corpus — the rest is owed
+      // to stakers and must not be spendable on redemption.
+      expect(await ethers.provider.getBalance(await treasury.getAddress())).to.equal(
+        ethers.parseEther("85")
+      );
+      expect(await treasury.ethBuffer()).to.equal(ethers.parseEther("80"));
     });
 
     it("survives an adapter that reverts on totalAssets()", async () => {

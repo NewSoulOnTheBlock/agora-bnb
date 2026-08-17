@@ -6,6 +6,10 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IYieldAdapter} from "./interfaces/IYieldAdapter.sol";
 
+interface IDistributor {
+    function distribute() external payable;
+}
+
 /**
  * @title Treasury
  * @notice The collective balance sheet behind AGORA's redemption floor.
@@ -120,6 +124,45 @@ contract Treasury is Ownable, ReentrancyGuard {
     /// @notice The only address permitted to move ETH out of this contract.
     address public redeemer;
 
+    /// @notice Splits income between stAGORA stakers and staked Suits.
+    address public distributor;
+
+    /**
+     * @notice ETH earmarked for stakers, awaiting `distributeIncome()`.
+     * @dev **Excluded from `nav()`.** This is the income/principal separation
+     *      spec §6 requires, and getting it wrong is subtly destructive:
+     *
+     *      If earmarked income counted as corpus, realizing yield would spike
+     *      the floor and paying it out would drop the floor straight back —
+     *      firing `FloorRegression` on every single distribution and making the
+     *      floor chart a sawtooth of false alarms. Worse, redemptions in between
+     *      would be priced against ETH that belongs to stakers.
+     *
+     *      So income never enters the floor calculation at all, and `payout()`
+     *      and `depositToAdapter()` both spend only `liquidEth()`.
+     */
+    uint256 public pendingIncome;
+
+    /**
+     * @notice Share of incoming TAX treated as income rather than corpus, in bps.
+     * @dev **Defaults to 0, which is the specified behaviour**: spec §9 says only
+     *      *realized* surplus is distributable and tax belongs to the corpus.
+     *
+     *      The lever exists because that specification has a consequence worth
+     *      being deliberate about — with no yield adapter deployed there is no
+     *      yield, so stakers and Suits holders earn exactly nothing until one
+     *      exists. Turning this above zero pays them out of trade tax instead,
+     *      at the cost of slowing the floor. That is an economic decision, so it
+     *      is left off until someone actively makes it.
+     */
+    uint16 public incomeShareBps;
+
+    /// @notice Cap on `incomeShareBps`, so the floor can never be starved.
+    uint16 public constant MAX_INCOME_SHARE_BPS = 5_000;
+
+    /// @notice Cumulative ETH sent onward to the Distributor.
+    uint256 public cumulativeIncomeDistributed;
+
     /// @notice Fraction of NAV allowed in the yield sleeve. Starts at 0.
     uint16 public sleeveBps;
 
@@ -158,6 +201,10 @@ contract Treasury is Ownable, ReentrancyGuard {
     event Funded(address indexed from, uint256 amount, bool isTax);
     event PaidOut(address indexed to, uint256 amount);
     event AgoraSet(address indexed agora);
+    event IncomeAccrued(uint256 amount, uint256 pendingIncome);
+    event IncomeDistributed(uint256 amount);
+    event DistributorSet(address indexed previous, address indexed current);
+    event IncomeShareBpsSet(uint16 previous, uint16 current);
     event FeeSinkSet(address indexed previous, address indexed current);
     event RedeemerSet(address indexed previous, address indexed current);
     event SleeveBpsSet(uint16 previous, uint16 current);
@@ -189,6 +236,9 @@ contract Treasury is Ownable, ReentrancyGuard {
     error CannotExcludeDead();
     error AgoraAlreadySet(address current);
     error NotAContract(address target);
+    error DistributorNotSet();
+    error NoIncome();
+    error IncomeShareTooLarge(uint16 requested, uint16 max);
 
     // -----------------------------------------------------------------------
     // Construction
@@ -230,9 +280,15 @@ contract Treasury is Ownable, ReentrancyGuard {
     // NAV accounting (spec §6)
     // -----------------------------------------------------------------------
 
+    /// @notice Liquid corpus ETH — the balance minus anything owed to stakers.
+    function liquidEth() public view returns (uint256) {
+        uint256 bal = address(this).balance;
+        return bal > pendingIncome ? bal - pendingIncome : 0;
+    }
+
     /// @notice Liquid ETH held directly, available for redemption immediately.
     function ethBuffer() public view returns (uint256) {
-        return address(this).balance;
+        return liquidEth();
     }
 
     /**
@@ -289,6 +345,47 @@ contract Treasury is Ownable, ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice The CORPUS value of one adapter: `min(totalAssets, principal)`.
+     * @dev Appreciation above the high-water mark is income owed to stakers, so
+     *      it is excluded from NAV; depreciation below it is a genuine loss of
+     *      corpus, so it is included. Without this the floor would sawtooth —
+     *      rising as yield accrued and falling the moment it was realized and
+     *      paid out, firing FloorRegression on every distribution.
+     */
+    function adapterCorpus(address adapter) public view returns (uint256) {
+        (uint256 assets, bool healthy) = adapterAssets(adapter);
+        if (!healthy) return 0;
+        try IYieldAdapter(adapter).principal() returns (uint256 p) {
+            return assets < p ? assets : p;
+        } catch {
+            // An adapter that cannot report principal is valued at its full
+            // assets — conservative only if it is underwater, so treat a broken
+            // reading as zero rather than trusting an unbacked number.
+            return 0;
+        }
+    }
+
+    /// @notice Corpus value across the sleeve — the figure `nav()` uses.
+    function sleeveCorpus() public view returns (uint256 total) {
+        uint256 n = _adapters.length;
+        for (uint256 i; i < n; ++i) {
+            total += adapterCorpus(_adapters[i]);
+        }
+    }
+
+    /// @notice Unrealized appreciation across the sleeve — income in waiting.
+    function unrealizedSurplus() external view returns (uint256 total) {
+        uint256 n = _adapters.length;
+        for (uint256 i; i < n; ++i) {
+            (uint256 assets, bool healthy) = adapterAssets(_adapters[i]);
+            if (!healthy) continue;
+            try IYieldAdapter(_adapters[i]).principal() returns (uint256 p) {
+                if (assets > p) total += assets - p;
+            } catch {}
+        }
+    }
+
     /// @notice Active adapters that currently fail to report their value.
     function unhealthyAdapters() external view returns (address[] memory list) {
         uint256 n = _adapters.length;
@@ -317,7 +414,7 @@ contract Treasury is Ownable, ReentrancyGuard {
      * @dev No oracle is involved: both terms are natively ETH-denominated.
      */
     function nav() public view returns (uint256) {
-        return address(this).balance + sleeveAssets();
+        return liquidEth() + sleeveCorpus();
     }
 
     /**
@@ -377,11 +474,50 @@ contract Treasury is Ownable, ReentrancyGuard {
         bool isTax = msg.sender == feeSink && feeSink != address(0);
         if (isTax) {
             cumulativeTaxReceived += msg.value;
+
+            // Only tax is ever split. Donations are unambiguously gifts to the
+            // corpus, and skimming them for stakers would surprise the giver.
+            if (incomeShareBps != 0) {
+                uint256 toIncome = (msg.value * incomeShareBps) / BPS;
+                if (toIncome != 0) {
+                    pendingIncome += toIncome;
+                    emit IncomeAccrued(toIncome, pendingIncome);
+                }
+            }
         } else {
             cumulativeDonated += msg.value;
         }
 
         emit Funded(msg.sender, msg.value, isTax);
+        _touch();
+    }
+
+    // -----------------------------------------------------------------------
+    // Income — the route from corpus yield to stakers
+    // -----------------------------------------------------------------------
+
+    /**
+     * @notice Forward all earmarked income to the Distributor. Permissionless.
+     * @dev The Distributor splits it (10% staked Suits / 90% stAGORA by default)
+     *      and reverts if neither side has stakers — in which case this reverts
+     *      too and the income simply stays earmarked here until someone stakes.
+     *      It is never silently reclassified as corpus, because it was already
+     *      excluded from `nav()` and quietly folding it back in would move the
+     *      floor for reasons no chart could explain.
+     */
+    function distributeIncome() external nonReentrant returns (uint256 amount) {
+        if (distributor == address(0)) revert DistributorNotSet();
+
+        amount = pendingIncome;
+        if (amount == 0) revert NoIncome();
+        if (amount > address(this).balance) revert InsufficientLiquidEth(amount, address(this).balance);
+
+        pendingIncome = 0;
+        cumulativeIncomeDistributed += amount;
+
+        IDistributor(distributor).distribute{value: amount}();
+
+        emit IncomeDistributed(amount);
         _touch();
     }
 
@@ -415,7 +551,9 @@ contract Treasury is Ownable, ReentrancyGuard {
         if (msg.sender != redeemer) revert NotRedeemer();
         if (to == address(0)) revert ZeroAddress();
 
-        uint256 available = address(this).balance;
+        // liquidEth(), not the raw balance: redemption must never be paid out of
+        // ETH already earmarked for stakers.
+        uint256 available = liquidEth();
         if (amount > available) revert InsufficientLiquidEth(amount, available);
 
         cumulativePaidOut += amount;
@@ -442,6 +580,24 @@ contract Treasury is Ownable, ReentrancyGuard {
         if (redeemer_ == address(0)) revert ZeroAddress();
         emit RedeemerSet(redeemer, redeemer_);
         redeemer = redeemer_;
+    }
+
+    function setDistributor(address distributor_) external onlyOwner {
+        if (distributor_ == address(0)) revert ZeroAddress();
+        emit DistributorSet(distributor, distributor_);
+        distributor = distributor_;
+    }
+
+    /**
+     * @notice Route a share of incoming tax to stakers instead of the corpus.
+     * @dev 0 (the default) is the specified behaviour. Raising it trades floor
+     *      growth for staker income — an economic choice, capped at 50% so the
+     *      floor can never be starved entirely.
+     */
+    function setIncomeShareBps(uint16 bps) external onlyOwner {
+        if (bps > MAX_INCOME_SHARE_BPS) revert IncomeShareTooLarge(bps, MAX_INCOME_SHARE_BPS);
+        emit IncomeShareBpsSet(incomeShareBps, bps);
+        incomeShareBps = bps;
     }
 
     function setSleeveBps(uint16 sleeveBps_) external onlyOwner {
@@ -559,7 +715,8 @@ contract Treasury is Ownable, ReentrancyGuard {
         if (!isAdapter[adapter]) revert AdapterNotActive();
         if (amount == 0) revert NothingToFund();
 
-        uint256 available = address(this).balance;
+        // Earmarked income must not be put at risk in a yield venue either.
+        uint256 available = liquidEth();
         if (amount > available) revert InsufficientLiquidEth(amount, available);
 
         // NAV is unchanged by the move itself, so the cap is checked against it
@@ -602,6 +759,14 @@ contract Treasury is Ownable, ReentrancyGuard {
         uint256 before = address(this).balance;
         IYieldAdapter(adapter).realizeSurplus();
         received = address(this).balance - before;
+
+        // Realized surplus is INCOME, not corpus (spec §9). Earmarking it here
+        // is what makes `distributeIncome()` possible at all — without this the
+        // yield would silently become corpus and stakers could never be paid.
+        if (received != 0) {
+            pendingIncome += received;
+            emit IncomeAccrued(received, pendingIncome);
+        }
 
         emit SurplusRealized(adapter, received);
         _touch();

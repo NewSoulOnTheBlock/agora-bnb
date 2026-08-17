@@ -235,6 +235,47 @@ Distributor checks first and sends the whole amount to whichever side has staker
 does it reverts and the caller keeps its ETH — parking an undistributable balance would create
 a claim nobody could exercise in a contract with no exit.
 
+## The income route — and why the floor doesn't sawtooth
+
+```
+tax ──► FeeSink ──► Treasury ──┬──► corpus  (raises the floor)
+                               └──► pendingIncome ──► Distributor ──┬──► 10% StakedSuits
+sleeve yield ──► realizeSurplus ──► pendingIncome ──────────────────┴──► 90% stAGORA
+```
+
+`pendingIncome` is **excluded from `nav()`**, and that single decision is what keeps the floor
+well-behaved. If income counted as corpus, realizing yield would spike the floor and paying it
+out would drop it straight back — firing `FloorRegression` on every distribution and turning
+the floor chart into a sawtooth of false alarms. Worse, redemptions in between would be priced
+against ETH that belongs to stakers. So `payout()` and `depositToAdapter()` both spend only
+`liquidEth()` (balance − pendingIncome), and `ethBuffer()` reports that rather than the raw
+balance.
+
+**The sleeve is valued at `min(totalAssets, principal)`** for NAV purposes — the adapter's
+high-water mark. This is symmetric and deliberate:
+
+| Sleeve moves | Counted in NAV? | Why |
+|---|---|---|
+| Gains **above** principal | **No** — `unrealizedSurplus()` | Income owed to stakers, not corpus. Counting it would inflate the floor and deflate it on payout. |
+| Losses **below** principal | **Yes** | A real loss of corpus. The floor must fall, and `FloorRegression` fires. |
+
+Without this, realizing yield would *lower* the floor — the sawtooth relocated rather than
+removed. A test caught exactly that.
+
+`distributeIncome()` is permissionless. If neither staking side has stakers it reverts and the
+income stays earmarked, never silently reclassified as corpus.
+
+### The lever you need to decide on
+
+`incomeShareBps` routes a share of incoming **tax** to stakers. It **defaults to 0**, which is
+the specified behaviour — spec §9 says only *realized* surplus is distributable and tax belongs
+to the corpus.
+
+That specification has a consequence worth being deliberate about: **with no yield adapter
+deployed there is no yield, so stakers and staked Suits earn exactly nothing.** Raising this
+above zero pays them out of trade tax at the cost of slowing the floor. Capped at 50%. Only
+tax is ever split — donations are unambiguously gifts to the corpus.
+
 ## Not written yet
 
 `BeefyAdapter` is specified in spec §3.1 but does not exist; `sleeveBps` stays 0 until it does.

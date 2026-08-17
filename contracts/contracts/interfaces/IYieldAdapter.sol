@@ -39,4 +39,21 @@ interface IYieldAdapter {
 
     /// @notice Current value of this adapter's position, in wei. Must not revert.
     function totalAssets() external view returns (uint256);
+
+    /**
+     * @notice Corpus principal deployed here — the high-water mark. Must not revert.
+     * @dev The Treasury values the sleeve at `min(totalAssets, principal)` when
+     *      computing NAV, which is what keeps the floor honest in both
+     *      directions:
+     *
+     *      - Appreciation **above** the mark is income owed to stakers, not
+     *        corpus. Counting it would inflate the floor and then deflate it the
+     *        moment the surplus was realized and paid out.
+     *      - Depreciation **below** the mark is a real loss of corpus, and the
+     *        floor must fall to reflect it.
+     *
+     *      So the mark must only move on deposits and withdrawals of principal,
+     *      never on price movement.
+     */
+    function principal() external view returns (uint256);
 }
