@@ -27,18 +27,40 @@ oracle to gate and `nav()` cannot go stale.
 with ETH. A floor of 0.000001 ETH/AGORA is hard in ether and soft in dollars. Spec §4.1
 recommended USDG for exactly this reason; ETH was chosen deliberately over that advice.
 
-## What the owner cannot do
+## The owner CAN withdraw corpus ETH — read this before trusting the floor
 
-There is **no** `execute(address,bytes)`, no arbitrary `call`, no `delegatecall`, and no
-upgradeability. A treasury with an arbitrary-call escape hatch is trivially rug-able by its
-owner, which would make the floor a promise rather than a property.
+`Treasury.withdraw(amount)` sends corpus ETH to a single `operator` address so it can be
+deployed into yield-generating activity off-contract. That is a deliberate product decision,
+and it has a direct consequence:
 
-Owner powers are enumerated and bounded: set the fee sink and redeemer, manage an
-allowlist of adapters behind a 2-day timelock, move ETH between the Treasury and those
-adapters within a capped sleeve, and adjust the supply-exclusion list.
+> **`floorPerToken()` is advisory, not enforceable.** It reports what backs each token *right
+> now*. It is not a level the contract can hold, because corpus ETH can leave without a
+> redemption.
 
-**The owner cannot withdraw ETH.** The only address that can move ETH out is `redeemer`,
-and only via `payout()`. A test asserts the absence of every common escape-hatch name.
+Do not describe AGORA as having a *guaranteed* or *hard* floor. The honest description is a
+**reported floor** that ratchets up with tax and redemptions and falls when the operator
+withdraws. Every withdrawal emits `Withdrawn(to, amount, navAfter)` and fires
+`FloorRegression`, so the entire history is auditable from events with no indexer.
+
+### What is still structurally guaranteed
+
+- **No arbitrary call.** No `execute(address,bytes)`, no `delegatecall`, no upgradeability.
+  `withdraw()` takes an amount but **no destination** — funds can only reach `operator`. A
+  compromised owner key bounds where corpus ETH lands, though not whether it leaves. A test
+  asserts the function signature has exactly one `uint256` parameter.
+- **Staker income is untouchable.** Withdrawal is capped at `liquidEth()`, which excludes
+  `pendingIncome`. ETH earmarked for stAGORA and staked Suits is owed to third parties, not
+  corpus, and the owner cannot reach it.
+- **Redemption settles honestly through a withdrawal.** `Redeemer` pays
+  `min(snapshotFloor, currentFloor)`, so a withdrawal between request and execution *reduces*
+  the payout rather than letting anyone claim value that is no longer there — and it can never
+  make a matured request revert. A test proves exactly this.
+- **Holders extract value only through redemption.** `payout()` is callable solely by
+  `redeemer`.
+
+Other owner powers remain enumerated and bounded: set the fee sink, redeemer, distributor and
+operator; manage an adapter allowlist behind a 2-day timelock; move ETH into a capped sleeve;
+adjust the supply-exclusion list.
 
 ## Design decisions worth knowing before you touch this
 

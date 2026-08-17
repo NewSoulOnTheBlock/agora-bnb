@@ -213,9 +213,89 @@ describe("Treasury (ETH-denominated corpus)", () => {
     });
 
     it("exposes no arbitrary-call escape hatch", () => {
-      for (const fn of ["execute", "call", "delegatecall", "sweepTo", "rescue", "withdraw"]) {
+      // `withdraw` exists by design, but takes no destination — see below.
+      for (const fn of ["execute", "call", "delegatecall", "sweepTo", "rescue"]) {
         expect(treasury.interface.hasFunction(fn), `unexpected ${fn}()`).to.equal(false);
       }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("operator withdrawal", () => {
+    beforeEach(async () => {
+      await treasury.connect(stranger).fund({ value: ethers.parseEther("100") });
+    });
+
+    it("defaults the operator to the owner", async () => {
+      expect(await treasury.operator()).to.equal(owner.address);
+    });
+
+    it("sends corpus ETH to the operator", async () => {
+      const before = await ethers.provider.getBalance(holder.address);
+      await treasury.setOperator(holder.address);
+      await treasury.withdraw(ethers.parseEther("10"));
+
+      expect(await ethers.provider.getBalance(holder.address)).to.equal(
+        before + ethers.parseEther("10")
+      );
+      expect(await treasury.cumulativeWithdrawn()).to.equal(ethers.parseEther("10"));
+      expect(await treasury.nav()).to.equal(ethers.parseEther("90"));
+    });
+
+    it("takes NO destination argument — funds can only reach the operator", () => {
+      const fn = treasury.interface.getFunction("withdraw");
+      expect(fn!.inputs).to.have.length(1);
+      expect(fn!.inputs[0].type).to.equal("uint256");
+    });
+
+    it("blocks everyone but the owner", async () => {
+      await expect(
+        treasury.connect(stranger).withdraw(1n)
+      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
+      await expect(
+        treasury.connect(redeemer).withdraw(1n)
+      ).to.be.revertedWithCustomError(treasury, "OwnableUnauthorizedAccount");
+    });
+
+    it("announces the drop rather than hiding it", async () => {
+      await expect(treasury.withdraw(ethers.parseEther("10")))
+        .to.emit(treasury, "Withdrawn")
+        .and.to.emit(treasury, "FloorRegression");
+    });
+
+    it("cannot take income owed to stakers", async () => {
+      await treasury.setIncomeShareBps(5000);
+      await treasury.setFeeSink(stranger.address); // make the next fund() count as tax
+      await treasury.connect(stranger).fund({ value: ethers.parseEther("100") });
+
+      // 50 ETH of that is earmarked; total balance 200, corpus 150.
+      expect(await treasury.pendingIncome()).to.equal(ethers.parseEther("50"));
+      expect(await treasury.liquidEth()).to.equal(ethers.parseEther("150"));
+
+      await expect(
+        treasury.withdraw(ethers.parseEther("151"))
+      ).to.be.revertedWithCustomError(treasury, "InsufficientLiquidEth");
+
+      await expect(treasury.withdraw(ethers.parseEther("150"))).to.not.be.reverted;
+
+      // The stakers' 50 ETH is still sitting there, untouched.
+      expect(await ethers.provider.getBalance(await treasury.getAddress())).to.equal(
+        ethers.parseEther("50")
+      );
+      expect(await treasury.pendingIncome()).to.equal(ethers.parseEther("50"));
+    });
+
+    it("cannot exceed the corpus", async () => {
+      await expect(
+        treasury.withdraw(ethers.parseEther("101"))
+      ).to.be.revertedWithCustomError(treasury, "InsufficientLiquidEth");
+    });
+
+    it("rejects a zero operator", async () => {
+      await expect(treasury.setOperator(ZERO)).to.be.revertedWithCustomError(
+        treasury,
+        "ZeroAddress"
+      );
     });
   });
 

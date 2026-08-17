@@ -65,17 +65,37 @@ interface IDistributor {
  * exclusion list is an explicit owner-set list rather than "any contract" so the
  * set is predictable rather than inferred.
  *
- * ## What this contract deliberately CANNOT do
+ * ## The owner CAN withdraw corpus ETH — read this before trusting the floor
  *
- * There is **no** `execute(address,bytes)`, no arbitrary `call`, no delegatecall,
- * and no upgradeability. A treasury with an arbitrary-call escape hatch is
- * trivially rug-able by its owner, which would make the floor a promise rather
- * than a property. The owner's powers are enumerated and bounded: set the fee
- * sink and redeemer, manage an allowlist of adapters behind a timelock, move ETH
- * between the Treasury and those adapters within a capped sleeve, and adjust the
- * exclusion list. The owner **cannot** withdraw ETH to an arbitrary address.
+ * `withdraw()` lets the owner send corpus ETH to a single `operator` address, so
+ * that it can be deployed into yield-generating activity off-contract. This is a
+ * deliberate product decision and it has a direct consequence:
  *
- * The only address that can move ETH out is `redeemer`, and only via `payout`.
+ * > **`floorPerToken()` is advisory, not enforceable.** It reports what backs
+ * > each token *at this moment*. It is not a level the contract can hold,
+ * > because corpus ETH can leave without a redemption.
+ *
+ * Do not describe this token as having a guaranteed or hard floor. The honest
+ * description is a *reported* floor that ratchets with tax and redemptions and
+ * falls when the operator withdraws — every withdrawal emits `Withdrawn` with
+ * the resulting NAV and fires `FloorRegression`, so the history is auditable
+ * from events alone.
+ *
+ * ## What is still structurally guaranteed
+ *
+ * - **No arbitrary call.** There is no `execute(address,bytes)`, no
+ *   `delegatecall`, and no upgradeability. `withdraw()` takes an amount but no
+ *   destination, so funds can only reach `operator` — a compromised owner key
+ *   bounds where corpus ETH lands, though not whether it leaves.
+ * - **Staker income is untouchable.** Withdrawal is limited to `liquidEth()`,
+ *   which excludes `pendingIncome`. ETH already earmarked for stAGORA and staked
+ *   Suits is owed to third parties, not corpus, and the owner cannot reach it.
+ * - **Redemption still settles honestly.** `Redeemer` pays
+ *   `min(snapshotFloor, currentFloor)`, so a withdrawal between request and
+ *   execution reduces the payout rather than letting anyone claim value that is
+ *   no longer there — and it can never make a matured request revert.
+ * - Redemption remains the only path by which a *holder* can extract value:
+ *   `payout` is callable solely by `redeemer`.
  */
 contract Treasury is Ownable, ReentrancyGuard {
     // -----------------------------------------------------------------------
@@ -163,6 +183,18 @@ contract Treasury is Ownable, ReentrancyGuard {
     /// @notice Cumulative ETH sent onward to the Distributor.
     uint256 public cumulativeIncomeDistributed;
 
+    /**
+     * @notice The ONLY address treasury ETH can be withdrawn to.
+     * @dev Defaults to the owner at construction. `withdraw()` takes no
+     *      destination argument, so a compromised owner key can move corpus ETH
+     *      to this one address and nowhere else. That does not make withdrawal
+     *      safe — it bounds where the funds can land, not whether they leave.
+     */
+    address public operator;
+
+    /// @notice Cumulative ETH withdrawn from the corpus by the operator.
+    uint256 public cumulativeWithdrawn;
+
     /// @notice Fraction of NAV allowed in the yield sleeve. Starts at 0.
     uint16 public sleeveBps;
 
@@ -204,6 +236,9 @@ contract Treasury is Ownable, ReentrancyGuard {
     event IncomeAccrued(uint256 amount, uint256 pendingIncome);
     event IncomeDistributed(uint256 amount);
     event DistributorSet(address indexed previous, address indexed current);
+    event OperatorSet(address indexed previous, address indexed current);
+    /// @dev navAfter is logged so the corpus is auditable from events alone.
+    event Withdrawn(address indexed to, uint256 amount, uint256 navAfter);
     event IncomeShareBpsSet(uint16 previous, uint16 current);
     event FeeSinkSet(address indexed previous, address indexed current);
     event RedeemerSet(address indexed previous, address indexed current);
@@ -237,6 +272,7 @@ contract Treasury is Ownable, ReentrancyGuard {
     error AgoraAlreadySet(address current);
     error NotAContract(address target);
     error DistributorNotSet();
+    error OperatorNotSet();
     error NoIncome();
     error IncomeShareTooLarge(uint16 requested, uint16 max);
 
@@ -253,6 +289,10 @@ contract Treasury is Ownable, ReentrancyGuard {
      */
     constructor(address owner_) Ownable(owner_) {
         if (owner_ == address(0)) revert ZeroAddress();
+
+        // Withdrawals default to the deploying owner. Repoint with setOperator.
+        operator = owner_;
+        emit OperatorSet(address(0), owner_);
 
         // The Treasury's own AGORA is never corpus, so exclude it from day one.
         _excluded.push(address(this));
@@ -580,6 +620,56 @@ contract Treasury is Ownable, ReentrancyGuard {
         if (redeemer_ == address(0)) revert ZeroAddress();
         emit RedeemerSet(redeemer, redeemer_);
         redeemer = redeemer_;
+    }
+
+    /**
+     * @notice Withdraw corpus ETH to the operator wallet, to be deployed into
+     *         yield-generating activity off-contract.
+     *
+     * @dev **This is the mechanism that makes the floor advisory rather than
+     *      enforceable.** Corpus ETH can leave without a redemption, so
+     *      `floorPerToken()` describes what is backing the token *right now*,
+     *      not a level the contract can hold. Withdrawal fires `FloorRegression`
+     *      for exactly that reason: the drop is real and is announced.
+     *
+     *      What the design still guarantees:
+     *
+     *      - Funds can only reach `operator`. There is no destination argument,
+     *        so this is not a general-purpose escape hatch to any address.
+     *      - Only `liquidEth()` is reachable, so **income already earmarked for
+     *        stakers and staked Suits cannot be taken.** That ETH is owed to
+     *        third parties, not corpus, and remains outside the owner's reach.
+     *      - Every withdrawal is logged with the resulting NAV, so the corpus
+     *        can be audited from events alone with no indexer.
+     *
+     *      Redeemers are not defenceless against a withdrawal: `Redeemer` pays
+     *      `min(snapshotFloor, currentFloor)`, so a queued redemption settles at
+     *      the *lower* of the two. A withdrawal between request and execution
+     *      reduces what they receive — it does not let them claim value that is
+     *      no longer there, and it cannot make the payout revert.
+     */
+    function withdraw(uint256 amount) external onlyOwner nonReentrant returns (uint256) {
+        if (operator == address(0)) revert OperatorNotSet();
+        if (amount == 0) revert NothingToFund();
+
+        uint256 available = liquidEth();
+        if (amount > available) revert InsufficientLiquidEth(amount, available);
+
+        cumulativeWithdrawn += amount;
+
+        (bool ok, ) = operator.call{value: amount}("");
+        if (!ok) revert EthTransferFailed();
+
+        emit Withdrawn(operator, amount, nav());
+        _touch();
+        return amount;
+    }
+
+    /// @notice Change the single address withdrawals may reach.
+    function setOperator(address operator_) external onlyOwner {
+        if (operator_ == address(0)) revert ZeroAddress();
+        emit OperatorSet(operator, operator_);
+        operator = operator_;
     }
 
     function setDistributor(address distributor_) external onlyOwner {

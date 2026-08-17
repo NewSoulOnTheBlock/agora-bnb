@@ -60,6 +60,8 @@ export const TREASURY_ABI = [
   "function cumulativeIncomeDistributed() view returns (uint256)",
   "function redeemer() view returns (address)",
   "function distributor() view returns (address)",
+  "function operator() view returns (address)",
+  "function cumulativeWithdrawn() view returns (uint256)",
   "function feeSink() view returns (address)",
   "function owner() view returns (address)",
   "function distributeIncome() returns (uint256)",
@@ -67,6 +69,9 @@ export const TREASURY_ABI = [
   // Emitted on every state change so the floor chart needs no indexer (§13.2).
   "event FloorUpdated(uint256 nav, uint256 eligibleSupply, uint256 timestamp)",
   "event FloorRegression(uint256 highWaterMark, uint256 current, uint256 timestamp)",
+  // Corpus ETH leaving for off-contract yield deployment. navAfter is logged so
+  // the corpus history is auditable from events alone.
+  "event Withdrawn(address indexed to, uint256 amount, uint256 navAfter)",
 ];
 
 export const FEE_SINK_ABI = [

@@ -159,6 +159,9 @@ export type Reserve = {
   pendingIncome: bigint | null;
   incomeShareBps: bigint | null;
   cumulativeIncomeDistributed: bigint | null;
+  /** Corpus ETH taken out for off-contract yield deployment. */
+  cumulativeWithdrawn: bigint | null;
+  operator: string | null;
 };
 
 const NO_RESERVE: Reserve = {
@@ -166,7 +169,7 @@ const NO_RESERVE: Reserve = {
   floorHighWaterMark: null, usdgBalance: null, ethBuffer: null, sleeveAssets: null,
   sleeveCorpus: null, unrealizedSurplus: null, sleeveCapBps: null,
   cumulativeTaxReceived: null, pendingIncome: null, incomeShareBps: null,
-  cumulativeIncomeDistributed: null,
+  cumulativeIncomeDistributed: null, cumulativeWithdrawn: null, operator: null,
 };
 
 export async function readReserve(): Promise<Reserve> {
@@ -193,11 +196,15 @@ export async function readReserve(): Promise<Reserve> {
     safe(async () => BigInt(await t.incomeShareBps())),
     safe(async () => BigInt(await t.cumulativeIncomeDistributed())),
   ]);
+  const [cumulativeWithdrawn, operator] = await Promise.all([
+    safe(async () => BigInt(await t.cumulativeWithdrawn())),
+    safe(() => t.operator() as Promise<string>),
+  ]);
   return {
     deployed: true, navWad, eligibleSupply, floorPerTokenWad, floorHighWaterMark,
     usdgBalance, ethBuffer, sleeveAssets, sleeveCorpus, unrealizedSurplus,
     sleeveCapBps, cumulativeTaxReceived, pendingIncome, incomeShareBps,
-    cumulativeIncomeDistributed,
+    cumulativeIncomeDistributed, cumulativeWithdrawn, operator,
   };
 }
 

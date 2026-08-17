@@ -254,10 +254,23 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
             <p className="sub">
               You are paid at <code>min(snapshot, current)</code> — the floor when you queued, or the floor
               when you claim, whichever is lower. That blocks queueing during a spike to claim afterwards,
-              and its mirror. Because burns ratchet the floor upward, the snapshot usually binds.
+              and its mirror. Burns ratchet the floor upward, so the snapshot usually binds; an operator
+              withdrawal in between is the case where the current floor binds instead.
             </p>
           </Panel>
         </div>
+      </div>
+
+      <div className="notice" style={{ marginTop: 18 }}>
+        <b>The floor is reported, not guaranteed.</b> The Treasury owner can withdraw corpus ETH to a
+        single operator wallet so it can be deployed into yield off-contract, which means{" "}
+        <code>floorPerToken</code> describes what backs each token <em>right now</em> rather than a level
+        the contract can hold. Withdrawals cannot touch ETH already earmarked for stakers, they can only
+        reach that one operator address, and each one emits <code>Withdrawn</code> with the resulting NAV
+        — so the corpus history is fully auditable on chain.
+        {r?.cumulativeWithdrawn != null && (
+          <> Withdrawn to date: <b>{formatEther(r.cumulativeWithdrawn)} ETH</b>.</>
+        )}
       </div>
     </>
   );

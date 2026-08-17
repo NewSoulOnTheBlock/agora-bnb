@@ -322,6 +322,28 @@ describe("StakedAgora + Redeemer", () => {
       );
     });
 
+    it("an operator withdrawal reduces a queued payout but never bricks it", async () => {
+      await agora.connect(alice).approve(await redeemer.getAddress(), stake);
+      await redeemer.connect(alice).requestRedeem(stake);
+      const [quotedBefore] = await redeemer.preview(0);
+
+      // The operator pulls half the corpus out to deploy into yield.
+      await treasury.setOperator(carol.address);
+      await treasury.withdraw(ethers.parseEther("500"));
+
+      await time.increase(24 * 3600 + 1);
+
+      // min(snapshot, current) means Alice settles at the LOWER, current floor.
+      const [quotedAfter] = await redeemer.preview(0);
+      expect(quotedAfter).to.be.lessThan(quotedBefore);
+
+      // Crucially the request still completes — it does not revert, and it does
+      // not try to pay out value the treasury no longer holds.
+      const before = await ethers.provider.getBalance(alice.address);
+      await expect(redeemer.connect(carol).execute(0)).to.not.be.reverted;
+      expect(await ethers.provider.getBalance(alice.address)).to.equal(before + quotedAfter);
+    });
+
     it("cannot be executed twice", async () => {
       await agora.connect(alice).approve(await redeemer.getAddress(), stake);
       await redeemer.connect(alice).requestRedeem(stake);

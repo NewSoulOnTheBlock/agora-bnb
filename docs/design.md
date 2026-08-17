@@ -45,6 +45,24 @@ anchored by a floor that rises on every trade.**
 
 ## 2. Why the floor is the product
 
+> **Correction (2026-08-17, superseding this section's central claim).** The shipped `Treasury`
+> exposes `withdraw(amount)`, letting the owner send corpus ETH to a single `operator` wallet so it
+> can be deployed into yield off-contract. That was a deliberate product decision, taken because
+> Beefy on chain 4663 turned out to hold **9 vaults totalling ~$2.7k, all two-asset LP, zero
+> single-asset** — there is no on-chain venue that can absorb a corpus, so deployment has to be
+> manual.
+>
+> The consequence is that **the floor is reported, not enforced.** `floorPerToken()` describes what
+> backs each token at this moment; it is not a level the contract can hold, because corpus ETH can
+> leave without a redemption. Everything below about ratcheting, haircuts and accretion still
+> describes how the floor *moves* — it no longer describes a guarantee. Do not market a hard or
+> guaranteed floor.
+>
+> What survives: withdrawals cannot reach `pendingIncome` (owed to stakers), they can only go to the
+> one `operator` address, redemption still settles at `min(snapshot, current)` so a withdrawal
+> reduces a queued payout rather than bricking it, and every withdrawal emits `Withdrawn` with the
+> resulting NAV plus a `FloorRegression`, so the corpus history is auditable from events alone.
+
 Tax revenue is `0.04 × volume` per swap. Pons additionally pays the creator **70% of a 1% pool fee**, so
 total protocol take is ≈ **4.7% of volume**:
 

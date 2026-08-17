@@ -200,6 +200,26 @@ These are live levers, not deployment steps.
 
 ---
 
+## Putting the corpus to work
+
+`Treasury.withdraw(amount)` sends corpus ETH to the `operator` wallet (defaults to the owner;
+change it with `setOperator`) so it can be deployed into yield off-contract. Send the proceeds
+back with `Treasury.fund()` — inflow from anywhere other than the FeeSink counts as a donation
+and raises the floor, or use `setIncomeShareBps` if some of it should reach stakers instead.
+
+Two consequences to hold in mind:
+
+- **`floorPerToken()` is advisory, not enforceable.** Corpus ETH can leave without a redemption.
+  Do not market a guaranteed or hard floor. Every withdrawal emits `Withdrawn` with the
+  resulting NAV and fires `FloorRegression`, so the record is public either way.
+- **You cannot withdraw staker income.** Withdrawal is capped at `liquidEth()`, which excludes
+  `pendingIncome`. That ETH is owed to stAGORA and staked Suits holders.
+
+Why there is no Beefy adapter: measured on 2026-08-17, Beefy on chain 4663 runs **9 vaults
+totalling ~$2.7k TVL, every one a two-asset LP, zero single-asset**. The largest is $2,347.
+There is nothing there that can absorb a corpus, so manual deployment through the operator
+wallet is the practical route.
+
 ## Treasury allocation is manual, by design
 
 There is **no keeper, no automation and no scheduled job** that moves corpus funds. Every
