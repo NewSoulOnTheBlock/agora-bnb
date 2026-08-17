@@ -5,6 +5,7 @@ import { AwaitingDeployment } from "./Layout";
 import { fmtSig, DASH } from "./format";
 import {
   AGORA, ZERO, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_VALIDATOR, SUITS_SHARE_BPS,
+  SUITS_MARKET,
 } from "./chain";
 import {
   readSuitsPosition, classifyTokens, approveSuitsForStaking, stakeSuits,
@@ -249,7 +250,22 @@ export default function Suits({ wallet }: { wallet: Wallet }) {
                   {SUITS_NFT.slice(0, 14)}…
                 </a>
               </Row>
+              <Row k="Marketplace">
+                <a className="rv" href={SUITS_MARKET} target="_blank" rel="noreferrer">
+                  OpenSea ↗
+                </a>
+              </Row>
             </div>
+
+            {pos?.owned === 0n && (
+              <p className="sub">
+                You don't hold a Suit. There are only {SUITS_SUPPLY}, all minted —{" "}
+                <a className="link" href={SUITS_MARKET} target="_blank" rel="noreferrer">
+                  find one on OpenSea
+                </a>{" "}
+                to take a share of protocol income.
+              </p>
+            )}
           </Panel>
 
           <div style={{ height: 14 }} />

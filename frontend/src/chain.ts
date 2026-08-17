@@ -143,6 +143,8 @@ export const AGORA: {
 export const SUITS_NFT = "0x3ac7beb099c560f5a09bd822621327d8768f0625";
 export const SUITS_SUPPLY = 1111;
 export const SUITS_VALIDATOR = "0xA000027A9B2802E1ddf7000061001e5c005A0000";
+/** Secondary market. Where a would-be staker goes to acquire a Suit. */
+export const SUITS_MARKET = "https://opensea.io/collection/suitsonchain";
 
 /** Share of yield routed to staked Suits. Mirrors Distributor.suitsBps default. */
 export const SUITS_SHARE_BPS = 1000;
