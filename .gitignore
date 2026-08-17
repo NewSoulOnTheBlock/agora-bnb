@@ -3,6 +3,11 @@ dist/
 .vercel
 *.tsbuildinfo
 
+# Hardhat build output
+artifacts/
+cache/
+typechain-types/
+
 # Never commit secrets. .env.local here holds a Vercel OIDC token.
 .env
 .env.*

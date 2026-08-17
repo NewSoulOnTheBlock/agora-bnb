@@ -1,0 +1,591 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.24;
+
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IYieldAdapter} from "./interfaces/IYieldAdapter.sol";
+
+/**
+ * @title Treasury
+ * @notice The collective balance sheet behind AGORA's redemption floor.
+ *         **ETH-denominated corpus** (spec §4.1, option 1).
+ *
+ * ## What ETH-denomination buys, and what it costs
+ *
+ * The corpus is held as native ETH, so:
+ *
+ *   nav()          = address(this).balance + Σ adapter.totalAssets()
+ *   floorPerToken  = nav * 1e18 / eligibleSupply
+ *
+ * Both sides of that equation are already in wei, which means **v1 needs no
+ * price oracle at all**. That matters more on this chain than it sounds: no
+ * Chainlink ETH/USD aggregator has been verified on chain 4663, so a
+ * USD-denominated corpus would have had to invent a price source for the one
+ * number that sets the redemption price. Spec §6.4 requires every NAV read to be
+ * oracle-gated for staleness and sequencer uptime — with an ETH corpus and no
+ * adapters, there is no oracle to gate, and `nav()` cannot go stale.
+ *
+ * The cost is honest and should not be papered over: **the floor is denominated
+ * in ETH, so its dollar value moves with ETH.** A floor of 0.000001 ETH/AGORA is
+ * a hard floor in ether and a soft one in dollars. Spec §4.1 recommended USDG
+ * for exactly this reason. That trade was made deliberately.
+ *
+ * ## The floor invariant
+ *
+ * With no adapters, `nav()` only moves in ways that are safe for the floor:
+ *   - tax inflow raises it,
+ *   - redemption pays out at a 5% haircut that *stays* in the corpus, so each
+ *     redemption is accretive to everyone who did not redeem (spec §7),
+ *   - AGORA's supply is fixed and burn-only, so `eligibleSupply` only shrinks.
+ * Floor is therefore monotonically non-decreasing in v1. `floorHighWaterMark`
+ * records that, and `FloorRegression` fires if it is ever violated — which can
+ * only happen once a yield sleeve exists and takes impermanent loss.
+ *
+ * A regression **emits rather than reverts** on purpose. Reverting on a falling
+ * floor would brick redemption at precisely the moment holders most want out,
+ * converting an accounting problem into a trapped-funds problem.
+ *
+ * ## AGORA is never corpus
+ *
+ * AGORA held by this contract is marked at **zero** in `nav()`, and the same
+ * balance is removed from `eligibleSupply()` so numerator and denominator agree
+ * (spec §6.1). A token that backs itself makes the floor self-referentially
+ * inflatable.
+ *
+ * Consequence worth understanding: donating AGORA to this contract shrinks the
+ * denominator and therefore *raises* reported `floorPerToken` without adding any
+ * value. It is not profitable to do (you give up more redemption value than you
+ * gain), but it does mean `floorPerToken()` is not manipulation-proof against a
+ * donor. The Redeemer must price against a **lagged** NAV per spec §6.3, and the
+ * exclusion list is an explicit owner-set list rather than "any contract" so the
+ * set is predictable rather than inferred.
+ *
+ * ## What this contract deliberately CANNOT do
+ *
+ * There is **no** `execute(address,bytes)`, no arbitrary `call`, no delegatecall,
+ * and no upgradeability. A treasury with an arbitrary-call escape hatch is
+ * trivially rug-able by its owner, which would make the floor a promise rather
+ * than a property. The owner's powers are enumerated and bounded: set the fee
+ * sink and redeemer, manage an allowlist of adapters behind a timelock, move ETH
+ * between the Treasury and those adapters within a capped sleeve, and adjust the
+ * exclusion list. The owner **cannot** withdraw ETH to an arbitrary address.
+ *
+ * The only address that can move ETH out is `redeemer`, and only via `payout`.
+ */
+contract Treasury is Ownable, ReentrancyGuard {
+    // -----------------------------------------------------------------------
+    // Constants
+    // -----------------------------------------------------------------------
+
+    uint256 public constant WAD = 1e18;
+    uint256 public constant BPS = 10_000;
+
+    /// @notice Hard ceiling on the yield sleeve. The corpus core never leaves ETH.
+    uint16 public constant MAX_SLEEVE_BPS = 5_000;
+
+    /// @notice Delay before a queued adapter may be activated (spec §10).
+    uint256 public constant ADAPTER_TIMELOCK = 2 days;
+
+    /// @notice Conventional burn address, always excluded from eligible supply.
+    address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
+
+    // -----------------------------------------------------------------------
+    // Immutable state
+    // -----------------------------------------------------------------------
+
+    /// @notice The AGORA token. Marked at zero in NAV, always.
+    IERC20 public immutable agora;
+
+    // -----------------------------------------------------------------------
+    // Mutable state
+    // -----------------------------------------------------------------------
+
+    /// @notice The logic-free ETH receiver registered with Pons.
+    address public feeSink;
+
+    /// @notice The only address permitted to move ETH out of this contract.
+    address public redeemer;
+
+    /// @notice Fraction of NAV allowed in the yield sleeve. Starts at 0.
+    uint16 public sleeveBps;
+
+    /// @notice Wei received from `feeSink` — the tax, cumulatively.
+    uint256 public cumulativeTaxReceived;
+
+    /// @notice Wei received from anywhere else. Counted separately so the tax
+    ///         figure the UI shows is actually the tax.
+    uint256 public cumulativeDonated;
+
+    /// @notice Wei paid out through `payout`, cumulatively.
+    uint256 public cumulativePaidOut;
+
+    /// @notice Highest `floorPerToken()` ever observed, in wei per whole AGORA.
+    uint256 public floorHighWaterMark;
+
+    address[] private _adapters;
+    mapping(address => bool) public isAdapter;
+    mapping(address => uint256) public adapterQueuedAt;
+
+    /// @dev Holders whose AGORA is excluded from `eligibleSupply()`. DEAD is
+    ///      always excluded and is NOT stored here.
+    address[] private _excluded;
+    mapping(address => bool) public isExcluded;
+
+    // -----------------------------------------------------------------------
+    // Events
+    // -----------------------------------------------------------------------
+
+    /// @notice Emitted on every state change, so the floor chart needs no indexer.
+    event FloorUpdated(uint256 nav, uint256 eligibleSupply, uint256 timestamp);
+
+    /// @notice The floor invariant was violated. Only possible with a live sleeve.
+    event FloorRegression(uint256 highWaterMark, uint256 current, uint256 timestamp);
+
+    event Funded(address indexed from, uint256 amount, bool isTax);
+    event PaidOut(address indexed to, uint256 amount);
+    event FeeSinkSet(address indexed previous, address indexed current);
+    event RedeemerSet(address indexed previous, address indexed current);
+    event SleeveBpsSet(uint16 previous, uint16 current);
+    event AdapterQueued(address indexed adapter, uint256 executableAt);
+    event AdapterQueueCancelled(address indexed adapter);
+    event AdapterAdded(address indexed adapter);
+    event AdapterRemoved(address indexed adapter);
+    event ExclusionSet(address indexed account, bool excluded);
+    event DepositedToAdapter(address indexed adapter, uint256 amount);
+    event WithdrawnFromAdapter(address indexed adapter, uint256 requested, uint256 received);
+    event SurplusRealized(address indexed adapter, uint256 amount);
+
+    // -----------------------------------------------------------------------
+    // Errors
+    // -----------------------------------------------------------------------
+
+    error ZeroAddress();
+    error NotRedeemer();
+    error NothingToFund();
+    error SleeveTooLarge(uint16 requested, uint16 max);
+    error SleeveCapExceeded(uint256 wouldBe, uint256 cap);
+    error InsufficientLiquidEth(uint256 requested, uint256 available);
+    error AdapterAlreadyActive();
+    error AdapterNotActive();
+    error AdapterNotQueued();
+    error TimelockNotElapsed(uint256 executableAt);
+    error AdapterStillFunded(uint256 assets);
+    error EthTransferFailed();
+    error CannotExcludeDead();
+
+    // -----------------------------------------------------------------------
+    // Construction
+    // -----------------------------------------------------------------------
+
+    /**
+     * @param agora_ The AGORA token address.
+     * @param owner_ Governance. Should be a multisig or timelock, NOT the
+     *               deploying EOA — see spec §10/§11. The deploy script warns
+     *               loudly if these are the same address.
+     */
+    constructor(address agora_, address owner_) Ownable(owner_) {
+        if (agora_ == address(0) || owner_ == address(0)) revert ZeroAddress();
+        agora = IERC20(agora_);
+
+        // The Treasury's own AGORA is never corpus, so exclude it from day one.
+        _excluded.push(address(this));
+        isExcluded[address(this)] = true;
+        emit ExclusionSet(address(this), true);
+    }
+
+    // -----------------------------------------------------------------------
+    // NAV accounting (spec §6)
+    // -----------------------------------------------------------------------
+
+    /// @notice Liquid ETH held directly, available for redemption immediately.
+    function ethBuffer() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    /**
+     * @notice USDG held by the Treasury.
+     * @dev Always 0 in ETH mode. This exists because the frontend read layer is
+     *      written against a superset ABI that also covers a USDG-denominated
+     *      corpus. Returning a hard zero is accurate — the Treasury holds no
+     *      USDG — and is preferable to wiring in a USDG address that has not
+     *      been verified on chain 4663.
+     */
+    function usdgBalance() public pure returns (uint256) {
+        return 0;
+    }
+
+    /**
+     * @notice One adapter's reported value, and whether it answered at all.
+     * @dev Wrapped in try/catch because a single misbehaving adapter must not be
+     *      able to take the whole Treasury down with it. Beefy deprecates vaults
+     *      routinely (spec §4.3), so an adapter going unreadable is an expected
+     *      operational event, not a hypothetical.
+     */
+    function adapterAssets(address adapter) public view returns (uint256 assets, bool healthy) {
+        try IYieldAdapter(adapter).totalAssets() returns (uint256 a) {
+            return (a, true);
+        } catch {
+            return (0, false);
+        }
+    }
+
+    /**
+     * @notice Total value across every active adapter, in wei.
+     * @dev An unreadable adapter contributes **zero** rather than reverting.
+     *
+     *      That choice is deliberate and it is a trade, not a free win: it means
+     *      a broken adapter *understates* NAV and drops the floor, which fires
+     *      `FloorRegression`. The alternative — propagating the revert — would
+     *      make `nav()` revert, and because `payout()` touches `nav()`, that
+     *      would brick redemption permanently and trap every holder's claim.
+     *      A visibly wrong floor is recoverable; a frozen treasury is not.
+     *
+     *      Monitor `unhealthyAdapters()` so a zero-contribution adapter is never
+     *      mistaken for a genuine loss of value.
+     *
+     *      Note the limit of this defense: try/catch survives a revert, but an
+     *      adapter that consumes all forwarded gas can still make `nav()`
+     *      unusable. Calling untrusted code cannot be made fully safe — the
+     *      allowlist and the 2-day timelock are the real mitigations.
+     */
+    function sleeveAssets() public view returns (uint256 total) {
+        uint256 n = _adapters.length;
+        for (uint256 i; i < n; ++i) {
+            (uint256 a, ) = adapterAssets(_adapters[i]);
+            total += a;
+        }
+    }
+
+    /// @notice Active adapters that currently fail to report their value.
+    function unhealthyAdapters() external view returns (address[] memory list) {
+        uint256 n = _adapters.length;
+        address[] memory buf = new address[](n);
+        uint256 count;
+        for (uint256 i; i < n; ++i) {
+            (, bool healthy) = adapterAssets(_adapters[i]);
+            if (!healthy) buf[count++] = _adapters[i];
+        }
+        list = new address[](count);
+        for (uint256 i; i < count; ++i) list[i] = buf[i];
+    }
+
+    /// @notice The sleeve cap, in basis points of NAV.
+    function sleeveCapBps() public view returns (uint256) {
+        return sleeveBps;
+    }
+
+    /// @notice Absolute sleeve cap in wei, at current NAV.
+    function sleeveCapWei() public view returns (uint256) {
+        return (nav() * sleeveBps) / BPS;
+    }
+
+    /**
+     * @notice Net asset value in wei. AGORA is marked at zero, always.
+     * @dev No oracle is involved: both terms are natively ETH-denominated.
+     */
+    function nav() public view returns (uint256) {
+        return address(this).balance + sleeveAssets();
+    }
+
+    /**
+     * @notice Supply the floor is spread across: total minus burned minus
+     *         protocol-owned AGORA (spec §6).
+     * @dev Do NOT add the staking vault to the exclusion list. It *custodies*
+     *      user AGORA rather than owning it, and stakers must keep their floor
+     *      backing. Exclude only AGORA the protocol itself owns.
+     */
+    function eligibleSupply() public view returns (uint256) {
+        uint256 supply = agora.totalSupply();
+        uint256 excluded = agora.balanceOf(DEAD);
+
+        uint256 n = _excluded.length;
+        for (uint256 i; i < n; ++i) {
+            excluded += agora.balanceOf(_excluded[i]);
+        }
+
+        return supply > excluded ? supply - excluded : 0;
+    }
+
+    /// @notice Wei of NAV backing each whole AGORA. Zero when supply is zero.
+    function floorPerToken() public view returns (uint256) {
+        uint256 supply = eligibleSupply();
+        if (supply == 0) return 0;
+        return (nav() * WAD) / supply;
+    }
+
+    /// @notice Active adapter addresses.
+    function adapters() external view returns (address[] memory) {
+        return _adapters;
+    }
+
+    /// @notice Accounts excluded from eligible supply, not counting DEAD.
+    function exclusions() external view returns (address[] memory) {
+        return _excluded;
+    }
+
+    // -----------------------------------------------------------------------
+    // Inflow
+    // -----------------------------------------------------------------------
+
+    /**
+     * @notice Receive ETH into the corpus. Permissionless.
+     * @dev Inflow from `feeSink` counts as tax; anything else counts as a
+     *      donation. Both raise the floor identically — the split exists so the
+     *      UI's "cumulative tax" figure is not inflated by gifts.
+     */
+    function fund() external payable {
+        if (msg.value == 0) revert NothingToFund();
+
+        bool isTax = msg.sender == feeSink && feeSink != address(0);
+        if (isTax) {
+            cumulativeTaxReceived += msg.value;
+        } else {
+            cumulativeDonated += msg.value;
+        }
+
+        emit Funded(msg.sender, msg.value, isTax);
+        _touch();
+    }
+
+    /**
+     * @notice Accept bare ETH transfers.
+     * @dev Empty on purpose: this must survive a 2300-gas stipend in case a fee
+     *      path ever pays the Treasury directly instead of the FeeSink. The
+     *      inflow is still corpus and still backs the floor; it just is not
+     *      counted or announced until someone calls `poke()`.
+     */
+    receive() external payable {}
+
+    /// @notice Re-emit `FloorUpdated` from current state. Permissionless.
+    function poke() external {
+        _touch();
+    }
+
+    // -----------------------------------------------------------------------
+    // Outflow — redemption only
+    // -----------------------------------------------------------------------
+
+    /**
+     * @notice Pay `amount` wei to `to`. The ONLY path ETH can leave by.
+     * @dev Restricted to `redeemer`. Pays exclusively from liquid ETH, so a
+     *      redemption wave can never force a loss-making liquidation of the
+     *      yield sleeve (spec §7). If the buffer is short, this reverts and the
+     *      owner must unwind sleeve positions first — deliberately a manual,
+     *      visible step rather than an automatic fire sale.
+     */
+    function payout(address to, uint256 amount) external nonReentrant returns (uint256) {
+        if (msg.sender != redeemer) revert NotRedeemer();
+        if (to == address(0)) revert ZeroAddress();
+
+        uint256 available = address(this).balance;
+        if (amount > available) revert InsufficientLiquidEth(amount, available);
+
+        cumulativePaidOut += amount;
+
+        (bool ok, ) = to.call{value: amount}("");
+        if (!ok) revert EthTransferFailed();
+
+        emit PaidOut(to, amount);
+        _touch();
+        return amount;
+    }
+
+    // -----------------------------------------------------------------------
+    // Governance — enumerated and bounded
+    // -----------------------------------------------------------------------
+
+    function setFeeSink(address feeSink_) external onlyOwner {
+        if (feeSink_ == address(0)) revert ZeroAddress();
+        emit FeeSinkSet(feeSink, feeSink_);
+        feeSink = feeSink_;
+    }
+
+    function setRedeemer(address redeemer_) external onlyOwner {
+        if (redeemer_ == address(0)) revert ZeroAddress();
+        emit RedeemerSet(redeemer, redeemer_);
+        redeemer = redeemer_;
+    }
+
+    function setSleeveBps(uint16 sleeveBps_) external onlyOwner {
+        if (sleeveBps_ > MAX_SLEEVE_BPS) revert SleeveTooLarge(sleeveBps_, MAX_SLEEVE_BPS);
+        emit SleeveBpsSet(sleeveBps, sleeveBps_);
+        sleeveBps = sleeveBps_;
+    }
+
+    /**
+     * @notice Exclude or re-include an account's AGORA in `eligibleSupply()`.
+     * @dev DEAD is unconditionally excluded and cannot be listed here — listing
+     *      it would double-count and understate eligible supply, overstating the
+     *      floor.
+     */
+    function setExclusion(address account, bool excluded) external onlyOwner {
+        if (account == address(0)) revert ZeroAddress();
+        if (account == DEAD) revert CannotExcludeDead();
+        if (isExcluded[account] == excluded) return;
+
+        isExcluded[account] = excluded;
+        if (excluded) {
+            _excluded.push(account);
+        } else {
+            uint256 n = _excluded.length;
+            for (uint256 i; i < n; ++i) {
+                if (_excluded[i] == account) {
+                    _excluded[i] = _excluded[n - 1];
+                    _excluded.pop();
+                    break;
+                }
+            }
+        }
+        emit ExclusionSet(account, excluded);
+        _touch();
+    }
+
+    // -----------------------------------------------------------------------
+    // Adapters — timelocked in, immediate out
+    // -----------------------------------------------------------------------
+
+    /**
+     * @notice Start the clock on adding a yield adapter.
+     * @dev Adding an adapter is the single most dangerous action available to
+     *      governance: an adapter can hold the corpus. Spec §10 rates adapter
+     *      exploit as Critical, so activation is delayed by `ADAPTER_TIMELOCK`
+     *      to give holders time to exit at the current floor first.
+     */
+    function queueAdapter(address adapter) external onlyOwner {
+        if (adapter == address(0)) revert ZeroAddress();
+        if (isAdapter[adapter]) revert AdapterAlreadyActive();
+
+        adapterQueuedAt[adapter] = block.timestamp;
+        emit AdapterQueued(adapter, block.timestamp + ADAPTER_TIMELOCK);
+    }
+
+    function cancelQueuedAdapter(address adapter) external onlyOwner {
+        if (adapterQueuedAt[adapter] == 0) revert AdapterNotQueued();
+        delete adapterQueuedAt[adapter];
+        emit AdapterQueueCancelled(adapter);
+    }
+
+    function activateAdapter(address adapter) external onlyOwner {
+        uint256 queuedAt = adapterQueuedAt[adapter];
+        if (queuedAt == 0) revert AdapterNotQueued();
+        if (isAdapter[adapter]) revert AdapterAlreadyActive();
+
+        uint256 executableAt = queuedAt + ADAPTER_TIMELOCK;
+        if (block.timestamp < executableAt) revert TimelockNotElapsed(executableAt);
+
+        delete adapterQueuedAt[adapter];
+        isAdapter[adapter] = true;
+        _adapters.push(adapter);
+        emit AdapterAdded(adapter);
+    }
+
+    /**
+     * @notice Remove an adapter. Immediate — no timelock.
+     * @dev Removal is always safe and sometimes urgent (Beefy deprecates vaults
+     *      routinely, spec §4.3), so it must never be delayed. A funded adapter
+     *      cannot be removed, otherwise its assets would silently vanish from
+     *      `nav()` and drop the floor.
+     *
+     *      An **unreadable** adapter, however, must always be removable. It
+     *      already contributes zero to `nav()`, so leaving it listed preserves
+     *      the fault forever — and if the emptiness check itself called into the
+     *      broken adapter, the removal path would revert too and the Treasury
+     *      would have no way out. Recovering value stranded in a broken adapter
+     *      is necessarily an off-contract operation.
+     */
+    function removeAdapter(address adapter) external onlyOwner {
+        if (!isAdapter[adapter]) revert AdapterNotActive();
+
+        (uint256 assets, bool healthy) = adapterAssets(adapter);
+        if (healthy && assets != 0) revert AdapterStillFunded(assets);
+
+        isAdapter[adapter] = false;
+        uint256 n = _adapters.length;
+        for (uint256 i; i < n; ++i) {
+            if (_adapters[i] == adapter) {
+                _adapters[i] = _adapters[n - 1];
+                _adapters.pop();
+                break;
+            }
+        }
+        emit AdapterRemoved(adapter);
+        _touch();
+    }
+
+    /// @notice Move ETH from the buffer into an adapter, within the sleeve cap.
+    function depositToAdapter(address adapter, uint256 amount)
+        external
+        onlyOwner
+        nonReentrant
+    {
+        if (!isAdapter[adapter]) revert AdapterNotActive();
+        if (amount == 0) revert NothingToFund();
+
+        uint256 available = address(this).balance;
+        if (amount > available) revert InsufficientLiquidEth(amount, available);
+
+        // NAV is unchanged by the move itself, so the cap is checked against it
+        // directly: ETH simply relocates from the buffer into the sleeve.
+        uint256 cap = sleeveCapWei();
+        uint256 wouldBe = sleeveAssets() + amount;
+        if (wouldBe > cap) revert SleeveCapExceeded(wouldBe, cap);
+
+        IYieldAdapter(adapter).deposit{value: amount}();
+
+        emit DepositedToAdapter(adapter, amount);
+        _touch();
+    }
+
+    /// @notice Pull ETH back out of an adapter into the liquid buffer.
+    function withdrawFromAdapter(address adapter, uint256 amount)
+        external
+        onlyOwner
+        nonReentrant
+        returns (uint256 received)
+    {
+        if (!isAdapter[adapter]) revert AdapterNotActive();
+
+        uint256 before = address(this).balance;
+        IYieldAdapter(adapter).withdraw(amount);
+        received = address(this).balance - before;
+
+        emit WithdrawnFromAdapter(adapter, amount, received);
+        _touch();
+    }
+
+    /**
+     * @notice Realize an adapter's surplus above its high-water mark.
+     * @dev Permissionless: it can only move value from an adapter into this
+     *      contract, which raises the floor. The Distributor pulls from here.
+     */
+    function realizeSurplus(address adapter) external nonReentrant returns (uint256 received) {
+        if (!isAdapter[adapter]) revert AdapterNotActive();
+
+        uint256 before = address(this).balance;
+        IYieldAdapter(adapter).realizeSurplus();
+        received = address(this).balance - before;
+
+        emit SurplusRealized(adapter, received);
+        _touch();
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal
+    // -----------------------------------------------------------------------
+
+    /// @dev Recompute the floor, track its high-water mark, announce both.
+    function _touch() internal {
+        uint256 n = nav();
+        uint256 supply = eligibleSupply();
+        uint256 floor = supply == 0 ? 0 : (n * WAD) / supply;
+
+        if (floor > floorHighWaterMark) {
+            floorHighWaterMark = floor;
+        } else if (floor < floorHighWaterMark) {
+            emit FloorRegression(floorHighWaterMark, floor, block.timestamp);
+        }
+
+        emit FloorUpdated(n, supply, block.timestamp);
+    }
+}

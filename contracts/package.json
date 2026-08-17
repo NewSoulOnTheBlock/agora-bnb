@@ -1,0 +1,27 @@
+{
+  "name": "agora-contracts",
+  "version": "0.1.0",
+  "description": "AGORA — ETH-denominated Treasury and FeeSink for the redemption floor (Robinhood Chain, 4663)",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:robinhood": "hardhat run scripts/deploy.ts --network robinhood",
+    "verify:robinhood": "hardhat run scripts/verify-deployment.ts --network robinhood"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.14.0",
+    "chai": "^4.4.1",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}
