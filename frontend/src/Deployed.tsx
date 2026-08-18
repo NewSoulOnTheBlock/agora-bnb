@@ -3,6 +3,7 @@ import { useSnapshot, useBeefy, useOperatorHoldings, useEthUsd } from "./useRead
 import { usdOf } from "./price";
 import { fmtSig, fmtGrouped, fmtUnits, DASH } from "./format";
 import { AGORA, explorerAddr, ST_AGORA_DECIMALS } from "./chain";
+import { pricedCoverage } from "./beefy";
 
 /**
  * Deployed capital.
@@ -37,7 +38,28 @@ export default function Deployed() {
   const withdrawn = s?.reserve.cumulativeWithdrawn ?? null;
   const worth = beefy.total;
 
-  /** Everything visible, against what left the Treasury. */
+  /**
+   * Three states, not two.
+   *
+   * `beefy.total` is null both when the operator holds nothing and when it
+   * holds positions that could not be priced, and those must not render the
+   * same. Printing "0 ETH" over a visible list of open vaults asserts they are
+   * worthless — the same shape of mistake as reporting a failed sweep as "no
+   * positions", which this page already had to fix once.
+   */
+  const cover = pricedCoverage(beefy.data ?? []);
+  const partial = cover.total > 0 && cover.priced < cover.total;
+
+  const deployedValue =
+    beefy.loading ? null                                  // still reading
+      : cover.total === 0 ? "0"                           // genuinely nothing open
+        : worth != null ? fmtSig(worth)                   // priced
+          : null;                                         // open, but unpriceable
+
+  /**
+   * Everything visible, against what left the Treasury. With incomplete pricing
+   * this is a floor rather than a figure, and it is labelled as one.
+   */
   const accountedPct =
     withdrawn != null && withdrawn > 0n && (beefy.total != null || held != null)
       ? (Number(accountedFor) / Number(withdrawn)) * 100
@@ -60,10 +82,14 @@ export default function Deployed() {
           />
           <Stat
             k="Worth now"
-            value={worth != null ? fmtSig(worth) : beefy.loading ? null : "0"}
+            value={deployedValue}
             unit="ETH"
             usd={usdOf(worth, ethUsd)}
-            note="mark-to-market across every open position"
+            note={
+              partial
+                ? `mark-to-market — ${cover.priced} of ${cover.total} positions could be priced`
+                : "mark-to-market across every open position"
+            }
           />
           <Stat
             k="Still in the Treasury"
@@ -82,9 +108,13 @@ export default function Deployed() {
         <div className="grid c4">
           <Stat
             k="In Beefy vaults"
-            value={beefy.total != null ? fmtSig(beefy.total) : beefy.loading ? null : "0"}
+            value={deployedValue}
             unit="ETH"
-            note="open cowcentrated positions"
+            note={
+              cover.total > 0
+                ? `${cover.total} open cowcentrated position${cover.total === 1 ? "" : "s"}`
+                : "open cowcentrated positions"
+            }
           />
           <Stat
             k="Operator ETH"
@@ -117,8 +147,14 @@ export default function Deployed() {
 
         {accountedPct != null && (
           <p className="sub">
-            Visible holdings account for <b>{accountedPct.toFixed(1)}%</b> of everything ever
-            withdrawn. The remainder is not necessarily missing — it may have been returned to the
+            Visible holdings account for{" "}
+            <b>{partial ? "at least " : ""}{accountedPct.toFixed(1)}%</b> of everything ever
+            withdrawn.{partial && (
+              <>
+                {" "}It is a floor, not a figure: {cover.total - cover.priced} of {cover.total} Beefy
+                positions could not be priced on this pass and are counted at nothing.
+              </>
+            )} The remainder is not necessarily missing — it may have been returned to the
             Treasury with <code>fund()</code>, spent on gas, or moved into a venue this page does
             not scan. What this page can prove is only what it can read, and it reads three places:
             Beefy, the wallet's ETH, and the wallet's AGORA.

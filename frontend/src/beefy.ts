@@ -382,6 +382,24 @@ export function totalDeployedWei(ps: BeefyPosition[]): bigint | null {
   return priced.reduce((acc, p) => acc + (p.valueWei ?? 0n), 0n);
 }
 
+/**
+ * How much of the position list the total actually covers.
+ *
+ * `totalDeployedWei` returns null for two different facts — "there are no
+ * positions" and "there are positions but none of them could be priced" — and
+ * a caller that collapses both to `0` publishes the second one as a
+ * measurement. It is not: the positions are visibly there, and saying they are
+ * worth nothing is worse than saying nothing.
+ *
+ * Pricing is the fragile half of this read. Discovery is one multicall, but
+ * valuation walks each vault's strategy to its pool, and a single slow response
+ * anywhere in that chain drops a position to unpriced. So partial coverage is
+ * normal and has to be sayable.
+ */
+export function pricedCoverage(ps: BeefyPosition[]): { priced: number; total: number } {
+  return { priced: ps.filter((p) => p.valueWei !== null).length, total: ps.length };
+}
+
 export type OperatorHoldings = {
   eth: bigint | null;
   agora: bigint | null;
