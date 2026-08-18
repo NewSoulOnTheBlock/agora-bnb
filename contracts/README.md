@@ -6,7 +6,7 @@ The collective balance sheet behind AGORA's redemption floor. **ETH-denominated 
 ```bash
 npm install
 npm run compile
-npm test                  # 43 tests
+npm test                  # 165 tests
 ```
 
 ## Why ETH-denomination makes v1 oracle-free
@@ -298,9 +298,102 @@ deployed there is no yield, so stakers and staked Suits earn exactly nothing.** 
 above zero pays them out of trade tax at the cost of slowing the floor. Capped at 50%. Only
 tax is ever split — donations are unambiguously gifts to the corpus.
 
-## Not written yet
+## BeefyCLMAdapter — the yield sleeve
 
-`BeefyAdapter` is specified in spec §3.1 but does not exist; `sleeveBps` stays 0 until it does.
+`contracts/adapters/BeefyCLMAdapter.sol` deploys corpus ETH into a **Beefy
+Cowcentrated Liquidity Manager** vault without the ETH leaving the Treasury's
+accounting.
+
+It replaces the manual route — `Treasury.withdraw()` → operator EOA → the
+beefy.com zap → the operator personally holding the position. That route works,
+but the deployed ETH **leaves `nav()` entirely**, so the reported floor drops by
+the full amount deployed and the position backs nothing on-chain.
+
+```
+deposit(ETH)
+  → wrap to WETH
+  → swap the correct fraction to the paired token, straight through the
+    Uniswap v3 pool (no router, no path encoding, no off-chain route)
+  → CLM.deposit(amount0, amount1, minShares)
+  → RewardPool.stake(shares)
+```
+
+The split comes from the vault's live `balances()` ratio, so the deposit lands
+in-ratio rather than being diluted. Beefy's own zap takes a route **computed
+off-chain** and a contract cannot produce that for itself, which is why this
+does the equivalent work natively instead of wrapping `BeefyZapRouter`.
+
+**Only WETH-paired vaults.** The pair must have WETH on one side. On chain 4663
+that covers `weth-usdg`, `stonkbroker-weth`, `cashcat-weth`, `tendies-weth` and
+friends. It does **not** cover the USDG/tokenized-stock vaults (`msft-usdg`,
+`aapl-usdg`, …) — those need a two-hop route, and their stock leg is ERC-8056
+with a `uiMultiplier`, which spec §6.2 flags as its own valuation trap. The
+deploy script aborts rather than deploying against a vault with no WETH leg.
+
+### `totalAssets()` is the number that had to be got right
+
+It feeds `Treasury.nav()`, which sets `floorPerToken()`, which sets the
+**redemption price**. The pool this was built against holds ~1.8 ETH in total,
+so spot price there is cheap to move — a naive mark-to-market would be a direct
+theft vector (spec §6.3). Three layers answer that:
+
+1. **Valuation takes `min(spot, TWAP)`.** Pumping spot cannot raise reported
+   assets; crashing it only understates them, which is the safe direction.
+2. **The Treasury already caps corpus at `min(totalAssets, principal)`**, so no
+   reading of the adapter can inflate NAV above the ETH actually deployed.
+3. **`realizeSurplus()` — the only path that pays value *out* on a price
+   reading — also requires Beefy's `isCalm()`** and a cooldown. That closes the
+   remaining vector: pump the pool, then let the permissionless
+   `Treasury.realizeSurplus()` turn fictitious appreciation into staker income.
+
+`totalAssets()` cannot revert: a broken oracle returns 0 and flips `healthy()`
+to false. `payout()` touches `nav()`, so an adapter able to revert a NAV read
+would brick redemption for everyone.
+
+### Impermanent loss is not hedged
+
+A CLM position is a concentrated two-asset LP. If the paired token falls, the
+position converts into that token and the ETH value of the corpus falls with it.
+`principal()` is a high-water mark, so the loss is reported honestly — NAV
+drops, the floor drops, `FloorRegression` fires. Only `sleeveBps` and
+`maxVaultShareBps` bound how much is exposed. **Spec §4.3 says never to point
+this at a memecoin pair**, and that advice is unchanged by the adapter existing.
+
+### Round-trip cost, measured
+
+Against the live STONKBROKER/WETH vault on a fork, a 0.05 ETH round trip cost
+**187 bps** — two swaps through a 1% pool plus CLM fees. Yield has to clear that
+before a deployment is worth making, so this is for positions held for a while,
+not for parking ETH overnight.
+
+### Testing
+
+```bash
+npx hardhat test test/BeefyAdapter.test.ts        # 23 guard tests, mocked
+
+# full lifecycle against the REAL Beefy vault:
+npx hardhat node --fork $RH_RPC_URL --port 8546
+npx hardhat run scripts/rehearse-beefy.ts --network forked
+```
+
+The mocks prove the guards — access control, the TWAP band, the capacity cap,
+the calm gate, that `totalAssets()` cannot revert. They deliberately do **not**
+model Beefy's economics; a mock that agreed with my own assumptions would prove
+nothing. Whether a deposit really mints the shares it should, and what the round
+trip really costs, is answered by the fork rehearsal against live state.
+
+### Deploying it
+
+```bash
+CLM=0x… REWARD_POOL=0x… npx hardhat run scripts/deploy-beefy-adapter.ts --network robinhood
+```
+
+Deploying is harmless on its own — the adapter holds nothing and the Treasury
+does not know about it. Three owner actions, one behind the 2-day
+`ADAPTER_TIMELOCK`, stand between deployment and any corpus ETH moving:
+`queueAdapter` → wait → `activateAdapter` → `setSleeveBps` → `depositToAdapter`.
+
+## Not written yet
 
 `StakedAgora` and `Redeemer` are deployed by **step 3** (`bind.ts`), not step 1, because both
 take the token address as a constructor argument. Until `Redeemer` is set via `setRedeemer()`,
@@ -315,11 +408,21 @@ than owning it, so stakers must keep their floor backing.
 contracts/
   Treasury.sol              ETH corpus, NAV, floor, capped sleeve, timelocked adapters
   FeeSink.sol               logic-free 2300-gas-safe ETH receiver
+  Redeemer.sol              burn AGORA → queued pro-rata claim at a haircut
+  StakedAgora.sol           ERC-4626 stAGORA; ETH rewards via an accumulator
+  StakedSuits.sol           custodial ERC-721 staking, one Suit one share
+  Distributor.sol           10/90 split between staked Suits and stAGORA
+  adapters/BeefyCLMAdapter.sol   ETH ⇄ Beefy cowcentrated vault, TWAP-guarded
   interfaces/IYieldAdapter.sol   the only external integration surface
-  mocks/Mocks.sol           test doubles incl. a 2300-gas sender and a reverting adapter
+  interfaces/IBeefyCLM.sol  Beefy + Uniswap v3 ABIs, read from verified sources
+  libraries/UniV3Math.sol   FullMath.mulDiv + TickMath.getSqrtRatioAtTick
+  mocks/                    test doubles incl. a 2300-gas sender and a broken oracle
 scripts/
   deploy.ts                 Treasury → FeeSink → wire; prints multisig calldata if needed
+  deploy-beefy-adapter.ts   adapter + the governance sequence that activates it
+  rehearse-beefy.ts         full adapter lifecycle against a FORK of the live vault
   seed-local.ts             local-only mock AGORA for rehearsing deploy.ts
 test/
-  Treasury.test.ts          43 tests
+  Treasury.test.ts          82 tests
+  BeefyAdapter.test.ts      23 guard tests (mocked; economics proven on a fork)
 ```

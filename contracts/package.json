@@ -1,7 +1,7 @@
 {
   "name": "agora-contracts",
   "version": "0.1.0",
-  "description": "AGORA — ETH-denominated Treasury and FeeSink for the redemption floor (Robinhood Chain, 4663)",
+  "description": "AGORA \u2014 ETH-denominated Treasury and FeeSink for the redemption floor (Robinhood Chain, 4663)",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
@@ -10,7 +10,10 @@
     "deploy:robinhood": "hardhat run scripts/deploy.ts --network robinhood",
     "launch:robinhood": "hardhat run scripts/launch.ts --network robinhood",
     "bind:robinhood": "hardhat run scripts/bind.ts --network robinhood",
-    "rehearse": "hardhat run scripts/rehearse.ts --network localhost"
+    "rehearse": "hardhat run scripts/rehearse.ts --network localhost",
+    "fork": "hardhat node --fork ${RH_RPC_URL:-https://rpc.mainnet.chain.robinhood.com} --port 8546",
+    "rehearse:beefy": "hardhat run scripts/rehearse-beefy.ts --network forked",
+    "deploy:adapter": "hardhat run scripts/deploy-beefy-adapter.ts --network robinhood"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

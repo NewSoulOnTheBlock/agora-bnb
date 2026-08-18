@@ -17,7 +17,7 @@ which is the only address allowed to call `sweepFees`. That is exactly how v1 di
 cd contracts
 cp .env.example .env
 npm install
-npm test          # expect 133 passing
+npm test          # expect 165 passing
 npm run rehearse  # optional: full 3-step dry run vs. a local node
 ```
 
@@ -215,10 +215,17 @@ Two consequences to hold in mind:
 - **You cannot withdraw staker income.** Withdrawal is capped at `liquidEth()`, which excludes
   `pendingIncome`. That ETH is owed to stAGORA and staked Suits holders.
 
-Why there is no Beefy adapter: measured on 2026-08-17, Beefy on chain 4663 runs **9 vaults
-totalling ~$2.7k TVL, every one a two-asset LP, zero single-asset**. The largest is $2,347.
-There is nothing there that can absorb a corpus, so manual deployment through the operator
-wallet is the practical route.
+**There is now an on-chain alternative to that manual route.** `BeefyCLMAdapter` deploys corpus
+ETH into a WETH-paired Beefy cowcentrated vault **without the ETH leaving `nav()`**, so the
+floor stops dropping by the full amount every time you put money to work. See
+[`contracts/README.md`](./contracts/README.md#beefyclmadapter--the-yield-sleeve). It only
+handles vaults with a WETH leg; the USDG/tokenized-stock vaults still need the operator route.
+
+Beefy's capacity on this chain remains the binding constraint, not APY. Measured 2026-08-18:
+**57 vaults, ~$138k TVL chain-wide, every one a two-asset LP, zero single-asset.** The largest
+is `cashcat-weth-rp` at $87k; `weth-usdg-rp` — the only non-memecoin, non-stock pair — holds
+$4.5k. A corpus taking 0.78 ETH of tax in its first days outgrows any single vault quickly,
+which is what `maxVaultShareBps` on the adapter and `sleeveBps` on the Treasury are for.
 
 ## Treasury allocation is manual, by design
 
@@ -243,5 +250,12 @@ Say the word if you want `realizeSurplus` gated to the owner as well; it is a on
 It is left open because it can only move value toward the protocol, and gating it would add a
 liveness dependency for no security gain.
 
-**Nothing is deployed against Beefy today.** `sleeveBps` is 0 and there are no adapters, so
-100% of the corpus sits as liquid ETH in the Treasury until you deliberately change that.
+**Nothing is deployed against Beefy from the Treasury today.** On-chain, `sleeveBps` is 0 and
+`adapters()` is empty, so 100% of the corpus sits as liquid ETH until you deliberately change
+that. `BeefyCLMAdapter` exists in the repo but is not deployed or activated — that takes
+`queueAdapter` → 2 days → `activateAdapter` → `setSleeveBps` → `depositToAdapter`.
+
+Note this is separate from any position the **operator wallet** holds on beefy.com. Those were
+funded by `Treasury.withdraw()`, so that ETH already left `nav()` and the adapter cannot adopt
+them. To bring them under the Treasury's accounting they have to be withdrawn on beefy.com,
+returned with `Treasury.fund()`, and redeployed through the adapter.
