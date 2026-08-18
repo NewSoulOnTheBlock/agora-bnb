@@ -1,5 +1,51 @@
 import type { ReactNode } from "react";
-import { DASH } from "./format";
+import { formatUnits } from "ethers";
+import { DASH, fmtGrouped } from "./format";
+
+/**
+ * The "balance …" line above an amount input, made clickable.
+ *
+ * Typing out 10,000,000 by hand to unstake everything is a real cost and a real
+ * source of off-by-a-digit mistakes. Clicking the figure fills the field with
+ * the **exact** balance — `formatUnits`, not the grouped display string — so
+ * the value that goes back through `parseUnits` is bit-for-bit what the wallet
+ * holds and "max" never leaves dust behind.
+ *
+ * `decimals` is required rather than defaulted: the one balance on this site
+ * that is not 18dp is stAGORA, and that is precisely the field where a wrong
+ * default would be least visible.
+ */
+export function Balance({
+  label = "balance", value, decimals, unit, frac = 2, onPick,
+}: {
+  label?: string;
+  value: bigint | null;
+  decimals: number;
+  unit: string;
+  frac?: number;
+  onPick?: (exact: string) => void;
+}) {
+  const usable = value !== null && value > 0n && !!onPick;
+  const text = (
+    <>
+      {label} <b>{value !== null ? fmtGrouped(value, frac, decimals) : DASH}</b> {unit}
+    </>
+  );
+
+  if (!usable) return <span className="bal">{text}</span>;
+
+  return (
+    <button
+      type="button"
+      className="bal pick"
+      title={`Use the full balance — ${formatUnits(value, decimals)} ${unit}`}
+      onClick={() => onPick(formatUnits(value, decimals))}
+    >
+      {text}
+      <span className="maxtag">MAX</span>
+    </button>
+  );
+}
 
 export function Panel({
   label, id, children, tight, right,

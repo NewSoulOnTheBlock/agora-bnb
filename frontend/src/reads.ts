@@ -225,6 +225,7 @@ export async function readReserve(): Promise<Reserve> {
 export type Staking = {
   deployed: boolean;
   totalAssets: bigint | null;
+  /** Raw stAGORA supply — 21 decimals, not 18. See `ST_AGORA_DECIMALS`. */
   totalShares: bigint | null;
   cumulativeRewards: bigint | null;
   cumulativeClaimed: bigint | null;

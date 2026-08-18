@@ -100,7 +100,7 @@ export function useBeefy(holder: string | null | undefined, intervalMs = 60_000)
       readBeefyPositions(holder)
         .then((d) => alive && setState({ data: d, loading: false, error: null }))
         .catch((e) => alive && setState({ data: null, loading: false, error: String(e?.message ?? e) }));
-    warmup = window.setTimeout(go, 1200);
+    warmup = window.setTimeout(go, 400);
     const t = setInterval(go, intervalMs);
     return () => { alive = false; clearTimeout(warmup); clearInterval(t); };
   }, [holder, intervalMs]);

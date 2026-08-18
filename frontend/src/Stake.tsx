@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatEther, parseEther } from "ethers";
-import { Panel, Row, Stat, Pill, Dot } from "./components";
+import { formatEther, parseUnits } from "ethers";
+import { Panel, Row, Stat, Pill, Dot, Balance } from "./components";
 import StakePitch from "./StakePitch";
 import { AwaitingDeployment } from "./Layout";
 import { fmtGrouped, fmtSig, DASH } from "./format";
-import { AGORA, ZERO, explorerAddr, SUITS_SHARE_BPS } from "./chain";
+import { AGORA, ZERO, explorerAddr, SUITS_SHARE_BPS, ST_AGORA_DECIMALS } from "./chain";
 import {
   readStakePosition, approveAgoraForStaking, stakeAgora, unstakeAgora,
   claimAgoraYield, type StakePosition,
@@ -31,11 +31,20 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  /**
+   * The field means different tokens in the two modes, and they do not share a
+   * scale: `deposit` takes AGORA assets at 18dp, `redeem` takes stAGORA shares
+   * at 21dp. Parsing both as ether would send a redeem a thousand times too
+   * small — the user would type their whole balance and unstake a thousandth
+   * of it.
+   */
+  const decimals = mode === "stake" ? 18 : ST_AGORA_DECIMALS;
+
   const parsed = useMemo(() => {
     const t = amount.trim();
     if (!t) return 0n;
-    try { return parseEther(t); } catch { return null; }
-  }, [amount]);
+    try { return parseUnits(t, decimals); } catch { return null; }
+  }, [amount, decimals]);
 
   const balance = mode === "stake" ? pos?.agoraBalance ?? null : pos?.shares ?? null;
   const needsApproval =
@@ -94,10 +103,12 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           <div className="field">
             <div className="field-top">
               <span className="k">{mode === "stake" ? "Amount to stake" : "Shares to redeem"}</span>
-              <span className="bal">
-                balance <b>{balance !== null ? fmtGrouped(balance, 2) : DASH}</b>{" "}
-                {mode === "stake" ? "AGORA" : "stAGORA"}
-              </span>
+              <Balance
+                value={balance}
+                decimals={decimals}
+                unit={mode === "stake" ? "AGORA" : "stAGORA"}
+                onPick={setAmount}
+              />
             </div>
             <div className="input-wrap">
               <input
@@ -178,7 +189,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           <div className="grid c2">
             <Stat
               k="Your position"
-              value={pos?.shares != null ? fmtGrouped(pos.shares, 2) : null}
+              value={pos?.shares != null ? fmtGrouped(pos.shares, 2, ST_AGORA_DECIMALS) : null}
               unit="stAGORA"
               note={pos?.pendingYield != null ? `${fmtSig(pos.pendingYield)} ETH unclaimed` : undefined}
             />

@@ -9,6 +9,7 @@ import { useDrag, withDrag } from "./win98/useDrag";
 import TaxWatch from "./win98/TaxWatch";
 import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
 import { MyComputer, NetworkNeighborhood, Notepad } from "./win98/Explorer";
+import { NftFolder } from "./win98/NftFolder";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
 import { AGORA, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
 
@@ -240,7 +241,7 @@ export default function Layout({
   const [tip, setTip] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
   const [win, setWin] = useState<
-    null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad"
+    null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad" | "suitsfolder"
   >(null);
   const [crt, setCrt] = useState(() => {
     try { return localStorage.getItem("agora98:crt") === "on"; } catch { return false; }
@@ -425,6 +426,21 @@ export default function Layout({
           </span>
         </button>
 
+        {/* The wallet's Suits, as a folder. Right-click a file to stake it —
+            the collection is not enumerable, so the folder has to read all 1111
+            owners to know which files belong in it. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("suitsfolder"); }}
+          title="My Suits — your NFTs"
+        >
+          <PixelIcon name="folder" size={32} />
+          <span>
+            My Suits
+            <span className="kana">スーツ</span>
+          </span>
+        </button>
+
         <button className="desk-icon" onClick={() => { play("click"); setDialog("bin"); }} title="Recycle Bin">
           <PixelIcon name="recycle" size={32} />
           <span>Recycle Bin</span>
@@ -586,6 +602,7 @@ export default function Layout({
               open={openMenu === "help"} setOpen={(v) => setOpenMenu(v ? "help" : null)}
               entries={[
                 { kind: "item", label: "What is this?", onClick: () => go("about") },
+                { kind: "item", label: "My Suits…", onClick: () => setWin("suitsfolder") },
                 { kind: "item", label: "Windows Update…", onClick: () => setWin("update") },
                 { kind: "item", label: "Redemption Queue…", onClick: () => setWin("queue") },
                 { kind: "item", label: "System Properties…", onClick: () => setWin("sysprops") },
@@ -810,6 +827,9 @@ export default function Layout({
       {win === "mycomputer" && <MyComputer onClose={() => { play("close"); setWin(null); }} />}
       {win === "network" && <NetworkNeighborhood onClose={() => { play("close"); setWin(null); }} />}
       {win === "notepad" && <Notepad onClose={() => { play("close"); setWin(null); }} />}
+      {win === "suitsfolder" && (
+        <NftFolder wallet={wallet} onClose={() => { play("close"); setWin(null); }} />
+      )}
 
       {/* ---- start menu ---- */}
       {startOpen && (
@@ -842,6 +862,10 @@ export default function Layout({
             <button role="menuitem" onClick={() => { play("open"); setWin("network"); setStartOpen(false); }}>
               <PixelIcon name="network" size={24} />
               Network Neighborhood
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("suitsfolder"); setStartOpen(false); }}>
+              <PixelIcon name="folder" size={24} />
+              My Suits
             </button>
             <button role="menuitem" onClick={() => { play("open"); setWin("notepad"); setStartOpen(false); }}>
               <PixelIcon name="help" size={24} />

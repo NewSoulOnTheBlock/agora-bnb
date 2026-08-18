@@ -2,7 +2,7 @@ import { Contract, Interface } from "ethers";
 import {
   readProvider, BEEFY_VAULTS, WETH_ADDR, USDG_ADDR, WETH_USDG_POOL, ZERO, beefyUrl,
 } from "./chain";
-import { aggregate3, multiRead, asStr, asBig } from "./multicall";
+import { aggregate3Strict, multiRead, asStr, asBig } from "./multicall";
 
 /**
  * Reads the Beefy positions the operator wallet holds.
@@ -335,7 +335,9 @@ export async function readBeefyPositions(holder: string): Promise<BeefyPosition[
   const targets: string[] = [];
   for (const [, , clmAddr, rpAddr] of BEEFY_VAULTS) targets.push(rpAddr, clmAddr);
 
-  const raw = await aggregate3(targets.map((target) => ({ target, callData })));
+  // Strict: a failed sweep must not decode to 33 zero balances and be
+  // reported as "no positions". Let it throw and surface as an error.
+  const raw = await aggregate3Strict(targets.map((target) => ({ target, callData })));
   const num = (r: string | null): bigint => {
     if (r === null) return 0n;
     try {
@@ -385,9 +387,11 @@ export type OperatorHoldings = {
   agora: bigint | null;
   /** AGORA valued at the live pool price, in wei. */
   agoraWei: bigint | null;
-  /** stAGORA shares. The operator is staked in the protocol's own vault. */
+  /** stAGORA shares, raw — 21 decimals, not 18. See `ST_AGORA_DECIMALS`. */
   stAgora: bigint | null;
-  /** Those shares expressed in AGORA, then in wei. */
+  /** Those shares expressed in AGORA (18dp), by the vault's own accounting. */
+  stAgoraAssets: bigint | null;
+  /** And that, valued at the pool price, in wei. */
   stAgoraWei: bigint | null;
 };
 
@@ -410,7 +414,10 @@ export async function readOperatorHoldings(
   stAgoraVault: string,
   priceWad: bigint | null
 ): Promise<OperatorHoldings> {
-  const empty = { eth: null, agora: null, agoraWei: null, stAgora: null, stAgoraWei: null };
+  const empty = {
+    eth: null, agora: null, agoraWei: null,
+    stAgora: null, stAgoraAssets: null, stAgoraWei: null,
+  };
   if (!holder || holder === ZERO) return empty;
 
   const bal = "function balanceOf(address) view returns (uint256)";
@@ -419,16 +426,50 @@ export async function readOperatorHoldings(
     safe(async () => BigInt(await readProvider.getBalance(holder))),
     multiRead([
       { target: agoraToken, fragment: bal, args: [holder] },
-      // stAGORA shares track deposits one-to-one — rewards are ETH and stay
-      // outside `totalAssets()` — so a share count is an AGORA count.
       { target: stAgoraVault, fragment: bal, args: [holder] },
     ]),
   ]);
 
   const agora = asBig(tokens[0]);
   const stAgora = asBig(tokens[1]);
+
+  /**
+   * Shares are NOT interchangeable with assets at the raw-integer level.
+   *
+   * They track one-to-one in *whole* units — rewards are ETH and stay outside
+   * `totalAssets()`, so the share price never moves — but stAGORA carries a
+   * decimals offset of 3, which makes a raw share number a thousand times
+   * larger than the AGORA it represents. Pricing the raw number, as this used
+   * to, inflated the operator's reported holdings 1000× and fed that straight
+   * into the "visible holdings account for N%" reconciliation.
+   *
+   * `convertToAssets` is the vault's own answer, so this stays correct even if
+   * the offset or the share price ever changes.
+   */
+  const stAgoraAssets =
+    stAgora === null || stAgora === 0n
+      ? stAgora
+      : asBig(
+          (
+            await multiRead([
+              {
+                target: stAgoraVault,
+                fragment: "function convertToAssets(uint256) view returns (uint256)",
+                args: [stAgora],
+              },
+            ])
+          )[0]
+        );
+
   const wei = (v: bigint | null) =>
     v !== null && priceWad !== null ? (v * priceWad) / 10n ** 18n : null;
 
-  return { eth, agora, agoraWei: wei(agora), stAgora, stAgoraWei: wei(stAgora) };
+  return {
+    eth,
+    agora,
+    agoraWei: wei(agora),
+    stAgora,
+    stAgoraAssets,
+    stAgoraWei: wei(stAgoraAssets),
+  };
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther, parseEther } from "ethers";
-import { Panel, Row, Stat, Pill, Dot } from "./components";
+import { Panel, Row, Stat, Pill, Dot, Balance } from "./components";
 import { AwaitingDeployment } from "./Layout";
 import { fmtGrouped, fmtSig, DASH } from "./format";
 import { AGORA, ZERO, explorerAddr } from "./chain";
@@ -106,9 +106,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
           <div className="field">
             <div className="field-top">
               <span className="k">Amount to burn</span>
-              <span className="bal">
-                balance <b>{balance !== null ? fmtGrouped(balance, 2) : DASH}</b> AGORA
-              </span>
+              <Balance value={balance} decimals={18} unit="AGORA" onPick={setAmount} />
             </div>
             <div className="input-wrap">
               <input

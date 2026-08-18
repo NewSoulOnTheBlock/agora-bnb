@@ -63,7 +63,7 @@ export type Call = { target: string; callData: string };
  * reads, sat in the queue and never landed. The heavy scan is also delayed on
  * mount (see `useBeefy`) so it stops competing with first paint.
  */
-const MAX_INFLIGHT = 3;
+const MAX_INFLIGHT = 4;
 let inflight = 0;
 const waiting: (() => void)[] = [];
 
@@ -116,6 +116,40 @@ export async function aggregate3(calls: Call[]): Promise<(string | null)[]> {
       } catch {
         return calls.map(() => null);
       }
+    }
+  });
+}
+
+/**
+ * Like `aggregate3`, but a failure throws instead of decoding to nulls.
+ *
+ * The soft version is right for a panel of independent fields: one unreadable
+ * value renders "unavailable" and the rest still show. It is **wrong** for a
+ * sweep, because there every null looks like a legitimate zero — and a sweep
+ * that comes back all-zero is indistinguishable from a sweep that found
+ * nothing. That mistake put "No open Beefy positions" on screen while three
+ * positions were sitting on-chain.
+ *
+ * So a caller that would misread nulls as data uses this, and lets the error
+ * reach the UI as "could not read" rather than as a finding.
+ */
+export async function aggregate3Strict(calls: Call[]): Promise<(string | null)[]> {
+  if (!calls.length) return [];
+
+  const send = async () => {
+    const mc = new Contract(MULTICALL3, MC3_ABI, readProvider);
+    const res: { success: boolean; returnData: string }[] = await mc.aggregate3(
+      calls.map((c) => ({ target: c.target, allowFailure: true, callData: c.callData }))
+    );
+    return res.map((r) => (r.success && r.returnData !== "0x" ? r.returnData : null));
+  };
+
+  return gate(async () => {
+    try {
+      return await send();
+    } catch {
+      await sleep(450);
+      return send(); // second failure propagates
     }
   });
 }
@@ -175,8 +209,15 @@ export type MCall = { target: string; fragment: string; args?: unknown[] };
  * A call that reverts, or a contract that is not there, decodes to `null` — the
  * same contract as the old per-call `safe()` wrapper, so readers keep rendering
  * "unavailable" for one bad value instead of losing the whole panel.
+ *
+ * `strict` swaps that for `aggregate3Strict`, which throws instead. Use it for
+ * a **sweep**, where a soft failure is indistinguishable from a real zero and
+ * would be read as a finding: every balance zero, every token not yours.
  */
-export async function multiRead(calls: MCall[]): Promise<(unknown[] | null)[]> {
+export async function multiRead(
+  calls: MCall[],
+  opts?: { strict?: boolean }
+): Promise<(unknown[] | null)[]> {
   const ifaces = calls.map((c) => new Interface([c.fragment]));
   const names = ifaces.map((i) => i.fragments[0].format("sighash").split("(")[0]);
 
@@ -185,7 +226,7 @@ export async function multiRead(calls: MCall[]): Promise<(unknown[] | null)[]> {
     callData: ifaces[i].encodeFunctionData(names[i], c.args ?? []),
   }));
 
-  const raw = await aggregate3(encoded);
+  const raw = opts?.strict ? await aggregate3Strict(encoded) : await batched(encoded);
 
   return raw.map((r, i) => {
     if (r === null) return null;
@@ -194,6 +235,71 @@ export async function multiRead(calls: MCall[]): Promise<(unknown[] | null)[]> {
     } catch {
       return null;
     }
+  });
+}
+
+/* --------------------------------------------------------------------------
+   Automatic coalescing
+   --------------------------------------------------------------------------
+   Every reader on a page fires at mount, and each one used to become its own
+   `aggregate3`: the snapshot's six, the pool state, the ETH price. Twenty-odd
+   round-trips through a gate three wide is slow, and it is slow for no reason —
+   they are all the same kind of call to the same contract.
+
+   So calls are buffered for a few milliseconds and everything raised in that
+   window goes out as ONE aggregate3, with results sliced back to whoever asked.
+   Readers are untouched; they simply stop paying for each other's latency.
+
+   The window is short enough to be invisible and long enough to catch a React
+   render's worth of effects, which all run in the same tick.
+-------------------------------------------------------------------------- */
+
+const BATCH_MS = 12;
+/** Beyond this the call itself gets unwieldy, so a full buffer flushes early. */
+const BATCH_MAX = 350;
+
+type Pending = {
+  calls: Call[];
+  resolve: (v: (string | null)[]) => void;
+};
+
+let buffer: Pending[] = [];
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+function flush() {
+  const batch = buffer;
+  buffer = [];
+  timer = null;
+  if (!batch.length) return;
+
+  const all: Call[] = [];
+  const spans: [number, number][] = [];
+  for (const p of batch) {
+    spans.push([all.length, p.calls.length]);
+    all.push(...p.calls);
+  }
+
+  void aggregate3(all).then((res) => {
+    batch.forEach((p, i) => {
+      const [start, len] = spans[i];
+      p.resolve(res.slice(start, start + len));
+    });
+  });
+}
+
+function batched(calls: Call[]): Promise<(string | null)[]> {
+  if (!calls.length) return Promise.resolve([]);
+
+  return new Promise((resolve) => {
+    buffer.push({ calls, resolve });
+
+    const queued = buffer.reduce((n, p) => n + p.calls.length, 0);
+    if (queued >= BATCH_MAX) {
+      if (timer) clearTimeout(timer);
+      flush();
+      return;
+    }
+    if (!timer) timer = setTimeout(flush, BATCH_MS);
   });
 }
 

@@ -128,6 +128,25 @@ export const AGORA: {
 };
 
 /**
+ * stAGORA does **not** have 18 decimals. It has 21.
+ *
+ * `StakedAgora._decimalsOffset()` returns 3 — OpenZeppelin's virtual-share
+ * defence against the classic 4626 first-depositor donation attack — and
+ * ERC-4626 defines `decimals() = underlying decimals + offset`. So one whole
+ * stAGORA is `1e21`, and it is still worth exactly one AGORA: the share price
+ * never legitimately moves, because rewards are ETH and live outside
+ * `totalAssets()`.
+ *
+ * Formatting a share balance through `formatEther` therefore prints it **1000×
+ * too large** — a 10,000,000 AGORA stake rendering as "10,000,000,000 stAGORA".
+ * Anything that touches a raw share number must scale by this, not by WAD.
+ * Nothing on-chain is affected: the reward accumulator divides and multiplies
+ * by the same supply, so the offset cancels, and the floor is computed from
+ * AGORA's own `totalSupply()`, never the vault's.
+ */
+export const ST_AGORA_DECIMALS = 21;
+
+/**
  * The Suits ERC-721 — LIVE and independent of the relaunch.
  * SeaDrop clone, fully minted 1111/1111, chain 4663.
  *
@@ -147,28 +166,34 @@ export const SUITS_VALIDATOR = "0xA000027A9B2802E1ddf7000061001e5c005A0000";
 export const SUITS_MARKET = "https://opensea.io/collection/suitsonchain";
 
 /**
- * Suits staking is DISABLED because it cannot currently work.
+ * Suits staking is ENABLED — the transfer validator no longer blocks it.
  *
- * The collection sits at Limit Break transfer-security **level 3** —
- * "allowlisted operators only". `StakedSuits.stake()` calls
- * `suits.transferFrom(owner, vault, id)` with the *vault* as `msg.sender`,
- * which makes the vault an operator, and it is not on the allowlist:
+ * ## What used to be wrong
  *
- *   isOperatorWhitelisted(list 0, 0xE76Cb0cc…e1A3) → false
+ * The collection sat at Limit Break transfer-security **level 3**, "allowlisted
+ * operators only". `StakedSuits.stake()` calls `suits.transferFrom(owner,
+ * vault, id)` with the *vault* as `msg.sender`, which makes the vault an
+ * operator, and it was not on the allowlist. Control tests at the time showed
+ * an owner-initiated transfer into the vault succeeding and a vault-as-operator
+ * transfer reverting — the operator policy, not the destination and not a
+ * missing approval, so no amount of approving fixed it.
  *
- * Verified by control tests: an owner-initiated transfer INTO the vault
- * succeeds and a transfer to an EOA succeeds, but a vault-as-operator transfer
- * reverts. So it is the operator policy, not the destination and not a missing
- * approval — no amount of approving fixes it.
+ * ## Re-verified on chain 4663, and it now passes
  *
- * The vault contract is fine and needs no redeploy. Flip this to `true` the
- * moment the Suits owner (0x53977e37…f6ED) allowlists the vault or drops the
- * collection to security level 1 or 0.
+ * `eth_estimateGas` on `StakedSuits.stake([id])` from a holder returns
+ * **150,821 gas** for every token tried, rather than reverting. The control
+ * still holds — a caller with no rights reverts — so the node is enforcing
+ * `msg.sender` and the simulation is meaningful. The collection owner has
+ * either allowlisted the vault or dropped the security level.
  *
- * Until then the Distributor reroutes the Suits share to stAGORA, which is the
- * designed fallback and is working correctly.
+ * The validator address is unchanged and the owner can tighten the policy again
+ * at any time, which is why the disclosure on the Suits page stays: unstaking
+ * could be blocked later, and nothing in these contracts can prevent that.
+ *
+ * A holder still has to `setApprovalForAll(vault, true)` once — that is an
+ * ordinary ERC-721 approval, not the thing that was broken.
  */
-export const SUITS_STAKING_ENABLED = false;
+export const SUITS_STAKING_ENABLED = true;
 
 /** Share of yield routed to staked Suits. Mirrors Distributor.suitsBps default. */
 export const SUITS_SHARE_BPS = 1000;

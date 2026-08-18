@@ -2,7 +2,7 @@ import { Panel, Stat, Row, Dot, Pill } from "./components";
 import { useSnapshot, useBeefy, useOperatorHoldings, useEthUsd } from "./useReads";
 import { usdOf } from "./price";
 import { fmtSig, fmtGrouped, fmtUnits, DASH } from "./format";
-import { AGORA, explorerAddr } from "./chain";
+import { AGORA, explorerAddr, ST_AGORA_DECIMALS } from "./chain";
 
 /**
  * Deployed capital.
@@ -105,7 +105,7 @@ export default function Deployed() {
           />
           <Stat
             k="Operator stAGORA"
-            value={held?.stAgora != null ? fmtGrouped(held.stAgora, 0) : null}
+            value={held?.stAgora != null ? fmtGrouped(held.stAgora, 0, ST_AGORA_DECIMALS) : null}
             unit="stAGORA"
             note={
               held?.stAgoraWei != null
@@ -130,7 +130,7 @@ export default function Deployed() {
         <p className="label">
           Open positions{" "}
           <span className="id">
-            {beefy.data ? `${beefy.data.length} of 33 vaults` : "scanning…"}
+            {beefy.error ? "scan failed" : beefy.data ? `${beefy.data.length} of 33 vaults` : "scanning…"}
           </span>
         </p>
 
@@ -140,7 +140,23 @@ export default function Deployed() {
           </Panel>
         )}
 
-        {beefy.data && beefy.data.length === 0 && (
+        {/* A failed sweep and an empty one are different facts and must read
+            differently. Claiming "no positions" because the RPC did not answer
+            is the same class of mistake as rendering a zero for a value that
+            could not be read. */}
+        {beefy.error && (
+          <Panel tight>
+            <span className="err" style={{ marginTop: 0 }}>
+              Could not read the Beefy registry — {beefy.error}
+            </span>
+            <p className="sub" style={{ marginTop: 6 }}>
+              This is a failed read, not a finding. Positions may well be open; the sweep will
+              retry on the next pass.
+            </p>
+          </Panel>
+        )}
+
+        {!beefy.error && beefy.data && beefy.data.length === 0 && (
           <Panel tight>
             <span className="muted">
               No open Beefy positions. Every wei withdrawn has either come back to the Treasury or
