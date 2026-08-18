@@ -1,7 +1,6 @@
 import { Contract } from "ethers";
 import {
   readProvider, V4, PONS, AGORA, ZERO, activeToken, SUITS_NFT,
-  AGORA_V4_POOL_ID, AGORA_V4_POOL_KEY,
 } from "./chain";
 import {
   STAKED_SUITS_ABI, DISTRIBUTOR_ABI, SUITS_ABI,
@@ -46,50 +45,28 @@ export type PoolState = {
 };
 
 export async function readPoolState(token: string): Promise<PoolState> {
-  const derivedKey = ponsPoolKey(token);
-  const derivedId = poolId(derivedKey);
+  const key = ponsPoolKey(token);
+  const id = poolId(key);
 
-  // The pre-graduation key (fee 0, V2MemeHook) and the graduated one (fee
-  // 901300, no hook) are different pools, and only one of them is ever live.
-  // Read the derived id first; if it comes back uninitialised and this is the
-  // token we have a verified graduated pool for, read that instead. Without
-  // this the page showed a market price of zero after graduation.
-  const isAgora = token.toLowerCase() === AGORA.token.toLowerCase();
+  // One `eth_call` for both reads. Note that a freshly graduated pool answers
+  // zero here until its locked LP is seeded — that is a timing state, not a
+  // wrong PoolKey. See the note in `chain.ts`.
+  const r = await multiRead([
+    { target: V4.stateView, fragment: "function getSlot0(bytes32) view returns (uint160,int24,uint24,uint24)", args: [id] },
+    { target: V4.stateView, fragment: "function getLiquidity(bytes32) view returns (uint128)", args: [id] },
+  ]);
 
-  const tryPool = async (id: string) => {
-    const r = await multiRead([
-      { target: V4.stateView, fragment: "function getSlot0(bytes32) view returns (uint160,int24,uint24,uint24)", args: [id] },
-      { target: V4.stateView, fragment: "function getLiquidity(bytes32) view returns (uint128)", args: [id] },
-    ]);
-    const sqrt = r[0] && r[0].length ? BigInt(r[0][0] as bigint) : null;
-    const tick = r[0] && r[0].length > 1 ? Number(r[0][1]) : null;
-    const liq = asBig(r[1]);
-    return { sqrt, tick, liq };
-  };
-
-  let key = derivedKey;
-  let id = derivedId;
-  let { sqrt, tick, liq } = await tryPool(derivedId);
-
-  if ((sqrt === null || sqrt === 0n) && isAgora) {
-    const graduated = await tryPool(AGORA_V4_POOL_ID);
-    if (graduated.sqrt !== null && graduated.sqrt > 0n) {
-      key = { ...AGORA_V4_POOL_KEY };
-      id = AGORA_V4_POOL_ID;
-      sqrt = graduated.sqrt;
-      tick = graduated.tick;
-      liq = graduated.liq;
-    }
-  }
+  const sqrtPriceX96 = r[0] && r[0].length ? BigInt(r[0][0] as bigint) : null;
+  const tick = r[0] && r[0].length > 1 ? Number(r[0][1]) : null;
 
   return {
     key,
     id,
-    sqrtPriceX96: sqrt,
+    sqrtPriceX96,
     tick,
-    liquidity: liq,
-    priceWad: sqrt && sqrt > 0n ? priceFromSqrtX96(sqrt, key, token) : null,
-    initialised: !!sqrt && sqrt > 0n,
+    liquidity: asBig(r[1]),
+    priceWad: sqrtPriceX96 && sqrtPriceX96 > 0n ? priceFromSqrtX96(sqrtPriceX96, key, token) : null,
+    initialised: !!sqrtPriceX96 && sqrtPriceX96 > 0n,
   };
 }
 

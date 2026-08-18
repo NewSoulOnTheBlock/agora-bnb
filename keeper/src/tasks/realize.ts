@@ -1,6 +1,6 @@
 import { Contract, type Wallet } from "ethers";
 import { provider, ADDR } from "../config.js";
-import { appraise, type Job, type Decision } from "../task.js";
+import { appraise, waitFor, type Job, type Decision } from "../task.js";
 
 const TREASURY_ABI = [
   "function adapters() view returns (address[])",
@@ -58,7 +58,7 @@ export const realizeSurplus: Job = {
     const t = new Contract(ADDR.treasury, TREASURY_ABI, signer);
     const adapters: string[] = await t.adapters();
     const tx = await t.realizeSurplus(adapters[0]);
-    await tx.wait();
-    return tx.hash;
+    const state = await waitFor(tx);
+    return state === "timeout" ? `${tx.hash} (unconfirmed after 120s)` : tx.hash;
   },
 };

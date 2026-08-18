@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatEther, parseEther } from "ethers";
 import { Panel, Row, Pill, Dot } from "./components";
+import Chart from "./Chart";
 import { fmtSig, fmtGrouped, bpsToPct, DASH } from "./format";
+import { useSnapshot } from "./useReads";
 import { AGORA, PONS, explorerAddr, readProvider } from "./chain";
 import type { Wallet } from "./eth";
 import {
@@ -14,6 +16,9 @@ type Side = "buy" | "sell";
 const SLIPPAGE_CHOICES = [50, 100, 300];
 
 export default function Trade({ wallet }: { wallet: Wallet }) {
+  const { data: snap } = useSnapshot();
+  const pool = snap?.pool ?? null;
+
   const [side, setSide] = useState<Side>("buy");
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState(100);
@@ -123,19 +128,39 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
 
   return (
     <>
-      <div className="notice">
-        <b>Trading on the bonding curve.</b> AGORA has not graduated
-        {curve && <> — <b>{curve.graduationPct.toFixed(2)}%</b> of the 4.2 ETH threshold</>}, so there is no
-        Uniswap v4 pool yet and all trades route through the Pons curve at{" "}
-        <a className="link" href={explorerAddr(AGORA.curve)} target="_blank" rel="noreferrer">
-          {AGORA.curve.slice(0, 10)}…
-        </a>. The v4 path is built and validated; it activates automatically on graduation.
-      </div>
+      {graduated ? (
+        <div className="notice">
+          <b>AGORA has graduated.</b> The bonding curve is closed and every trade now routes
+          through the Uniswap v4 pool, priced by <code>StateView.getSlot0</code> rather than by
+          the curve. The 4% creator tax still applies — it lives in the hook, not the curve, so
+          graduation did not change it.
+        </div>
+      ) : (
+        <div className="notice">
+          <b>Trading on the bonding curve.</b> AGORA has not graduated
+          {curve && <> — <b>{curve.graduationPct.toFixed(2)}%</b> of the 4.2 ETH threshold</>}, so there is no
+          Uniswap v4 pool yet and all trades route through the Pons curve at{" "}
+          <a className="link" href={explorerAddr(AGORA.curve)} target="_blank" rel="noreferrer">
+            {AGORA.curve.slice(0, 10)}…
+          </a>. The v4 path is built and validated; it activates automatically on graduation.
+        </div>
+      )}
+
+      {graduated && (
+        <div className="section" style={{ marginTop: 0 }}>
+          <p className="label">
+            Price <span className="id">from PoolManager Swap logs</span>
+          </p>
+          <Panel tight>
+            <Chart />
+          </Panel>
+        </div>
+      )}
 
       <div className="two">
         <Panel
           label={`${side === "buy" ? "Buy" : "Sell"} AGORA`}
-          id="pons v2 curve"
+          id={graduated ? "uniswap v4" : "pons v2 curve"}
           right={<Pill><Dot kind={graduated ? "ok" : "warn"} />{graduated ? "graduated" : "curve"}</Pill>}
         >
           <div className="swapdir">
@@ -262,30 +287,66 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
         </Panel>
 
         <div>
-          <Panel label="Curve state" id="live">
-            <div className="rows">
-              <Row k="Graduation progress">
-                {curve ? `${fmtSig(curve.realQuoteReserve, 6)} / ${fmtSig(curve.graduationThreshold, 4)} ETH` : DASH}
-              </Row>
-              <Row k="Percent to graduation">{curve ? `${curve.graduationPct.toFixed(3)}%` : DASH}</Row>
-              <Row k="Spot price">{curve ? `${fmtSig(curve.priceWad, 6)} ETH` : DASH}</Row>
-              <Row k="Token reserve">{curve ? fmtGrouped(curve.tokenReserve, 0) : DASH}</Row>
-              <Row k="Quote reserve (incl. phantom)">{curve ? `${fmtSig(curve.quoteReserve, 6)} ETH` : DASH}</Row>
-              <Row k="Phantom quote">{curve ? `${fmtSig(curve.phantomQuote, 4)} ETH` : DASH}</Row>
-              <Row k="Creator tax">{curve ? bpsToPct(curve.creatorTaxBps) : DASH}</Row>
-              <Row k="Curve fee">{curve ? bpsToPct(curve.feeBps) : DASH}</Row>
-              <Row k="Tax accrued on curve">
-                {curve ? `${fmtSig(curve.creatorTaxBalance, 8)} ETH` : DASH}
-              </Row>
-              <Row k="Snipe tax (first 3s)">
-                {curve ? `${bpsToPct(curve.snipeTaxStartBps)} — window closed` : DASH}
-              </Row>
-            </div>
-          </Panel>
+          {graduated ? (
+            /* Post-graduation the curve's reserves are drained by design, so a
+               "0 / 4.2 ETH, 0.000%" progress bar is technically accurate and
+               completely meaningless. Once the token has graduated, the pool is
+               the thing worth reading. */
+            <Panel label="Pool state" id="uniswap v4 · StateView">
+              <div className="rows">
+                <Row k="Spot price">
+                  {pool?.priceWad ? `${fmtSig(pool.priceWad, 6)} ETH` : DASH}
+                </Row>
+                <Row k="Active liquidity" na={pool?.liquidity == null}>
+                  {pool?.liquidity != null ? fmtGrouped(pool.liquidity, 4) : DASH}
+                </Row>
+                <Row k="Tick">{pool?.tick != null ? String(pool.tick) : DASH}</Row>
+                <Row k="Creator tax">{curve ? bpsToPct(curve.creatorTaxBps) : "4%"}</Row>
+                <Row k="Pool fee">0 — the hook prices every swap dynamically</Row>
+                <Row k="poolId">
+                  <span className="n">{pool ? `${pool.id.slice(0, 18)}…` : DASH}</span>
+                </Row>
+                <Row k="Hook">
+                  <a className="link" href={explorerAddr(PONS.memeHook)} target="_blank" rel="noreferrer">
+                    V2MemeHook
+                  </a>
+                </Row>
+                <Row k="Curve">
+                  <span className="muted">closed — graduated at 4.2 ETH</span>
+                </Row>
+              </div>
+              <p className="sub">
+                The 4% creator tax did not move with graduation. It lives in the hook, applied in{" "}
+                <code>beforeSwap</code>, so it still reaches the FeeSink on every trade through this
+                pool.
+              </p>
+            </Panel>
+          ) : (
+            <Panel label="Curve state" id="live">
+              <div className="rows">
+                <Row k="Graduation progress">
+                  {curve ? `${fmtSig(curve.realQuoteReserve, 6)} / ${fmtSig(curve.graduationThreshold, 4)} ETH` : DASH}
+                </Row>
+                <Row k="Percent to graduation">{curve ? `${curve.graduationPct.toFixed(3)}%` : DASH}</Row>
+                <Row k="Spot price">{curve ? `${fmtSig(curve.priceWad, 6)} ETH` : DASH}</Row>
+                <Row k="Token reserve">{curve ? fmtGrouped(curve.tokenReserve, 0) : DASH}</Row>
+                <Row k="Quote reserve (incl. phantom)">{curve ? `${fmtSig(curve.quoteReserve, 6)} ETH` : DASH}</Row>
+                <Row k="Phantom quote">{curve ? `${fmtSig(curve.phantomQuote, 4)} ETH` : DASH}</Row>
+                <Row k="Creator tax">{curve ? bpsToPct(curve.creatorTaxBps) : DASH}</Row>
+                <Row k="Curve fee">{curve ? bpsToPct(curve.feeBps) : DASH}</Row>
+                <Row k="Tax accrued on curve">
+                  {curve ? `${fmtSig(curve.creatorTaxBalance, 8)} ETH` : DASH}
+                </Row>
+                <Row k="Snipe tax (first 3s)">
+                  {curve ? `${bpsToPct(curve.snipeTaxStartBps)} — window closed` : DASH}
+                </Row>
+              </div>
+            </Panel>
+          )}
 
           <div style={{ height: 14 }} />
 
-          <Panel label="After graduation" id="uniswap v4 · validated, dormant">
+          <Panel label={graduated ? "Swap route" : "After graduation"} id={graduated ? "uniswap v4 · live" : "uniswap v4 · validated, dormant"}>
             <div className="rows">
               <Row k="Route">UniversalRouter → V4_SWAP</Row>
               <Row k="Quotes">V4Quoter (staticCall only)</Row>

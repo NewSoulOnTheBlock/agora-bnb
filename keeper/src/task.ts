@@ -101,3 +101,27 @@ export function log(job: string, d: Decision, extra = "") {
     `${stamp}  ${job.padEnd(18)} ${mode}   moves ${eth(d.value)} · gas ~${eth(d.gasCost)} ${extra}`
   );
 }
+
+/**
+ * Wait for a receipt, but never forever.
+ *
+ * `tx.wait()` with no timeout is fine in a script someone is watching and a
+ * latent hang in a process that is not. If the chain reorgs, the RPC drops the
+ * transaction, or the fee turns out to be too low, an unbounded wait parks the
+ * whole loop — the keeper stops collecting tax and nothing says so.
+ *
+ * Timing out is not the same as the transaction failing: it may still confirm
+ * later. The caller reports it as sent-but-unconfirmed and moves on, and the
+ * next pass re-reads state, so a transaction that did land is simply seen as
+ * "nothing to do".
+ */
+export async function waitFor(
+  tx: { hash: string; wait: (n?: number) => Promise<unknown> },
+  seconds = 120
+): Promise<"confirmed" | "timeout"> {
+  const timeout = new Promise<"timeout">((resolve) =>
+    setTimeout(() => resolve("timeout"), seconds * 1000)
+  );
+  const confirmed = tx.wait(1).then(() => "confirmed" as const);
+  return Promise.race([confirmed, timeout]);
+}

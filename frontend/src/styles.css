@@ -1671,3 +1671,37 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 }
 .start-items a:hover { background: var(--navy); color: var(--white); }
 .start-items a img { image-rendering: pixelated; flex: 0 0 auto; }
+
+/* --------------------------------------------------------------------------
+   23 · Price chart
+   Candles drawn on a canvas, so there is no charting library in the bundle and
+   nothing to keep in sync with the palette.
+   -------------------------------------------------------------------------- */
+.chart { display: flex; flex-direction: column; gap: 7px; }
+
+.chart canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: var(--well);
+  background: var(--crt-bg);
+}
+
+.chart-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.chart-price {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--black);
+}
+
+.chart-foot {
+  font-size: 10.5px;
+  color: #5a4a70;
+  line-height: 1.45;
+}

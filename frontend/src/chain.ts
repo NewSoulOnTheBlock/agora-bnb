@@ -199,34 +199,23 @@ export function activeToken(): { address: string; isDemo: boolean } {
 export const ETH_USD_FEED: string | null = null;
 
 /**
- * The Uniswap v4 pool AGORA graduated into. **Verified from the PoolManager's
- * own `Initialize` event**, block 39354812, not derived.
+ * Graduation, and a trap worth recording.
  *
- * Deriving it failed, and the reason is worth recording: the pre-graduation
- * Pons PoolKey uses `fee = 0` with `hooks = V2MemeHook`, because the hook
- * applies the tax dynamically. The graduated pool uses neither —
+ * The Pons PoolKey — `fee = 0`, `hooks = V2MemeHook`, `tickSpacing = 200` — is
+ * the correct key both before and after graduation, and `poolkey.ts` derives it
+ * unchanged. There is no override here, and there should not be one.
  *
- *   currency0    0x0 (native ETH)
- *   currency1    AGORA
- *   fee          901300
- *   tickSpacing  200
- *   hooks        0x0000…0000        ← no hook at all
+ * The trap: between the curve graduating and the locked LP actually being
+ * seeded, `StateView.getSlot0` on that derived id returns **zero**. Reading a
+ * zero there and concluding the derivation was wrong is a mistake — it happened
+ * during this build, and led to a hunt through `Initialize` events that turned
+ * up `0x716f4492…`, a pool with the same currencies but a different fee, no
+ * hook, and **zero liquidity**. It was a decoy. The real pool is the derived
+ * one, and it started answering as soon as the LP landed.
  *
- * so the derived id pointed at a pool that was never initialised and the UI
- * read a market price of zero while the token was live. Scanning `Initialize`
- * filtered on `currency1` is what found it; the same scan is the way to find
- * the pool for any future relaunch.
+ * If the price ever reads zero again after graduation, wait for the LP rather
+ * than changing the key.
  */
-export const AGORA_V4_POOL_ID =
-  "0x716f449277f3f2c936fc5b1aa2e852b977919c1e71a3a66fe0ec5bbf6c57a2ea";
-
-export const AGORA_V4_POOL_KEY = {
-  currency0: ZERO,
-  currency1: "0x286b4b456Bd10FD1745A7b7B33f25a804DDf5F04",
-  fee: 901300,
-  tickSpacing: 200,
-  hooks: ZERO,
-} as const;
 
 /** GMGN's page for the token — the chart people actually look at. */
 export const GMGN_URL =

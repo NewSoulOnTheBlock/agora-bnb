@@ -1,6 +1,6 @@
 import { Contract, type Wallet } from "ethers";
 import { provider, ADDR } from "../config.js";
-import { appraise, type Job, type Decision } from "../task.js";
+import { appraise, waitFor, type Job, type Decision } from "../task.js";
 
 const FEE_SINK_ABI = [
   "function collect() returns (uint256)",
@@ -48,7 +48,7 @@ export const collectTax: Job = {
   async send(signer: Wallet): Promise<string> {
     const sink = new Contract(ADDR.feeSink, FEE_SINK_ABI, signer);
     const tx = await sink.collect();
-    await tx.wait();
-    return tx.hash;
+    const state = await waitFor(tx);
+    return state === "timeout" ? `${tx.hash} (unconfirmed after 120s)` : tx.hash;
   },
 };
