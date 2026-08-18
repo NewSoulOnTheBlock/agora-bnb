@@ -691,6 +691,15 @@ button.mini,
 /* --------------------------------------------------------------------------
    8 · Client area
    -------------------------------------------------------------------------- */
+
+/* Flex children default to `min-width: auto`, which refuses to shrink below
+   their content's intrinsic minimum. The tab strip holds six non-shrinking
+   tabs, so on a phone it forced `.win` to about 700px and every panel below
+   inherited that width — text ran off the right edge under `overflow-x:
+   hidden`. Resetting it here is the fix, and it has to be on every flex child
+   rather than just the strip. */
+.win > * { min-width: 0; }
+.page { min-width: 0; }
 .client {
   flex: 1 1 auto;
   min-height: 0;
@@ -1502,8 +1511,9 @@ button.mini[aria-selected="true"] {
   .tabstrip {
     flex-wrap: nowrap;
     overflow-x: auto;
-    overflow-y: hidden;
-    padding-bottom: 2px;
+    /* No `overflow-y: hidden` — paired with a scrolling x axis it clips the
+       tabs, which sit 2px proud by design. */
+    padding: 6px 0 2px 3px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
