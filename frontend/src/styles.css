@@ -106,10 +106,10 @@ body {
     radial-gradient(700px 420px at 12% 8%, rgba(201, 162, 39, 0.07), transparent 60%),
     radial-gradient(760px 460px at 88% 4%, rgba(201, 162, 39, 0.06), transparent 60%),
     linear-gradient(180deg,
-      rgba(11, 15, 21, 0.80) 0%,
-      rgba(7, 10, 14, 0.90) 46%,
-      rgba(5, 7, 10, 0.97) 78%,
-      #05070a 100%),
+      rgba(11, 15, 21, 0.30) 0%,
+      rgba(7, 10, 14, 0.46) 42%,
+      rgba(5, 7, 10, 0.72) 74%,
+      rgba(5, 7, 10, 0.94) 100%),
     var(--vista);
   background-repeat: no-repeat;
   background-position: center, center, center, center, top center;
@@ -243,14 +243,31 @@ body {
    Panels — dark stone slabs with a gold hairline
    -------------------------------------------------------------------------- */
 
+/**
+ * Panels are translucent so the vista reads THROUGH the UI, not only around
+ * it. The blur is what makes that safe: it removes the high-frequency detail
+ * that would otherwise fight the text, leaving only the artwork's tone.
+ *
+ * The `background` shorthand below is a deliberate fallback — browsers without
+ * `backdrop-filter` get the opaque gradient instead of unreadable text over
+ * raw artwork, and the @supports block only opts in once blur is available.
+ */
 .panel {
   position: relative;
   background: linear-gradient(180deg, var(--ink-600), var(--ink-700));
-  border: 1px solid rgba(201, 162, 39, 0.22);
+  border: 1px solid rgba(201, 162, 39, 0.24);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.03) inset,
     0 -1px 0 rgba(0, 0, 0, 0.5) inset,
     0 18px 40px -28px rgba(0, 0, 0, 0.9);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .panel {
+    background: linear-gradient(180deg, rgba(23, 29, 40, 0.80), rgba(17, 22, 31, 0.86));
+    -webkit-backdrop-filter: blur(9px) saturate(0.85);
+    backdrop-filter: blur(9px) saturate(0.85);
+  }
 }
 
 /* Inner keyline, offset — the "frame within a frame" of a carved cartouche. */
@@ -265,6 +282,8 @@ body {
 .panel-inner { padding: 20px 20px 22px; position: relative; }
 .panel-inner.tight { padding: 15px 16px; }
 
+/* Section headers use this class OUTSIDE a panel, directly over the vista, so
+   it carries a shadow. Harmless where it appears inside a panel. */
 .label {
   display: flex;
   align-items: center;
@@ -274,6 +293,7 @@ body {
   letter-spacing: 0.26em;
   text-transform: uppercase;
   color: var(--gold-300);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.7);
 }
 .label .id {
   font-family: var(--mono);
@@ -407,7 +427,13 @@ a.rv:hover, .link:hover { color: var(--gold-100); }
 .notice {
   border: 1px solid rgba(201, 138, 42, 0.34);
   border-left-width: 3px;
-  background: linear-gradient(90deg, rgba(201, 138, 42, 0.10), rgba(201, 138, 42, 0.02));
+  /* Opaque base under the tint: this used to sit on a near-black page, and now
+     sits on artwork. */
+  background:
+    linear-gradient(90deg, rgba(201, 138, 42, 0.12), rgba(201, 138, 42, 0.03)),
+    linear-gradient(180deg, rgba(17, 22, 31, 0.88), rgba(11, 15, 21, 0.9));
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
   padding: 14px 18px;
   margin-bottom: 20px;
   font-size: 13.5px;
@@ -725,7 +751,8 @@ a.rv:hover, .link:hover { color: var(--gold-100); }
   font-size: 10.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--text-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
 /* --------------------------------------------------------------------------

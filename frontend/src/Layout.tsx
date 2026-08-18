@@ -1,20 +1,29 @@
 import type { ReactNode } from "react";
 import { Dot, Pill } from "./components";
 import { shortAddr } from "./format";
+import { SUITS_STAKING_ENABLED } from "./chain";
 import type { Wallet } from "./eth";
 
 export type Tab = "about" | "floor" | "trade" | "stake" | "suits" | "redeem";
 
-export const TABS: { id: Tab; label: string }[] = [
+export const TABS: { id: Tab; label: string; disabled?: boolean; why?: string }[] = [
   // First, deliberately: a newcomer landing here should meet the explanation
   // before the dashboard.
   { id: "about", label: "What is this?" },
   { id: "floor", label: "Reserve" },
   { id: "trade", label: "Trade" },
   { id: "stake", label: "Stake" },
-  { id: "suits", label: "Suits" },
+  {
+    id: "suits",
+    label: "Suits",
+    disabled: !SUITS_STAKING_ENABLED,
+    why: "Suits staking is unavailable: the collection only permits allowlisted operators to move tokens, and this vault is not on that list.",
+  },
   { id: "redeem", label: "Redeem" },
 ];
+
+/** Routes a user must not reach, because the underlying action cannot succeed. */
+export const DISABLED_TABS = new Set(TABS.filter((t) => t.disabled).map((t) => t.id));
 
 export default function Layout({
   tab, setTab, wallet, status, children,
@@ -51,7 +60,9 @@ export default function Layout({
                   key={t.id}
                   className="tab"
                   aria-selected={tab === t.id}
-                  onClick={() => setTab(t.id)}
+                  disabled={t.disabled}
+                  title={t.why}
+                  onClick={() => !t.disabled && setTab(t.id)}
                 >
                   {t.label}
                 </button>

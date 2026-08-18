@@ -142,26 +142,97 @@ Reuse the Memebrokers Hardhat 2 / Solidity 0.8.24 / OZ `Ownable` + `ReentrancyGu
 
 ---
 
-## 4. The corpus — and the capacity wall
+## 4. The corpus — tokenized equity is the destination
 
-### 4.1 What the corpus is denominated in
+> **Rewritten 2026-08-18.** Earlier drafts treated the tokenized-stock/USDG vaults as a
+> thesis-aligned curiosity and recommended a USDG core with a `weth-usdg` sleeve. That is
+> inverted. **Equity exposure is the goal**, not a sleeve — AGORA is meant to be a reserve
+> backed by a basket of tokenized stocks, and everything below is written toward that.
+>
+> This section states what that costs, because the cost is real and mostly architectural.
 
-The tax arrives in **ETH**. The choice of what to hold defines what the floor promises:
+### 4.1 The target, and the two things it breaks
 
-| Option | Floor denominated in | Notes |
+The tax arrives in **ETH**. The corpus is *reported* in ETH (§6), which is what makes NAV
+oracle-free today. Holding tokenized equity breaks that in two specific ways, and both have to
+be solved before a single wei is deployed:
+
+**1. There is no ETH route into a stock vault.** Every stock/USDG CLM on this chain is
+`STOCK/USDG` — measured 2026-08-18, **not one has a WETH leg**:
+
+| Vault | CLM | Holdings (measured) |
 |---|---|---|
-| **Hold ETH** | ETH | RH Chain ETH is bridged — **no native staking yield**. Floor swings with ETH. |
-| **Convert to USDG** *(recommended)* | **USD** | Legible dollar floor, the most defensible promise. USDG is the canonical dollar on this chain per the AGORA work. |
-| **Index stock tokens** | Equity basket | Higher expected return, *volatile* floor, and stacks §11 exposure considerably. |
+| MSFT/USDG | `0xE3627473…6C31` | 0.9245 MSFT + 214.21 USDG |
+| RDDT/USDG | `0x3Ca0b5eb…33Ef` | 0.7357 RDDT + 101.24 USDG |
+| GME/USDG | `0x3AB58808…B5e0` | 1.4536 GME + 21.55 USDG |
+| USO/USDG | `0x1176141b…981F` | 0.0322 USO + 8.07 USDG |
+| TSLA/USDG | `0x6A5057a5…e9FD` | 0.0240 TSLA + 7.24 USDG |
 
-**Recommendation: USDG core**, with a small ETH gas buffer. Note the conversion carries none of the
-reflexivity a transfer-tax design has — the protocol never sells its own token.
+All five report `isCalm() == true`. The deployed `BeefyCLMAdapter` converts ETH into a pair
+**through a single pool** and aborts when neither side is WETH — so it cannot serve any of
+these. Reaching them needs a **two-hop route: ETH → USDG → stock**, which is a different
+contract, not a parameter change.
 
-> **Worth checking on Pons v2:** Pons v2 supports **pairs beyond ETH, including USDG and tokenized stocks**,
-> and its hook "sets who receives trading fees **and what asset they are paid in**." If v2 lets the tax be
-> paid directly in **USDG**, the ETH→USDG conversion step disappears entirely and the floor is
-> dollar-denominated from the first trade. That is a materially better configuration than ETH payout, and
-> it is a launch-time setting, not something changeable later. **Resolve before launching.**
+**2. Valuing the position re-introduces the oracle we deliberately removed.**
+`IYieldAdapter.totalAssets()` must return **wei**. A USDG+stock position has no ETH leg, so
+converting it to wei requires a price path. The options are all worse than the ETH corpus:
+
+- **Pool spot** — manipulable within a block, and §6.3 already forbids it for redemption pricing.
+- **Two-hop TWAP** (stock→USDG→WETH) — needs two pools, each with its own manipulation surface
+  and liquidity assumption, on pools this thin.
+- **Chainlink** — no ETH/USD aggregator has been verified on chain 4663, which is why
+  `ETH_USD_FEED` is still `null`.
+
+**This is the decision the equity thesis forces.** Either the corpus stops being reported in ETH
+and becomes USD-denominated — which makes stock/USDG natural and the floor legible in dollars —
+or an oracle is introduced and gated per §6.4. **Recommendation: move the corpus to USD
+denomination.** Equity in an ETH-denominated reserve is measuring one volatile thing in another.
+
+### 4.1a ERC-8056 — the trap that must not be re-learned
+
+**Every tokenized stock here is ERC-8056**, confirmed on chain: all five expose
+`uiMultiplier()`, currently `1.0`. That number is *not* decorative.
+
+> **Never value an ERC-8056 asset from raw `balanceOf`.** These tokens hold `balanceOf`
+> constant across corporate actions and move value through `uiMultiplier()`. A split, dividend
+> or adjustment changes what a balance is worth without changing the balance. Any adapter that
+> reads `balanceOf` and multiplies by a price will silently misprice the corpus — and because
+> NAV sets the redemption price, mispricing NAV *is* the theft vector.
+
+Use `balanceOfUI()` where available, or `balanceOf × uiMultiplier`, and treat the multiplier as
+oracle input subject to the same staleness gating as any price. The multiplier reading `1.0`
+today proves nothing about tomorrow; that is precisely when it bites.
+
+### 4.2 Capacity — still the binding constraint, and worse here
+
+The stock vaults are the **most thesis-aligned and the most starved**. Reading their measured
+holdings above: the USDG side of all five together is roughly **352 USDG**, and the equity side
+is fractions of a share each. Precise dollar sizing needs a price feed the chain does not
+verifiably have — which is itself the point.
+
+Against a corpus already past **0.2 ETH** and compounding on every trade, the arithmetic is
+blunt: **AGORA outgrows every stock vault on this chain combined, quickly.** Spec's own
+`vaultCapBps ≤ 2000` rule — never more than 20% of a vault's TVL — caps a MSFT/USDG deposit at
+roughly 40 USDG of exposure today. That is not a treasury allocation; it is a rounding error.
+
+Three conclusions, unchanged in force and now sharper:
+
+1. **Capacity, not APY, decides everything.** A vault that cannot absorb the corpus is not an
+   option regardless of its yield.
+2. **LP share value can fall.** Impermanent loss against a corpus whose job is reliability is a
+   direct hit to the floor, and equity/stablecoin pairs are *more* prone to it than
+   correlated pairs, not less.
+3. **The equity thesis is directionally right and currently unfundable at scale.** The honest
+   sequence is: build the two-hop adapter and the valuation discipline now, deploy token
+   amounts to prove the path, and scale only as the vaults deepen.
+
+### 4.2b Beefy on Robinhood Chain — measured, 2026-08-17
+
+Beefy **is** live on chain 4663 (confirmed via `api.beefy.finance/tvl`). But:
+
+- **40 vaults, ~$125,000 total TVL chain-wide.**
+- **Largest vault: `uniswap-cow-robinhood-cashcat-weth-rp` at $67k** — a memecoin/WETH pair.
+- **Every vault is a two-asset LP / CLM position. Zero single-asset vaults. Zero stablecoin-only vaults.**
 
 ### 4.2 Beefy on Robinhood Chain — measured, 2026-08-17
 
@@ -187,13 +258,22 @@ Beefy **is** live on chain 4663 (confirmed via `api.beefy.finance/tvl`). But:
 
 ### 4.3 Policy that survives these facts
 
-- **USDG core, held directly in `Treasury`.** Earns ~0% but is stable, instantly liquid for redemption, and
-  is what the floor is measured in. This is the default destination for tax inflow.
+- **Target the tokenized-stock/USDG vaults.** This is the thesis: a reserve backed by a basket of
+  equities, not a pile of ether. Everything else in this section is about getting there safely.
+- **`weth-usdg` is the bridgehead, not the destination.** It is the only non-memecoin pair with a
+  WETH leg, so it is reachable by the single-pool adapter that exists today and is the right place
+  to prove the sleeve mechanics — deposit, `principal()` high-water mark, `realizeSurplus`,
+  withdrawal — before adding a two-hop route and an oracle to the critical path.
+- **Corpus core stays liquid and unlevered**, held directly in `Treasury`. It earns ~0% and is
+  instantly available for redemption. This is the default destination for tax inflow.
 - **Beefy sleeve, double-capped:** `min(sleeveBps × nav, vaultCapBps × vault.totalTVL)` with
   `vaultCapBps ≤ 2000` (never more than 20% of a vault's TVL) and `sleeveBps` starting near zero. The
   sleeve grows automatically as Beefy's RH TVL grows, and never becomes the pool.
-- **Restrict to `weth-usdg` and stock/USDG pairs.** Never a memecoin pair — correlated, illiquid, and IL
-  against a corpus whose entire job is to be reliable.
+- **Never a memecoin pair** — correlated, illiquid, and IL against a corpus whose entire job is to
+  be reliable. This rules out the largest vaults on the chain, deliberately.
+- **Diversify across the equity basket rather than concentrating.** Five stock vaults exist; one
+  adapter per vault, each independently capped and independently removable, is the shape that
+  survives a single vault being deprecated or drained.
 - **Prefer 0-withdrawal-fee vaults**, because distribution withdraws every epoch (§9). Beefy applies a
   withdrawal fee on *some* vaults; a fee turns frequent distribution into a leak.
 - **Deposit the underlying directly — never ZAP** (0.05% zap fee).
@@ -375,6 +455,9 @@ from the same corpus, and any future lockup lever lives in `stTITH` alone.
 | **Adapter exploit** — the corpus *is* the token's value | Critical | Per-adapter caps; two-layer Beefy risk acknowledged; governance timelock on adapter adds |
 | **Volume death spiral** — tax suppresses volume → corpus stalls | High | Rate decay *if Pons permits*; floor keeps working at zero volume |
 | **NAV manipulation via `getPricePerFullShare`** | High | Lagged / per-block-capped NAV for redemption; oracle guards |
+| **ERC-8056 mispricing** — every tokenized stock on 4663 exposes `uiMultiplier()`; raw `balanceOf` is not value (§4.1a) | **Critical** | Value via `balanceOfUI()`; treat the multiplier as oracle input and gate it for staleness. Mispricing NAV *is* the theft vector |
+| **Equity sleeve needs a price oracle** — stock/USDG has no ETH leg, so `totalAssets()` in wei needs a price path (§4.1) | **Critical** | Move the corpus to USD denomination, or introduce a gated oracle per §6.4. Do not price off pool spot |
+| **No ETH route to a stock vault** — none of the five has a WETH leg, so the single-pool adapter cannot reach them | High | Two-hop ETH→USDG→stock adapter; `weth-usdg` first to prove the mechanics |
 | **Pons payout convention mismatch** (2300-gas stipend / pull-based / EOA-only) | High | §5 — logic-free `FeeSink`; verify on **testnet 46630 first** |
 | **Wrong payout asset locked at launch** (ETH when USDG was available) | High | §4.1 — resolve before launch; not changeable after |
 | **Immutable 4%** | Medium | Verify pre-launch; if fixed, accept permanent volume drag |

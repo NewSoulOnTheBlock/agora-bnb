@@ -3,6 +3,7 @@ import { Panel, Row } from "./components";
 import { fmtSig, fmtGrouped, DASH } from "./format";
 import {
   AGORA, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_MARKET, AGORA_TAX_BPS,
+  SUITS_STAKING_ENABLED,
 } from "./chain";
 import { useSnapshot } from "./useReads";
 
@@ -166,10 +167,19 @@ export default function About() {
       <div className="section">
         <p className="label">Suits <span className="id">{SUITS_SUPPLY} of them, that's all there will ever be</span></p>
         <Panel>
-          <p className="sub" style={{ marginTop: 0 }}>
-            Suits is a separate NFT collection. Stake one and it earns <b>{suitsPct}%</b> of all
-            protocol income, split evenly across every Suit that is staked — the fewer people stake,
-            the bigger each share. Every Suit earns the same; there is no rarity bonus.
+          {!SUITS_STAKING_ENABLED && (
+            <div className="notice" style={{ marginTop: 0 }}>
+              <b>Suits staking is currently unavailable.</b> The collection only lets approved
+              contracts move its tokens, and this staking vault has not been approved by the
+              collection's owner. Until that changes, no Suit can be staked — and the {suitsPct}%
+              share is paid to AGORA stakers instead. Nothing is lost or stuck; the vault works the
+              moment the collection approves it.
+            </div>
+          )}
+          <p className="sub" style={{ marginTop: SUITS_STAKING_ENABLED ? 0 : 12 }}>
+            Suits is a separate NFT collection. Staking one {SUITS_STAKING_ENABLED ? "earns" : "would earn"}{" "}
+            <b>{suitsPct}%</b> of all protocol income, split evenly across every Suit staked — the
+            fewer staked, the bigger each share. Every Suit earns the same; there is no rarity bonus.
           </p>
           <div className="rows" style={{ marginTop: 12 }}>
             <Row k="Supply">{SUITS_SUPPLY}, fully minted — none can ever be created</Row>

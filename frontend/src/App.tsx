@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Layout, { type Tab } from "./Layout";
+import Layout, { DISABLED_TABS, type Tab } from "./Layout";
 import About from "./About";
 import Floor from "./Floor";
 import Trade from "./Trade";
@@ -12,7 +12,11 @@ const VALID: Tab[] = ["about", "floor", "trade", "stake", "suits", "redeem"];
 
 function initialTab(): Tab {
   const h = window.location.hash.replace("#", "") as Tab;
-  return VALID.includes(h) ? h : "floor";
+  // A disabled route must not be reachable by pasting its hash either — the
+  // action behind it cannot succeed, so landing there would only produce a
+  // reverted transaction.
+  if (!VALID.includes(h) || DISABLED_TABS.has(h)) return "floor";
+  return h;
 }
 
 export default function App() {
@@ -31,7 +35,7 @@ export default function App() {
       {tab === "floor" && <Floor />}
       {tab === "trade" && <Trade wallet={wallet} />}
       {tab === "stake" && <Stake wallet={wallet} />}
-      {tab === "suits" && <Suits wallet={wallet} />}
+      {tab === "suits" && !DISABLED_TABS.has("suits") && <Suits wallet={wallet} />}
       {tab === "redeem" && <Redeem wallet={wallet} />}
     </Layout>
   );

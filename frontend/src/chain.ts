@@ -146,6 +146,30 @@ export const SUITS_VALIDATOR = "0xA000027A9B2802E1ddf7000061001e5c005A0000";
 /** Secondary market. Where a would-be staker goes to acquire a Suit. */
 export const SUITS_MARKET = "https://opensea.io/collection/suitsonchain";
 
+/**
+ * Suits staking is DISABLED because it cannot currently work.
+ *
+ * The collection sits at Limit Break transfer-security **level 3** —
+ * "allowlisted operators only". `StakedSuits.stake()` calls
+ * `suits.transferFrom(owner, vault, id)` with the *vault* as `msg.sender`,
+ * which makes the vault an operator, and it is not on the allowlist:
+ *
+ *   isOperatorWhitelisted(list 0, 0xE76Cb0cc…e1A3) → false
+ *
+ * Verified by control tests: an owner-initiated transfer INTO the vault
+ * succeeds and a transfer to an EOA succeeds, but a vault-as-operator transfer
+ * reverts. So it is the operator policy, not the destination and not a missing
+ * approval — no amount of approving fixes it.
+ *
+ * The vault contract is fine and needs no redeploy. Flip this to `true` the
+ * moment the Suits owner (0x53977e37…f6ED) allowlists the vault or drops the
+ * collection to security level 1 or 0.
+ *
+ * Until then the Distributor reroutes the Suits share to stAGORA, which is the
+ * designed fallback and is working correctly.
+ */
+export const SUITS_STAKING_ENABLED = false;
+
 /** Share of yield routed to staked Suits. Mirrors Distributor.suitsBps default. */
 export const SUITS_SHARE_BPS = 1000;
 
