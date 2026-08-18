@@ -15,9 +15,10 @@
  * and `winme/start.wav` on guidebookgallery are the same sound family Windows
  * 98 shipped; drop them in `public/` and swap `play()` for an `<audio>` call.
  *
- * **Muted by default.** This is an app people check their money on; it should
- * not make noise at someone in an open-plan office because they clicked a tab.
- * The tray speaker toggles it, and the choice persists.
+ * **On by default**, but silent until the first interaction — the browser will
+ * not start an AudioContext without a user gesture, so nothing can ambush
+ * someone who merely has the tab open. The tray speaker turns it off, and the
+ * choice persists.
  */
 
 type Voice = "ding" | "chord" | "error" | "click" | "open" | "close" | "startup";
@@ -27,11 +28,18 @@ const KEY = "agora98:sound";
 let ctx: AudioContext | null = null;
 let enabled = read();
 
+/**
+ * On unless explicitly switched off.
+ *
+ * Nothing actually plays until the first click regardless: browsers refuse to
+ * start an AudioContext outside a user gesture, so a page left open in a
+ * background tab stays silent. The tray speaker turns it off for good.
+ */
 function read(): boolean {
   try {
-    return localStorage.getItem(KEY) === "on";
+    return localStorage.getItem(KEY) !== "off";
   } catch {
-    return false;
+    return true;
   }
 }
 

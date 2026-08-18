@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Contract, formatEther } from "ethers";
 import { readProvider, AGORA, EXPLORER, explorerAddr, AGORA_TAX_BPS, CHAIN_ID } from "../chain";
-import { PixelIcon } from "./pixel";
-import { useDrag, withDrag } from "./useDrag";
+import { Frame } from "./Frame";
 
 /**
  * Three windows that dress a real protocol state as a period artefact.
@@ -37,7 +36,7 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <Window title="System Properties" icon="computer" onClose={onClose} width={460}>
+    <Frame title="System Properties" icon="computer" onClose={onClose} width={460}>
       <div className="sysprops">
         <div className="sysprops-art">
           <img src="/logo.png" width={64} height={64} alt="" />
@@ -72,7 +71,7 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
         This system is not a bank, a fund, or advice. It is a tax, a pot, and a queue — all three
         verifiable at <a className="link" href={EXPLORER} target="_blank" rel="noreferrer">{EXPLORER.replace("https://", "")}</a>.
       </p>
-    </Window>
+    </Frame>
   );
 }
 
@@ -138,7 +137,7 @@ export function WindowsUpdate({ onClose }: { onClose: () => void }) {
   const ss = remaining !== null ? remaining % 60 : 0;
 
   return (
-    <Window title="Windows Update" icon="floppy" onClose={onClose} width={520}>
+    <Frame title="Windows Update" icon="floppy" onClose={onClose} width={520}>
       {queuedAt === null ? (
         <p style={{ margin: 0 }}>No update is queued.</p>
       ) : active ? (
@@ -195,7 +194,7 @@ export function WindowsUpdate({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
-    </Window>
+    </Frame>
   );
 }
 
@@ -243,7 +242,7 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <Window title="Redemption Queue" icon="recycle" onClose={onClose} width={560}>
+    <Frame title="Redemption Queue" icon="recycle" onClose={onClose} width={560}>
       <div className="queue-head">
         {jobs === null
           ? "Reading the queue…"
@@ -299,53 +298,6 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
         Requests mature after the redeem delay, then anyone may execute them — the payout goes to
         the owner, not the caller, so a stranger cranking the queue costs them nothing.
       </p>
-    </Window>
-  );
-}
-
-/* ==========================================================================
-   Shared frame
-   ========================================================================== */
-function Window({
-  title, icon, onClose, width, children,
-}: {
-  title: string;
-  icon: Parameters<typeof PixelIcon>[0]["name"];
-  onClose: () => void;
-  width: number;
-  children: React.ReactNode;
-}) {
-  const drag = useDrag();
-
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
-
-  return (
-    <div
-      className="win win-game"
-      style={{
-        top: 140,
-        left: "50%",
-        transform: withDrag(drag.offset, "translateX(-50%)"),
-        width: `min(${width}px, calc(100vw - 24px))`,
-      }}
-    >
-      <div
-        className="titlebar"
-        {...drag.handleProps}
-        onDoubleClick={drag.reset}
-        title="Drag to move · double-click to recentre"
-      >
-        <PixelIcon name={icon} size={16} />
-        <span className="t-text">{title}</span>
-        <span className="t-btns">
-          <button className="tbtn close" aria-label="Close" onClick={onClose} />
-        </span>
-      </div>
-      <div className="client" style={{ padding: 14 }}>{children}</div>
-    </div>
+    </Frame>
   );
 }

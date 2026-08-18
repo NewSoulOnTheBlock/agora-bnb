@@ -1834,3 +1834,80 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
     drop-shadow(0.6px 0 0 rgba(255, 47, 185, 0.28))
     drop-shadow(-0.6px 0 0 rgba(1, 205, 254, 0.28));
 }
+
+/* --------------------------------------------------------------------------
+   25 · My Computer, Network Neighborhood, Notepad
+   -------------------------------------------------------------------------- */
+.drives { display: flex; flex-direction: column; gap: 10px; }
+
+.drive {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 8px;
+  box-shadow: var(--well);
+  background: rgba(255, 255, 255, 0.35);
+}
+.drive svg { flex: 0 0 auto; }
+.drive-body { min-width: 0; }
+.drive-name { display: flex; align-items: center; gap: 6px; }
+.drive-name svg { image-rendering: pixelated; }
+.drive-size {
+  font-family: var(--mono);
+  font-size: 14px;
+  margin-top: 2px;
+  color: var(--navy);
+  font-weight: 700;
+}
+.drive-note { color: #5a4a70; font-size: 11px; margin-top: 2px; }
+
+/* --- network --- */
+.netlist { display: flex; flex-direction: column; gap: 3px; }
+
+.netnode {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  padding: 6px 7px;
+  text-decoration: none;
+  color: var(--black);
+}
+.netnode:hover { background: var(--navy); color: var(--white); }
+.netnode:hover .netnode-role,
+.netnode:hover .netnode-addr { color: #d8c8ec; }
+.netnode svg { image-rendering: pixelated; flex: 0 0 auto; }
+.netnode-body { min-width: 0; }
+.netnode-name { display: flex; align-items: center; gap: 6px; font-weight: 700; font-family: var(--mono); }
+.netnode-role { font-size: 11px; color: #5a4a70; }
+.netnode-addr {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- notepad --- */
+.notepad { display: flex; flex-direction: column; }
+.notepad-menu {
+  display: flex;
+  gap: 14px;
+  padding: 2px 4px 5px;
+}
+.notepad-menu u { text-decoration: underline; }
+.notepad-body {
+  width: 100%;
+  height: 320px;
+  resize: vertical;
+  background: var(--white);
+  box-shadow: var(--well);
+  border: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 9px;
+  color: var(--black);
+  white-space: pre;
+  overflow: auto;
+}
+.notepad-body:focus { outline: none; }

@@ -8,6 +8,7 @@ import Screensaver from "./win98/Screensaver";
 import { useDrag, withDrag } from "./win98/useDrag";
 import TaxWatch from "./win98/TaxWatch";
 import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
+import { MyComputer, NetworkNeighborhood, Notepad } from "./win98/Explorer";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
 import { AGORA, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
 
@@ -238,7 +239,9 @@ export default function Layout({
   const [padOpen, setPadOpen] = useState(false);
   const [tip, setTip] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
-  const [win, setWin] = useState<null | "sysprops" | "update" | "queue">(null);
+  const [win, setWin] = useState<
+    null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad"
+  >(null);
   const [crt, setCrt] = useState(() => {
     try { return localStorage.getItem("agora98:crt") === "on"; } catch { return false; }
   });
@@ -386,6 +389,42 @@ export default function Layout({
 
         {/* The one desktop icon that is not a tab. Burned supply really is a
             recycle bin here: redemption destroys AGORA permanently. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("mycomputer"); }}
+          title="My Computer"
+        >
+          <PixelIcon name="computer" size={32} />
+          <span>
+            My Computer
+            <span className="kana">マイコンピュータ</span>
+          </span>
+        </button>
+
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("network"); }}
+          title="Network Neighborhood"
+        >
+          <PixelIcon name="network" size={32} />
+          <span>
+            Network
+            <span className="kana">ネットワーク</span>
+          </span>
+        </button>
+
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("notepad"); }}
+          title="readme.txt"
+        >
+          <PixelIcon name="help" size={32} />
+          <span>
+            readme.txt
+            <span className="kana">リードミー</span>
+          </span>
+        </button>
+
         <button className="desk-icon" onClick={() => { play("click"); setDialog("bin"); }} title="Recycle Bin">
           <PixelIcon name="recycle" size={32} />
           <span>Recycle Bin</span>
@@ -768,6 +807,9 @@ export default function Layout({
       {win === "sysprops" && <SystemProperties onClose={() => { play("close"); setWin(null); }} />}
       {win === "update" && <WindowsUpdate onClose={() => { play("close"); setWin(null); }} />}
       {win === "queue" && <PrintQueue onClose={() => { play("close"); setWin(null); }} />}
+      {win === "mycomputer" && <MyComputer onClose={() => { play("close"); setWin(null); }} />}
+      {win === "network" && <NetworkNeighborhood onClose={() => { play("close"); setWin(null); }} />}
+      {win === "notepad" && <Notepad onClose={() => { play("close"); setWin(null); }} />}
 
       {/* ---- start menu ---- */}
       {startOpen && (
@@ -792,6 +834,18 @@ export default function Layout({
             <button role="menuitem" onClick={() => { play("click"); toggleSound(); setStartOpen(false); }}>
               <PixelIcon name="computer" size={24} />
               {sound ? "Turn sounds off" : "Turn sounds on"}
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("mycomputer"); setStartOpen(false); }}>
+              <PixelIcon name="computer" size={24} />
+              My Computer
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("network"); setStartOpen(false); }}>
+              <PixelIcon name="network" size={24} />
+              Network Neighborhood
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("notepad"); setStartOpen(false); }}>
+              <PixelIcon name="help" size={24} />
+              readme.txt
             </button>
             <button role="menuitem" onClick={() => { play("open"); setPadOpen(true); setStartOpen(false); }}>
               <PixelIcon name="rocket" size={24} />
