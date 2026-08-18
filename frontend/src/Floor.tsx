@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Panel, Stat, Row, Dot, Pill } from "./components";
-import { useSnapshot, useTaxHistory, useFloorHistory } from "./useReads";
+import { useSnapshot, useTaxHistory, useFloorHistory, useBeefy } from "./useReads";
 import { fmtSig, fmtGrouped, bpsToPct, signedPct, shortAddr, DASH } from "./format";
-import { V4, PONS, AGORA, ZERO, explorerAddr, AGORA_TAX_BPS, ETH_USD_FEED } from "./chain";
+import { V4, PONS, AGORA, ZERO, explorerAddr, AGORA_TAX_BPS, ETH_USD_FEED, GMGN_URL } from "./chain";
 import { readCurveState, type CurveState } from "./curve";
 
 export default function Floor() {
@@ -16,6 +16,16 @@ export default function Floor() {
     return () => { alive = false; clearInterval(t); };
   }, []);
   const tax = useTaxHistory(s?.pool.id, !!s?.pool.initialised);
+
+  // The operator wallet is what holds the deployed positions, so that is the
+  // address to scan — the Treasury itself never touches Beefy today.
+  const beefy = useBeefy(s?.reserve.operator ?? AGORA.deployer);
+
+  /** NAV plus whatever is deployed. The number a holder actually cares about. */
+  const totalBacking =
+    s?.reserve.navWad != null && beefy.total != null
+      ? s.reserve.navWad + beefy.total
+      : s?.reserve.navWad ?? null;
   const floor = useFloorHistory(AGORA.treasury !== ZERO);
 
   const cumulativeTax = tax.data?.length ? tax.data[tax.data.length - 1].cumulativeTax : null;
@@ -97,36 +107,73 @@ export default function Floor() {
                 </>
               )}
             </p>
+            {s?.pool.initialised && s.pool.liquidity === 0n && (
+              <p className="sub">
+                <b className="tax">The pool holds no liquidity in range.</b> This is the price the
+                pool was initialised at, so it is a reference, not a level anything can trade
+                against. Check{" "}
+                <a className="link" href={GMGN_URL} target="_blank" rel="noreferrer">GMGN</a>{" "}
+                for where the token is actually changing hands.
+              </p>
+            )}
           </Panel>
         </div>
 
-        {/* ---- corpus ---- */}
+        {/* ---- what actually backs the token ---- */}
         <div className="section">
-          <p className="label">Corpus <span className="id">ETH-denominated · no oracle</span></p>
+          <p className="label">
+            Backing <span className="id">on-contract + deployed</span>
+          </p>
           <div className="grid c4">
             {/* `!= null` throughout, NOT truthiness: 0n is falsy in JS, and a
                 real zero must render as a measurement, never as "not deployed". */}
-            <Stat k="NAV" value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null} unit="ETH"
-              note="AGORA marked at zero; excludes staker income" />
-            <Stat k="Liquid corpus" value={s?.reserve.ethBuffer != null ? fmtSig(s.reserve.ethBuffer) : null} unit="ETH"
-              note="spendable on redemption" />
-            <Stat k="Owed to stakers" value={s?.reserve.pendingIncome != null ? fmtSig(s.reserve.pendingIncome) : null} unit="ETH"
-              note="earmarked; not part of NAV" />
-            <Stat k="Eligible supply" value={s?.reserve.eligibleSupply != null ? fmtGrouped(s.reserve.eligibleSupply, 0) : null}
-              unit="AGORA" note="excl. burned + protocol-held" />
+            <Stat
+              k="Total backing"
+              value={totalBacking != null ? fmtSig(totalBacking) : null}
+              unit="ETH"
+              note="NAV plus capital deployed at Beefy"
+            />
+            <Stat
+              k="In the Treasury"
+              value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null}
+              unit="ETH"
+              note="NAV — what the floor is computed from"
+            />
+            <Stat
+              k="Deployed at Beefy"
+              value={beefy.total != null ? fmtSig(beefy.total) : beefy.loading ? null : "0"}
+              unit="ETH"
+              note="live value of the operator's positions"
+            />
+            <Stat
+              k="Eligible supply"
+              value={s?.reserve.eligibleSupply != null ? fmtGrouped(s.reserve.eligibleSupply, 0) : null}
+              unit="AGORA"
+              note="excl. burned + protocol-held"
+            />
           </div>
 
           <div style={{ height: 14 }} />
 
-          <div className="grid c4">
-            <Stat k="Tax to income" value={s?.reserve.incomeShareBps != null ? String(Number(s.reserve.incomeShareBps) / 100) : null}
-              unit="%" note="rest compounds into the floor" />
-            <Stat k="Yield sleeve" value={s?.reserve.sleeveAssets != null ? fmtSig(s.reserve.sleeveAssets) : null} unit="ETH"
-              note="manual allocation only" />
-            <Stat k="Withdrawn by operator" value={s?.reserve.cumulativeWithdrawn != null ? fmtSig(s.reserve.cumulativeWithdrawn) : null}
-              unit="ETH" note="deployed into yield off-contract" />
-            <Stat k="Income distributed" value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
-              unit="ETH" note="90% stAGORA · 10% staked Suits" />
+          <div className="grid c3">
+            <Stat
+              k="Cumulative tax"
+              value={s?.reserve.cumulativeTaxReceived != null ? fmtSig(s.reserve.cumulativeTaxReceived) : null}
+              unit="ETH"
+              note="everything the 4% has ever collected"
+            />
+            <Stat
+              k="Paid to stakers"
+              value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
+              unit="ETH"
+              note="90% stAGORA · 10% staked Suits"
+            />
+            <Stat
+              k="Tax to income"
+              value={s?.reserve.incomeShareBps != null ? String(Number(s.reserve.incomeShareBps) / 100) : null}
+              unit="%"
+              note="rest compounds into the floor"
+            />
           </div>
         </div>
 
@@ -154,8 +201,14 @@ export default function Floor() {
         </div>
 
         {/* ---- proof: every input, traceable ---- */}
-        <div className="section">
-          <p className="label">Proof <span className="id">every number above, traceable</span></p>
+        {/* Collapsed by default. Seventeen rows of pool internals are the
+            difference between "verifiable" and "unreadable" — keeping them one
+            click away preserves the first without paying for it on every
+            visit. */}
+        <details className="section proof">
+          <summary>
+            Proof <span className="id">every number above, traceable</span>
+          </summary>
           <Panel>
             <div className="rows">
               <Row k="Token">
@@ -213,7 +266,7 @@ export default function Floor() {
               </Row>
             </div>
           </Panel>
-        </div>
+        </details>
 
     </>
   );

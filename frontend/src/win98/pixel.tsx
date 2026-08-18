@@ -395,9 +395,70 @@ export const harddrive: IconMap = [
   "                ",
 ];
 
+
+/** The no-internet runner. Only ever seen when something is broken. */
+export const dino: IconMap = [
+  "                ",
+  "        kkkkkk  ",
+  "        kwkkkk  ",
+  "        kkkkkk  ",
+  "        kkkkk   ",
+  " k      kkkk    ",
+  " kk   kkkkkkk   ",
+  " kkk kkkkkkk    ",
+  " kkkkkkkkkk     ",
+  "  kkkkkkkkk     ",
+  "   kkkkkkk      ",
+  "    kk  kk      ",
+  "    k    k      ",
+  "    kk   kk     ",
+  "                ",
+  "                ",
+];
+
+/** Trust me. */
+export const dolphin: IconMap = [
+  "                ",
+  "      kkkk      ",
+  "    kkccccck    ",
+  "   kcccccccck   ",
+  "  kccwkcccccck  ",
+  " kcccccccccccck ",
+  "kccccccccccccckk",
+  "kcccccccccccckk ",
+  " kkcccccccccck  ",
+  "   kkcccccckk   ",
+  "  kk kkccckk    ",
+  " kk    kkkk     ",
+  "kk       kk     ",
+  "          kk    ",
+  "                ",
+  "                ",
+];
+
+/** A launchpad we did not build. */
+export const rocket: IconMap = [
+  "                ",
+  "       kk       ",
+  "      kwwk      ",
+  "      kwwk      ",
+  "     kwrrwk     ",
+  "     kwrrwk     ",
+  "    kwwrrwwk    ",
+  "    kwwrrwwk    ",
+  "   kkwwrrwwkk   ",
+  "   kkwwrrwwkk   ",
+  "  kk kwwwwk kk  ",
+  "  k  kwrrwk  k  ",
+  "     kkrrkk     ",
+  "      kRRk      ",
+  "       kk       ",
+  "                ",
+];
+
 export const ICONS = {
   computer, coins, chart, lock, tie, flame, help, info, warning, error, network, folder,
-  floppy, key, globe, hourglass, recycle, harddrive,
+  floppy, key, globe, hourglass, recycle, harddrive, dino, dolphin, rocket,
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -490,8 +490,14 @@ button.mini,
   bottom: auto;
   max-height: calc(100vh - 118px - var(--taskbar-h) - 18px);
   max-height: calc(100dvh - 118px - var(--taskbar-h) - 18px);
-  width: min(1120px, 100%);
-  /* left + right + width all set, margins auto → the box centres in the gap. */
+  /* `width: auto` + `max-width`, NOT `width: min(1120px, 100%)`.
+     With left, right AND an explicit width all set, the box is over-constrained
+     and the browser drops `right` — so `left: 6px` plus a 100%-wide box ran 6px
+     past the viewport, and between ~1130px and 1500px it overhung by more.
+     Letting width be auto makes left/right govern, max-width caps it, and the
+     auto margins centre whatever is left over. */
+  width: auto;
+  max-width: 1120px;
   margin: 0 auto;
   z-index: 2;
   box-shadow:
@@ -1480,6 +1486,7 @@ button.mini[aria-selected="true"] {
   .win-main {
     left: 6px;
     right: 6px;
+    max-width: none;
     top: 78px;
     max-height: calc(100vh - 78px - var(--taskbar-h) - 12px);
     max-height: calc(100dvh - 78px - var(--taskbar-h) - 12px);
@@ -1496,7 +1503,8 @@ button.mini[aria-selected="true"] {
     top: 58px;
     bottom: var(--taskbar-h);
     max-height: none;
-    width: 100%;
+    width: auto;
+    max-width: none;
     margin: 0;
     box-shadow: none;
   }
@@ -1541,3 +1549,125 @@ button.mini[aria-selected="true"] {
   .frieze-band { display: none; }
   .win-main { top: 4px; }
 }
+
+/* --------------------------------------------------------------------------
+   21 · Disclosure
+   The Proof block is seventeen rows of pool internals. It is what makes the
+   page verifiable and it is not what anyone reads first, so it collapses.
+   -------------------------------------------------------------------------- */
+details.proof > summary {
+  cursor: var(--cur-hand), pointer;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 0 8px;
+  list-style: none;
+  user-select: none;
+}
+details.proof > summary::-webkit-details-marker { display: none; }
+
+/* A drawn triangle, so the marker matches the era rather than the browser. */
+details.proof > summary::before {
+  content: "";
+  width: 0; height: 0;
+  border: 5px solid transparent;
+  border-left-color: var(--black);
+  border-right-width: 0;
+  transition: transform 0.1s linear;
+}
+details.proof[open] > summary::before { transform: rotate(90deg) translateX(-1px); }
+details.proof > summary:focus-visible { outline: 1px dotted var(--black); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  details.proof > summary::before { transition: none; }
+}
+
+/* --------------------------------------------------------------------------
+   22 · The runner, and the dolphin
+   Two jokes, both load-bearing for the aesthetic and neither load-bearing for
+   the protocol.
+   -------------------------------------------------------------------------- */
+.dino { display: flex; flex-direction: column; gap: 6px; }
+
+.dino canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: var(--well);
+  /* The whole point: keep the pixels square when the canvas is scaled up. */
+  image-rendering: pixelated;
+  cursor: var(--cur-hand), pointer;
+}
+
+.dino-hud,
+.dino-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.dino-hud { justify-content: space-between; }
+.dino-hud .kana { color: var(--vw-cyan); font-family: var(--font); letter-spacing: 2px; }
+.dino-score { color: var(--black); font-weight: 700; letter-spacing: 1px; }
+.dino-foot { justify-content: center; color: #4a3a5e; }
+.dino-foot b { color: var(--bad); letter-spacing: 2px; }
+
+/* The game window floats above the main one. */
+.win-game {
+  position: absolute;
+  z-index: 40;
+  width: min(620px, calc(100vw - 24px));
+  box-shadow: var(--out), 0 0 30px rgba(1, 205, 254, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   The tooltip. Win98 drew these as a yellow box with a hairline border, and it
+   is the right container for a message that should look like it came from the
+   operating system rather than from the page.
+   -------------------------------------------------------------------------- */
+.tip-host { position: relative; }
+
+.tip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(100% + 6px);
+  z-index: 80;
+  width: max-content;
+  max-width: 220px;
+  background: #ffffe1;
+  color: #2a1140;
+  border: 1px solid var(--black);
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: left;
+  text-shadow: none;
+  pointer-events: none;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* Ten desktop icons no longer fit one column on a short screen, so they wrap
+   into a second — which is what Windows did once a column filled. */
+.desk-icons {
+  flex-wrap: wrap;
+  max-height: calc(100vh - 116px - var(--taskbar-h) - 8px);
+  max-height: calc(100dvh - 116px - var(--taskbar-h) - 8px);
+  align-content: flex-start;
+  gap: 4px 6px;
+}
+
+/* An <a> in the Start menu has to sit on the same rail as the buttons. */
+.start-items a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 22px 5px 6px;
+  color: var(--black);
+  text-decoration: none;
+  cursor: var(--cur-hand), pointer;
+}
+.start-items a:hover { background: var(--navy); color: var(--white); }
+.start-items a img { image-rendering: pixelated; flex: 0 0 auto; }

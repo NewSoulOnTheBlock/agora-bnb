@@ -2,13 +2,14 @@ import { useState } from "react";
 import Layout, { DISABLED_TABS, type Tab } from "./Layout";
 import About from "./About";
 import Floor from "./Floor";
+import Deployed from "./Deployed";
 import Trade from "./Trade";
 import Stake from "./Stake";
 import Suits from "./Suits";
 import Redeem from "./Redeem";
 import { useWallet } from "./eth";
 
-const VALID: Tab[] = ["about", "floor", "trade", "stake", "suits", "redeem"];
+const VALID: Tab[] = ["about", "floor", "deployed", "trade", "stake", "suits", "redeem"];
 
 function initialTab(): Tab {
   const h = window.location.hash.replace("#", "") as Tab;
@@ -33,6 +34,7 @@ export default function App() {
     <Layout tab={tab} setTab={setTab} wallet={wallet}>
       {tab === "about" && <About />}
       {tab === "floor" && <Floor />}
+      {tab === "deployed" && <Deployed />}
       {tab === "trade" && <Trade wallet={wallet} />}
       {tab === "stake" && <Stake wallet={wallet} />}
       {tab === "suits" && !DISABLED_TABS.has("suits") && <Suits wallet={wallet} />}

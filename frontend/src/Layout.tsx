@@ -3,10 +3,11 @@ import { Dot, Pill } from "./components";
 import { shortAddr } from "./format";
 import type { Wallet } from "./eth";
 import { PixelIcon, type IconName } from "./win98/pixel";
+import Dino from "./win98/Dino";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
-import { AGORA, EXPLORER, SUITS_STAKING_ENABLED } from "./chain";
+import { AGORA, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
 
-export type Tab = "about" | "floor" | "trade" | "stake" | "suits" | "redeem";
+export type Tab = "about" | "floor" | "deployed" | "trade" | "stake" | "suits" | "redeem";
 
 /**
  * The tab list is unchanged from the previous theme — same ids, same order,
@@ -15,14 +16,22 @@ export type Tab = "about" | "floor" | "trade" | "stake" | "suits" | "redeem";
 export const TABS: {
   id: Tab; label: string; icon: IconName; kana: string;
   disabled?: boolean; why?: string;
+  /** Kept out of the UI entirely, rather than shown greyed. */
+  hidden?: boolean;
 }[] = [
   { id: "about", label: "What is this?", icon: "help", kana: "ガイド" },
   { id: "floor", label: "Reserve", icon: "coins", kana: "リザーブ" },
+  { id: "deployed", label: "Deployed", icon: "harddrive", kana: "デプロイ" },
   { id: "trade", label: "Trade", icon: "chart", kana: "トレード" },
   { id: "stake", label: "Stake", icon: "lock", kana: "ステーク" },
   {
     id: "suits", label: "Suits", icon: "tie", kana: "スーツ",
     disabled: !SUITS_STAKING_ENABLED,
+    // Hidden rather than greyed while the collection's operator allowlist
+    // blocks the vault. A permanently dead tab is worse than no tab — it
+    // advertises a feature nobody can use. `DISABLED_TABS` still guards the
+    // route, so a pasted `#suits` hash cannot reach it either.
+    hidden: !SUITS_STAKING_ENABLED,
     why: "Suits staking is unavailable: the collection only permits allowlisted operators to move tokens, and this vault is not on that list.",
   },
   { id: "redeem", label: "Redeem", icon: "flame", kana: "リディーム" },
@@ -30,6 +39,9 @@ export const TABS: {
 
 /** Routes a user must not reach, because the underlying action cannot succeed. */
 export const DISABLED_TABS = new Set(TABS.filter((t) => t.disabled).map((t) => t.id));
+
+/** What the desktop, the tab strip and the Start menu actually offer. */
+const VISIBLE_TABS = TABS.filter((t) => !t.hidden);
 
 /**
  * Status-bar ticker.
@@ -55,6 +67,7 @@ const TICKER = [
 const TITLES: Record<Tab, string> = {
   about: "What is this?",
   floor: "Reserve",
+  deployed: "Deployed capital",
   trade: "Trade",
   stake: "Stake",
   suits: "Suits",
@@ -212,7 +225,10 @@ export default function Layout({
   const [maximised, setMaximised] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "close" | "about" | "bin" | "copied">(null);
+  const [dialog, setDialog] = useState<null | "close" | "about" | "bin" | "copied" | "dolphin">(null);
+  const [gameOpen, setGameOpen] = useState(false);
+  const [padOpen, setPadOpen] = useState(false);
+  const [tip, setTip] = useState<string | null>(null);
   const [sound, setSound] = useState(soundOn);
   const [clock, setClock] = useState(() => new Date());
   const shellRef = useRef<HTMLDivElement>(null);
@@ -318,7 +334,7 @@ export default function Layout({
 
       {/* ---- desktop icons ---- */}
       <div className="desk-icons">
-        {TABS.map((t) => (
+        {VISIBLE_TABS.map((t) => (
           <button
             key={t.id}
             className="desk-icon"
@@ -341,6 +357,65 @@ export default function Layout({
           <PixelIcon name="recycle" size={32} />
           <span>Recycle Bin</span>
         </button>
+
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setPadOpen(true); }}
+          title="Launchpad"
+        >
+          <PixelIcon name="rocket" size={32} />
+          <span>
+            Launchpad
+            <span className="kana">ローンチパッド</span>
+          </span>
+        </button>
+
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setGameOpen(true); }}
+          title="No Internet"
+        >
+          <PixelIcon name="dino" size={32} />
+          <span>
+            No Internet
+            <span className="kana">ランナー</span>
+          </span>
+        </button>
+
+        {/* The dolphin. Hover for the warning, click for the dialog. It does
+            nothing and that is the joke — but it is a real Win98 tooltip and a
+            real modal, not a picture of one. */}
+        <span
+          className="tip-host"
+          onMouseEnter={() => setTip("Totally not a virus.\nTrust me… I'm a dolphin.")}
+          onMouseLeave={() => setTip(null)}
+        >
+          <button className="desk-icon" onClick={() => { play("ding"); setDialog("dolphin"); }}>
+            <PixelIcon name="dolphin" size={32} />
+            <span>
+              dolphin.exe
+              <span className="kana">イルカ</span>
+            </span>
+          </button>
+          {tip && <span className="tip">{tip}</span>}
+        </span>
+
+        {/* A shortcut off the desktop, the way a browser bookmark sat on one.
+            GMGN is where the chart actually lives now that AGORA has graduated. */}
+        <a
+          className="desk-icon"
+          href={GMGN_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="AGORA on GMGN"
+          onClick={() => play("click")}
+        >
+          <img src="/GMGN_logo.svg" width={32} height={32} alt="" />
+          <span>
+            AGORA chart
+            <span className="kana">ジーエムジーエヌ</span>
+          </span>
+        </a>
       </div>
 
       {/* ---- the application window ---- */}
@@ -441,7 +516,7 @@ export default function Layout({
 
           {/* ---- tab control ---- */}
           <div className="tabstrip" role="tablist">
-            {TABS.map((t) => (
+            {VISIBLE_TABS.map((t) => (
               <button
                 key={t.id}
                 className="tab"
@@ -545,6 +620,80 @@ export default function Layout({
         </Dialog>
       )}
 
+      {gameOpen && (
+        <div className="win win-game" style={{ top: 130, left: "50%", transform: "translateX(-50%)" }}>
+          <div className="titlebar">
+            <PixelIcon name="dino" size={16} />
+            <span className="t-text">No Internet — ランナー</span>
+            <span className="t-btns">
+              <button
+                className="tbtn close"
+                aria-label="Close"
+                onClick={() => { play("close"); setGameOpen(false); }}
+              />
+            </span>
+          </div>
+          <div className="client" style={{ padding: 10 }}>
+            <Dino />
+          </div>
+        </div>
+      )}
+
+      {padOpen && (
+        <div className="win win-game" style={{ top: 150, left: "50%", transform: "translateX(-50%)" }}>
+          <div className="titlebar">
+            <PixelIcon name="rocket" size={16} />
+            <span className="t-text">Launchpad — ローンチパッド</span>
+            <span className="t-btns">
+              <button
+                className="tbtn close"
+                aria-label="Close"
+                onClick={() => { play("close"); setPadOpen(false); }}
+              />
+            </span>
+          </div>
+          <div className="client" style={{ padding: 16 }}>
+            <div className="dialog-body">
+              <PixelIcon name="rocket" size={32} />
+              <div>
+                <p style={{ margin: 0 }}>
+                  <b>There are already a hundred launchpads on Robinhood Chain.</b>
+                </p>
+                <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
+                  So we did not build another one. AGORA launched on Pons like everything else, and
+                  the interesting part was never the launch — it was what happens to the tax
+                  afterwards.
+                </p>
+                <p style={{ margin: "8px 0 0", color: "#4a3a5e", lineHeight: 1.5 }}>
+                  Every buy and sell still pays 4%. That is the whole product. A launchpad would
+                  have been a hundred-and-first way to start; the reserve is a way to keep going.
+                </p>
+              </div>
+            </div>
+            <div className="dialog-btns">
+              <button className="btn primary" onClick={() => { play("close"); setPadOpen(false); }}>
+                Fair enough
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dialog === "dolphin" && (
+        <Dialog title="dolphin.exe" icon="dolphin" onClose={() => setDialog(null)}>
+          <p style={{ margin: 0 }}>
+            <b>Totally not a virus.</b>
+          </p>
+          <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
+            Trust me… I'm a dolphin.
+          </p>
+          <p style={{ margin: "8px 0 0", color: "#4a3a5e" }}>
+            This program does nothing at all, which is more than can be said for most things that
+            ask you to trust them.
+          </p>
+        </Dialog>
+      )}
+
       {/* ---- start menu ---- */}
       {startOpen && (
         <div className="start-menu" role="menu">
@@ -552,7 +701,7 @@ export default function Layout({
             AGORA<b>98</b>
           </div>
           <div className="start-items">
-            {TABS.map((t) => (
+            {VISIBLE_TABS.map((t) => (
               <button
                 key={t.id}
                 role="menuitem"
@@ -569,6 +718,33 @@ export default function Layout({
               <PixelIcon name="computer" size={24} />
               {sound ? "Turn sounds off" : "Turn sounds on"}
             </button>
+            <button role="menuitem" onClick={() => { play("open"); setPadOpen(true); setStartOpen(false); }}>
+              <PixelIcon name="rocket" size={24} />
+              Launchpad
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setGameOpen(true); setStartOpen(false); }}>
+              <PixelIcon name="dino" size={24} />
+              No Internet
+            </button>
+            <button role="menuitem" onClick={() => { play("ding"); setDialog("dolphin"); setStartOpen(false); }}>
+              <PixelIcon name="dolphin" size={24} />
+              dolphin.exe
+            </button>
+            <button role="menuitem" onClick={() => { play("click"); setDialog("bin"); setStartOpen(false); }}>
+              <PixelIcon name="recycle" size={24} />
+              Recycle Bin
+            </button>
+            <a
+              role="menuitem"
+              href={GMGN_URL}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => { play("click"); setStartOpen(false); }}
+            >
+              <img src="/GMGN_logo.svg" width={24} height={24} alt="" />
+              AGORA chart on GMGN
+            </a>
+            <div className="sep" />
             <button role="menuitem" onClick={() => { play("click"); setDialog("about"); setStartOpen(false); }}>
               <PixelIcon name="info" size={24} />
               About AGORA 98…

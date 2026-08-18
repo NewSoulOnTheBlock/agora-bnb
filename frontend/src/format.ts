@@ -1,4 +1,4 @@
-import { formatEther } from "ethers";
+import { formatEther, formatUnits } from "ethers";
 
 export const DASH = "—";
 
@@ -136,4 +136,19 @@ export function timeAgo(tsSeconds: number): string {
   if (d < 3600) return `${Math.floor(d / 60)}m ago`;
   if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
   return `${Math.floor(d / 86400)}d ago`;
+}
+
+/**
+ * A token amount with its own decimals — Beefy legs are not all 18dp (USDG is
+ * 6), so formatting them through `formatEther` would be off by a factor of a
+ * trillion.
+ */
+export function fmtUnits(v: bigint | null | undefined, decimals: number, sig = 4): string {
+  if (v === null || v === undefined) return DASH;
+  const n = Number(formatUnits(v, decimals));
+  if (!Number.isFinite(n)) return DASH;
+  if (n === 0) return "0";
+  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: sig });
+  return n.toPrecision(sig).replace(/e[-+]\d+$/, "");
 }

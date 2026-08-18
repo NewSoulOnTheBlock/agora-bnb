@@ -198,6 +198,117 @@ export function activeToken(): { address: string; isDemo: boolean } {
  */
 export const ETH_USD_FEED: string | null = null;
 
+/**
+ * The Uniswap v4 pool AGORA graduated into. **Verified from the PoolManager's
+ * own `Initialize` event**, block 39354812, not derived.
+ *
+ * Deriving it failed, and the reason is worth recording: the pre-graduation
+ * Pons PoolKey uses `fee = 0` with `hooks = V2MemeHook`, because the hook
+ * applies the tax dynamically. The graduated pool uses neither —
+ *
+ *   currency0    0x0 (native ETH)
+ *   currency1    AGORA
+ *   fee          901300
+ *   tickSpacing  200
+ *   hooks        0x0000…0000        ← no hook at all
+ *
+ * so the derived id pointed at a pool that was never initialised and the UI
+ * read a market price of zero while the token was live. Scanning `Initialize`
+ * filtered on `currency1` is what found it; the same scan is the way to find
+ * the pool for any future relaunch.
+ */
+export const AGORA_V4_POOL_ID =
+  "0x716f449277f3f2c936fc5b1aa2e852b977919c1e71a3a66fe0ec5bbf6c57a2ea";
+
+export const AGORA_V4_POOL_KEY = {
+  currency0: ZERO,
+  currency1: "0x286b4b456Bd10FD1745A7b7B33f25a804DDf5F04",
+  fee: 901300,
+  tickSpacing: 200,
+  hooks: ZERO,
+} as const;
+
+/** GMGN's page for the token — the chart people actually look at. */
+export const GMGN_URL =
+  "https://gmgn.ai/robinhood/token/0x286b4b456bd10fd1745a7b7b33f25a804ddf5f04";
+
+
+// ---------------------------------------------------------------------------
+// Beefy — where withdrawn corpus ETH actually goes
+// ---------------------------------------------------------------------------
+/**
+ * `Treasury.withdraw()` sends corpus ETH to the operator wallet, which then
+ * deploys it on beefy.com. Until the on-chain adapter is activated that is the
+ * only route available, and it means the deployed ETH sits outside `nav()`.
+ *
+ * The dashboard used to report that as a bare "withdrawn" total and nothing
+ * else, which read as though money had gone missing. It has not — it is in
+ * these vaults, and every one of them is readable from the chain.
+ *
+ * **The whole registry is here, not just the vaults in use.** A three-entry
+ * list went stale within a day: the operator moved into
+ * `up33-cow-robinhood-up-stonkbroker-rp`, which was not on it, and the position
+ * silently read as zero. There is no way to enumerate an address's ERC-20
+ * holdings on-chain, so the alternatives were to hard-code a guess or to call
+ * Beefy's API at runtime. Neither is acceptable on a page whose point is that
+ * every number is verifiable against the RPC alone — so the full list is baked
+ * in and all of it is scanned. It is one cheap `balanceOf` per vault, batched.
+ *
+ * Snapshot of Beefy's registry for chain 4663, 2026-08-18. Re-run
+ * `api.beefy.finance/gov-vaults` and add rows if Beefy launches more.
+ *
+ * Tuple order: [id, label, CLM vault, reward pool].
+ */
+export const BEEFY_VAULTS: [string, string, string, string][] = [
+  ["uniswap-cow-robinhood-aapl-usdg-rp", "AAPL-USDG", "0x0B7dF93Bb66E13923a2153217B4a29Ec7CC3Efc1", "0x68a2E1Cf0007d28728774619d1aC89f66FA99894"],
+  ["uniswap-cow-robinhood-cashcat-usdg-rp", "CASHCAT-USDG", "0x104E6823bAB0be3fe9b48c5fB0F0413301d935a4", "0x8f6E62ac78B06F4f45DB8dE37C8A8B6e1F3e3a13"],
+  ["uniswap-cow-robinhood-cashcat-weth-rp", "CASHCAT-WETH", "0x0BF46176b181D8bB5bbF57C5d200c79daF416221", "0xA79fF9Ca6250A0ddEbc051dD898A4a892Caa4859"],
+  ["uniswap-cow-robinhood-frong-weth-rp", "FRONG-WETH", "0xd5319D37F56C70F10da99BFB3A38694D5BD1fF22", "0x5bc50ABa09C285529C14290179AC345D0baA033e"],
+  ["uniswap-cow-robinhood-gme-usdg-10000-rp", "GME-USDG", "0x3AB58808c6feC9CC0Ec56A04800e306C08fFB5e0", "0x28a7d169942bb50F51A2E53262Ca736980FE183f"],
+  ["uniswap-cow-robinhood-gme-usdg-rp", "GME-USDG", "0x4f95D85389de296869A5a815A1AA05ec32F7efb5", "0x0365ce42fbe05C07Cb835c06d3B68dD871E94Ae4"],
+  ["uniswap-cow-robinhood-msft-usdg-rp", "MSFT-USDG", "0xE36274737D99273d353d8d9F0a51c1AeA7426C31", "0xd9993b44E8d014F4ad979cb7706673386cd31520"],
+  ["uniswap-cow-robinhood-rddt-usdg-rp", "RDDT-USDG", "0x3Ca0b5eb3133982A982B72BfAD4dA71a6A6433Ef", "0x9eA8596752349525786e44d909432663B0680e7D"],
+  ["uniswap-cow-robinhood-spcx-usdg-rp", "SPCX-USDG", "0xc32834aC40a6529b2f7Bb2b9Af496aF0640Fc508", "0x7de04eD76BDE435df1526a994AC7f864274dc137"],
+  ["uniswap-cow-robinhood-spy-usdg-rp", "SPY-USDG", "0xe71389553681e8cC0b9164898D58b631fEd7586b", "0x18B52a793BC1261661236A7f39E7348659FbFD0a"],
+  ["uniswap-cow-robinhood-stonkbroker-weth-rp", "STONKBROKER-WETH", "0x9CcCE25f82f37ef777552E3BBB2A01BC5574AbE8", "0xDAceb29D88ee1b5eFE8ac134523dC93A35548703"],
+  ["uniswap-cow-robinhood-tendies-weth-rp", "TENDIES-WETH", "0xAAa8C1e4F75Ec7DF802607D827Ea0efE8dCDDbDD", "0xcD68b5A8850E5A10531bDE1BC657329575E40E2C"],
+  ["uniswap-cow-robinhood-tsla-usdg-rp", "TSLA-USDG", "0x6A5057a50178Cc9C90577d8Df401E7fBE79De9FD", "0xfE8585e7E1925C3Cf944772C75820c4DF47f1341"],
+  ["uniswap-cow-robinhood-usdg-intc-rp", "INTC-USDG", "0xBb18aCfeeB566E8549F83bF0F0E01Bd0B2a7BdD2", "0x8C241D00EE324162A1a727f0167EB470c5B456e5"],
+  ["uniswap-cow-robinhood-usdg-nvda-rp", "NVDA-USDG", "0xDaF08ca084DCbA9e801549803dE82160ADcAa1De", "0x11907281043B89F3b507159F37D254941B5f6525"],
+  ["uniswap-cow-robinhood-uso-usdg-rp", "USO-USDG", "0x1176141bdBe958576a2c064b15cA0e94f0A5981F", "0x7627E96758938951498F071988CB47c6bB52dD7F"],
+  ["uniswap-cow-robinhood-weth-coin-rp", "COIN-WETH", "0x83c2934FF42756e4FFaF0433c9E246e6888F3EF6", "0xC887326A6015f279FC68B5f6f93a1BE5899A5f2e"],
+  ["uniswap-cow-robinhood-weth-mstr-rp", "MSTR-WETH", "0x0151a001B2EAb292a36Ffd8c1A42396dAe221848", "0xC6A55D8E2a0700fFA760D1C8361A82Ec4DeE0Dfe"],
+  ["uniswap-cow-robinhood-weth-nvda-rp", "NVDA-WETH", "0xC61179279abB6cf3CEcCce23641B3d69986Ec777", "0x9776f496DFC4464df76B8503Ca1Ba95D116D1E02"],
+  ["uniswap-cow-robinhood-weth-pons-rp", "PONS-WETH", "0x4F702C76dd9D7841784922f87470E3F718aAF6DA", "0xedBAa34DCBA4250F6BF9582ddED03244e623268D"],
+  ["uniswap-cow-robinhood-weth-up-rp", "UP-WETH", "0xcB968f8382e3Fd875F47fbbde59Fdf46feB8b447", "0x41691Cb706ed97eF1AaF675D627EF5B01145E7d6"],
+  ["uniswap-cow-robinhood-weth-usdg-rp", "USDG-WETH", "0x1e8d576F71D5F416e7573b960fF59C4Fb77976ad", "0x72cF42d5951e3F2F9Da265601a064A075600d036"],
+  ["uniswap-cow-robinhood-weth-virtual-rp", "VIRTUAL-WETH", "0xc61b3b381C34A636451ba66A62792Bd84A78E112", "0x093f6613Dc96AF7c834A439F0a0aF18836B2dFdf"],
+  ["up33-cow-robinhood-cashcat-weth-rp", "CASHCAT-WETH", "0x137731B8B2D7Cd24aB4A4A9061f2D7b4Fd1aBFEE", "0x3B2162ea5C3F6f20Eb05818f40d54857d1Aa3B45"],
+  ["up33-cow-robinhood-up-stonkbroker-rp", "STONKBROKER-UP", "0xd922173C136443a1F7795A86B28Da964ea2BF6bc", "0x788D31D39da6252F228b5842d9215bb7abB83F8B"],
+  ["up33-cow-robinhood-usdg-intc-rp", "INTC-USDG", "0x599ac767099bB6f01712867BfA1Fc1Aa27DEFD37", "0x0e7fb97a89b20A682521c5D29868E50A7b693979"],
+  ["up33-cow-robinhood-usdg-nvda-rp", "NVDA-USDG", "0x63185DA98b76E7FA49d5d0611a6E211ee2988201", "0x6485817467Fd2129622e57b20577CF2697F3dDe2"],
+  ["up33-cow-robinhood-weth-frong-rp", "FRONG-WETH", "0x9818f01EDCcc3d8EB86B859931C3B877cf44A108", "0xa3EDa31c3d7C886a6Ff3ccB69D4045C05EAaf3b3"],
+  ["up33-cow-robinhood-weth-stonkbroker-rp", "STONKBROKER-WETH", "0x5794bB61E83397049c40D87BbF3d44AF583A27Ce", "0x10f9e8B973B5EA104618bd334f3CC2c0ff7E15F2"],
+  ["up33-cow-robinhood-weth-tendies-rp", "TENDIES-WETH", "0x9619bFB1f2D97E2B23F23310205e4c2089c1A45d", "0xF8AB44EA77cE06E9b42De8021449Af01B3De977d"],
+  ["up33-cow-robinhood-weth-up-rp", "UP-WETH", "0x36759534741E28Eb052238738963D684bFe719E4", "0xCC3DB04bB136A34E8569c1EfF2Ab19E3FA915d48"],
+  ["up33-cow-robinhood-weth-usdg-rp", "USDG-WETH", "0x4319C71984790f96ac190a7709B380F6F27DD238", "0x55fD3b49Ef7E5f9a31DA68051989F5f749658f99"],
+  ["up33-cow-robinhood-weth-virtual-rp", "VIRTUAL-WETH", "0x37698C12ecc727178617c5b7d694377eb98dE058", "0x5eD2B060b7f8809E6aC41DD769fE3528Fe44f424"],
+];
+
+export const WETH_ADDR = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
+export const USDG_ADDR = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+
+/**
+ * The WETH/USDG Uniswap v3 pool, used only to price a USDG leg back into ETH.
+ * Verified: token0 = WETH, token1 = USDG (6 decimals), fee 500.
+ */
+export const WETH_USDG_POOL = "0x69BfaF19C9f377BB306a89aEd9F6B07e2c1a8d9a";
+
+/** Beefy's page for a vault, for anyone who wants to check the position. */
+export function beefyUrl(id: string): string {
+  return `https://app.beefy.com/vault/${id}`;
+}
+
 export function explorerAddr(a: string): string {
   return `${EXPLORER}/address/${a}`;
 }

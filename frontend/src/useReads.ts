@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readSnapshot, type Snapshot } from "./reads";
 import { readTaxHistory, readFloorHistory, findFloorRegressions, type TaxEvent, type FloorPoint } from "./history";
+import { readBeefyPositions, totalDeployedWei, readOperatorHoldings, type BeefyPosition, type OperatorHoldings } from "./beefy";
 
 type Async<T> = { data: T | null; loading: boolean; error: string | null };
 
@@ -73,4 +74,56 @@ export function useFloorHistory(enabled = true) {
   }, [enabled]);
 
   return { ...state, regressions };
+}
+
+/**
+ * The operator's Beefy positions.
+ *
+ * Deployed corpus leaves `nav()`, so without this the dashboard shows a
+ * treasury that looks emptied — right now NAV reads 0.02 ETH against 1.37 ETH
+ * withdrawn — when the capital is simply working somewhere the Treasury cannot
+ * see. Polled slowly: it is a registry sweep plus a per-vault read, and the
+ * position does not move between blocks the way a price does.
+ */
+export function useBeefy(holder: string | null | undefined, intervalMs = 60_000) {
+  const [state, setState] = useState<Async<BeefyPosition[]>>({ data: null, loading: true, error: null });
+
+  useEffect(() => {
+    if (!holder) return;
+    let alive = true;
+    const go = () =>
+      readBeefyPositions(holder)
+        .then((d) => alive && setState({ data: d, loading: false, error: null }))
+        .catch((e) => alive && setState({ data: null, loading: false, error: String(e?.message ?? e) }));
+    go();
+    const t = setInterval(go, intervalMs);
+    return () => { alive = false; clearInterval(t); };
+  }, [holder, intervalMs]);
+
+  return { ...state, total: state.data ? totalDeployedWei(state.data) : null };
+}
+
+/** The operator wallet's own ETH and AGORA, for reconciling withdrawals. */
+export function useOperatorHoldings(
+  holder: string | null | undefined,
+  agoraToken: string,
+  stAgoraVault: string,
+  priceWad: bigint | null,
+  intervalMs = 60_000
+) {
+  const [data, setData] = useState<OperatorHoldings | null>(null);
+
+  useEffect(() => {
+    if (!holder) return;
+    let alive = true;
+    const go = () =>
+      readOperatorHoldings(holder, agoraToken, stAgoraVault, priceWad)
+        .then((d) => alive && setData(d))
+        .catch(() => alive && setData(null));
+    go();
+    const t = setInterval(go, intervalMs);
+    return () => { alive = false; clearInterval(t); };
+  }, [holder, agoraToken, stAgoraVault, priceWad, intervalMs]);
+
+  return data;
 }

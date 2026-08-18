@@ -1,13 +1,13 @@
 import { Contract } from "ethers";
 import {
   readProvider, V4, PONS, AGORA, ZERO, activeToken, SUITS_NFT,
+  AGORA_V4_POOL_ID, AGORA_V4_POOL_KEY,
 } from "./chain";
 import {
-  STATE_VIEW_ABI, MEME_HOOK_ABI, FEE_ESCROW_ABI, PONS_TOKEN_ABI,
-  TREASURY_ABI, STAKED_AGORA_ABI, REDEEMER_ABI, STAKED_SUITS_ABI,
-  DISTRIBUTOR_ABI, SUITS_ABI,
+  STAKED_SUITS_ABI, DISTRIBUTOR_ABI, SUITS_ABI,
 } from "./abis";
 import { ponsPoolKey, poolId, priceFromSqrtX96, type PoolKey } from "./poolkey";
+import { multiRead, asBig, asStr, asBool, type MCall } from "./multicall";
 
 /**
  * Every read returns `null` on failure rather than throwing.
@@ -46,28 +46,50 @@ export type PoolState = {
 };
 
 export async function readPoolState(token: string): Promise<PoolState> {
-  const key = ponsPoolKey(token);
-  const id = poolId(key);
-  const sv = new Contract(V4.stateView, STATE_VIEW_ABI, readProvider);
+  const derivedKey = ponsPoolKey(token);
+  const derivedId = poolId(derivedKey);
 
-  // One wave, not two: these are independent reads and awaiting them in
-  // sequence cost an extra round-trip on every poll.
-  const [slot0, liquidity] = await Promise.all([
-    safe(() => sv.getSlot0(id)),
-    safe(() => sv.getLiquidity(id)),
-  ]);
+  // The pre-graduation key (fee 0, V2MemeHook) and the graduated one (fee
+  // 901300, no hook) are different pools, and only one of them is ever live.
+  // Read the derived id first; if it comes back uninitialised and this is the
+  // token we have a verified graduated pool for, read that instead. Without
+  // this the page showed a market price of zero after graduation.
+  const isAgora = token.toLowerCase() === AGORA.token.toLowerCase();
 
-  const sqrtPriceX96: bigint | null = slot0 ? BigInt(slot0[0]) : null;
-  const tick = slot0 ? Number(slot0[1]) : null;
+  const tryPool = async (id: string) => {
+    const r = await multiRead([
+      { target: V4.stateView, fragment: "function getSlot0(bytes32) view returns (uint160,int24,uint24,uint24)", args: [id] },
+      { target: V4.stateView, fragment: "function getLiquidity(bytes32) view returns (uint128)", args: [id] },
+    ]);
+    const sqrt = r[0] && r[0].length ? BigInt(r[0][0] as bigint) : null;
+    const tick = r[0] && r[0].length > 1 ? Number(r[0][1]) : null;
+    const liq = asBig(r[1]);
+    return { sqrt, tick, liq };
+  };
+
+  let key = derivedKey;
+  let id = derivedId;
+  let { sqrt, tick, liq } = await tryPool(derivedId);
+
+  if ((sqrt === null || sqrt === 0n) && isAgora) {
+    const graduated = await tryPool(AGORA_V4_POOL_ID);
+    if (graduated.sqrt !== null && graduated.sqrt > 0n) {
+      key = { ...AGORA_V4_POOL_KEY };
+      id = AGORA_V4_POOL_ID;
+      sqrt = graduated.sqrt;
+      tick = graduated.tick;
+      liq = graduated.liq;
+    }
+  }
 
   return {
     key,
     id,
-    sqrtPriceX96,
+    sqrtPriceX96: sqrt,
     tick,
-    liquidity: liquidity === null ? null : BigInt(liquidity),
-    priceWad: sqrtPriceX96 ? priceFromSqrtX96(sqrtPriceX96, key, token) : null,
-    initialised: !!sqrtPriceX96 && sqrtPriceX96 > 0n,
+    liquidity: liq,
+    priceWad: sqrt && sqrt > 0n ? priceFromSqrtX96(sqrt, key, token) : null,
+    initialised: !!sqrt && sqrt > 0n,
   };
 }
 
@@ -86,18 +108,18 @@ export type TokenInfo = {
 };
 
 export async function readTokenInfo(address: string, poolInitialised: boolean): Promise<TokenInfo> {
-  const t = new Contract(address, PONS_TOKEN_ABI, readProvider);
-  const [name, symbol, totalSupply, curve] = await Promise.all([
-    safe(() => t.name() as Promise<string>),
-    safe(() => t.symbol() as Promise<string>),
-    safe(async () => BigInt(await t.totalSupply())),
-    safe(() => t.curve() as Promise<string>),
+  const r = await multiRead([
+    { target: address, fragment: "function name() view returns (string)" },
+    { target: address, fragment: "function symbol() view returns (string)" },
+    { target: address, fragment: "function totalSupply() view returns (uint256)" },
+    { target: address, fragment: "function curve() view returns (address)" },
   ]);
+  const curve = asStr(r[3]);
   return {
     address,
-    name,
-    symbol,
-    totalSupply,
+    name: asStr(r[0]),
+    symbol: asStr(r[1]),
+    totalSupply: asBig(r[2]),
     curve,
     graduated: curve === null ? null : poolInitialised,
   };
@@ -120,25 +142,33 @@ export type FeePipeline = {
 };
 
 export async function readFeePipeline(pid: string, recipient: string): Promise<FeePipeline> {
-  const hook = new Contract(PONS.memeHook, MEME_HOOK_ABI, readProvider);
-  const escrow = new Contract(PONS.feeEscrow, FEE_ESCROW_ABI, readProvider);
+  const H = PONS.memeHook;
+  const calls: MCall[] = [
+    { target: H, fragment: "function pendingCreatorTax(bytes32,address) view returns (uint256)", args: [pid, ZERO] },
+    { target: H, fragment: "function pendingFees(bytes32,address) view returns (uint256)", args: [pid, ZERO] },
+    { target: H, fragment: "function hookFeeBps() view returns (uint256)" },
+    { target: H, fragment: "function protocolFeeShareBps() view returns (uint256)" },
+    { target: H, fragment: "function feeSweepOperator() view returns (address)" },
+  ];
+  // The escrow read only makes sense once there is a recipient to ask about,
+  // but it rides in the same request rather than costing a second round-trip.
+  if (deployed(recipient)) {
+    calls.push({
+      target: PONS.feeEscrow,
+      fragment: "function balanceOf(address) view returns (uint256)",
+      args: [recipient],
+    });
+  }
 
-  const [pendingCreatorTaxEth, pendingFeesEth, hookFeeBps, protocolFeeShareBps, feeSweepOperator] =
-    await Promise.all([
-      safe(async () => BigInt(await hook.pendingCreatorTax(pid, ZERO))),
-      safe(async () => BigInt(await hook.pendingFees(pid, ZERO))),
-      safe(async () => BigInt(await hook.hookFeeBps())),
-      safe(async () => BigInt(await hook.protocolFeeShareBps())),
-      safe(() => hook.feeSweepOperator() as Promise<string>),
-    ]);
-
-  const escrowBalanceEth = deployed(recipient)
-    ? await safe(async () => BigInt(await escrow.balanceOf(recipient)))
-    : null;
+  const r = await multiRead(calls);
 
   return {
-    pendingCreatorTaxEth, pendingFeesEth, escrowBalanceEth,
-    hookFeeBps, protocolFeeShareBps, feeSweepOperator,
+    pendingCreatorTaxEth: asBig(r[0]),
+    pendingFeesEth: asBig(r[1]),
+    hookFeeBps: asBig(r[2]),
+    protocolFeeShareBps: asBig(r[3]),
+    feeSweepOperator: asStr(r[4]),
+    escrowBalanceEth: deployed(recipient) ? asBig(r[5]) : null,
   };
 }
 
@@ -179,37 +209,39 @@ const NO_RESERVE: Reserve = {
 export async function readReserve(): Promise<Reserve> {
   if (!deployed(AGORA.treasury)) return NO_RESERVE;
 
-  const t = new Contract(AGORA.treasury, TREASURY_ABI, readProvider);
-  const [
-    navWad, eligibleSupply, floorPerTokenWad, floorHighWaterMark, usdgBalance,
-    ethBuffer, sleeveAssets, sleeveCorpus, unrealizedSurplus, sleeveCapBps,
-    cumulativeTaxReceived, pendingIncome, incomeShareBps, cumulativeIncomeDistributed,
-    cumulativeWithdrawn, operator,
-  ] = await Promise.all([
-    safe(async () => BigInt(await t.nav())),
-    safe(async () => BigInt(await t.eligibleSupply())),
-    safe(async () => BigInt(await t.floorPerToken())),
-    safe(async () => BigInt(await t.floorHighWaterMark())),
-    safe(async () => BigInt(await t.usdgBalance())),
-    safe(async () => BigInt(await t.ethBuffer())),
-    safe(async () => BigInt(await t.sleeveAssets())),
-    safe(async () => BigInt(await t.sleeveCorpus())),
-    safe(async () => BigInt(await t.unrealizedSurplus())),
-    safe(async () => BigInt(await t.sleeveCapBps())),
-    safe(async () => BigInt(await t.cumulativeTaxReceived())),
-    safe(async () => BigInt(await t.pendingIncome())),
-    safe(async () => BigInt(await t.incomeShareBps())),
-    safe(async () => BigInt(await t.cumulativeIncomeDistributed())),
-    // Folded into the same wave. These were a second `await Promise.all`, which
-    // bought a whole extra round-trip for two values nothing else depends on.
-    safe(async () => BigInt(await t.cumulativeWithdrawn())),
-    safe(() => t.operator() as Promise<string>),
+  // One `eth_call`, not sixteen. Issued individually these were two sequential
+  // waves of parallel reads, and the public endpoint rate-limits a JSON-RPC
+  // batch as a batch — the Reserve page was paying for that on every poll.
+  const T = AGORA.treasury;
+  const f = (sig: string) => ({ target: T, fragment: `function ${sig} view returns (uint256)` });
+
+  const r = await multiRead([
+    f("nav()"), f("eligibleSupply()"), f("floorPerToken()"), f("floorHighWaterMark()"),
+    f("usdgBalance()"), f("ethBuffer()"), f("sleeveAssets()"), f("sleeveCorpus()"),
+    f("unrealizedSurplus()"), f("sleeveCapBps()"), f("cumulativeTaxReceived()"),
+    f("pendingIncome()"), f("incomeShareBps()"), f("cumulativeIncomeDistributed()"),
+    f("cumulativeWithdrawn()"),
+    { target: T, fragment: "function operator() view returns (address)" },
   ]);
+
   return {
-    deployed: true, navWad, eligibleSupply, floorPerTokenWad, floorHighWaterMark,
-    usdgBalance, ethBuffer, sleeveAssets, sleeveCorpus, unrealizedSurplus,
-    sleeveCapBps, cumulativeTaxReceived, pendingIncome, incomeShareBps,
-    cumulativeIncomeDistributed, cumulativeWithdrawn, operator,
+    deployed: true,
+    navWad: asBig(r[0]),
+    eligibleSupply: asBig(r[1]),
+    floorPerTokenWad: asBig(r[2]),
+    floorHighWaterMark: asBig(r[3]),
+    usdgBalance: asBig(r[4]),
+    ethBuffer: asBig(r[5]),
+    sleeveAssets: asBig(r[6]),
+    sleeveCorpus: asBig(r[7]),
+    unrealizedSurplus: asBig(r[8]),
+    sleeveCapBps: asBig(r[9]),
+    cumulativeTaxReceived: asBig(r[10]),
+    pendingIncome: asBig(r[11]),
+    incomeShareBps: asBig(r[12]),
+    cumulativeIncomeDistributed: asBig(r[13]),
+    cumulativeWithdrawn: asBig(r[14]),
+    operator: asStr(r[15]),
   };
 }
 
@@ -225,14 +257,18 @@ export async function readStaking(): Promise<Staking> {
   if (!deployed(AGORA.stakedAgora)) {
     return { deployed: false, totalAssets: null, totalShares: null, cumulativeRewards: null, cumulativeClaimed: null };
   }
-  const s = new Contract(AGORA.stakedAgora, STAKED_AGORA_ABI, readProvider);
-  const [totalAssets, totalShares, cumulativeRewards, cumulativeClaimed] = await Promise.all([
-    safe(async () => BigInt(await s.totalAssets())),
-    safe(async () => BigInt(await s.totalSupply())),
-    safe(async () => BigInt(await s.cumulativeRewards())),
-    safe(async () => BigInt(await s.cumulativeClaimed())),
+  const A = AGORA.stakedAgora;
+  const f = (sig: string) => ({ target: A, fragment: `function ${sig} view returns (uint256)` });
+  const r = await multiRead([
+    f("totalAssets()"), f("totalSupply()"), f("cumulativeRewards()"), f("cumulativeClaimed()"),
   ]);
-  return { deployed: true, totalAssets, totalShares, cumulativeRewards, cumulativeClaimed };
+  return {
+    deployed: true,
+    totalAssets: asBig(r[0]),
+    totalShares: asBig(r[1]),
+    cumulativeRewards: asBig(r[2]),
+    cumulativeClaimed: asBig(r[3]),
+  };
 }
 
 export type RedeemInfo = {
@@ -255,21 +291,23 @@ export async function readRedeemer(): Promise<RedeemInfo> {
       requestsPaused: null,
     };
   }
-  const r = new Contract(AGORA.redeemer, REDEEMER_ABI, readProvider);
-  const [haircutBps, redeemDelay, totalBurned, totalPaidOut, queueLength, epochCapBps, epochRemaining, requestsPaused] =
-    await Promise.all([
-      safe(async () => BigInt(await r.haircutBps())),
-      safe(async () => BigInt(await r.redeemDelay())),
-      safe(async () => BigInt(await r.totalBurned())),
-      safe(async () => BigInt(await r.totalPaidOut())),
-      safe(async () => BigInt(await r.queueLength())),
-      safe(async () => BigInt(await r.epochCapBps())),
-      safe(async () => BigInt(await r.epochRemaining())),
-      safe(async () => (await r.requestsPaused()) as boolean),
-    ]);
+  const R = AGORA.redeemer;
+  const f = (sig: string) => ({ target: R, fragment: `function ${sig} view returns (uint256)` });
+  const r = await multiRead([
+    f("haircutBps()"), f("redeemDelay()"), f("totalBurned()"), f("totalPaidOut()"),
+    f("queueLength()"), f("epochCapBps()"), f("epochRemaining()"),
+    { target: R, fragment: "function requestsPaused() view returns (bool)" },
+  ]);
   return {
-    deployed: true, haircutBps, redeemDelay, totalBurned, totalPaidOut,
-    queueLength, epochCapBps, epochRemaining, requestsPaused,
+    deployed: true,
+    haircutBps: asBig(r[0]),
+    redeemDelay: asBig(r[1]),
+    totalBurned: asBig(r[2]),
+    totalPaidOut: asBig(r[3]),
+    queueLength: asBig(r[4]),
+    epochCapBps: asBig(r[5]),
+    epochRemaining: asBig(r[6]),
+    requestsPaused: asBool(r[7]),
   };
 }
 
