@@ -15,3 +15,7 @@ typechain-types/
 
 .DS_Store
 *.log
+
+# A stray nested clone of this same repo. Its work is already merged
+# (3a79bec is an ancestor of main); it is redundant, not a submodule.
+contracts/tithe/
