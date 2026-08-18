@@ -1,5 +1,6 @@
 import { Panel, Stat, Row, Dot, Pill } from "./components";
-import { useSnapshot, useBeefy, useOperatorHoldings } from "./useReads";
+import { useSnapshot, useBeefy, useOperatorHoldings, useEthUsd } from "./useReads";
+import { usdOf } from "./price";
 import { fmtSig, fmtGrouped, fmtUnits, DASH } from "./format";
 import { AGORA, explorerAddr } from "./chain";
 
@@ -27,6 +28,7 @@ export default function Deployed() {
   const operator = s?.reserve.operator ?? AGORA.deployer;
   const beefy = useBeefy(operator);
   const held = useOperatorHoldings(operator, AGORA.token, AGORA.stakedAgora, s?.pool.priceWad ?? null);
+  const ethUsd = useEthUsd();
 
   /** Everything the operator can be seen to hold, deployed or not. */
   const accountedFor =
@@ -53,18 +55,21 @@ export default function Deployed() {
             k="Withdrawn, all time"
             value={withdrawn != null ? fmtSig(withdrawn) : null}
             unit="ETH"
+            usd={usdOf(withdrawn, ethUsd)}
             note="cumulative total, not a current balance"
           />
           <Stat
             k="Worth now"
             value={worth != null ? fmtSig(worth) : beefy.loading ? null : "0"}
             unit="ETH"
+            usd={usdOf(worth, ethUsd)}
             note="mark-to-market across every open position"
           />
           <Stat
             k="Still in the Treasury"
             value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null}
             unit="ETH"
+            usd={usdOf(s?.reserve.navWad, ethUsd)}
             note="NAV — the only part the floor counts"
           />
         </div>
@@ -85,6 +90,7 @@ export default function Deployed() {
             k="Operator ETH"
             value={held?.eth != null ? fmtSig(held.eth) : null}
             unit="ETH"
+            usd={usdOf(held?.eth, ethUsd)}
             note="idle in the wallet, not yet deployed"
           />
           <Stat

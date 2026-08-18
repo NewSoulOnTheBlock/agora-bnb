@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Panel, Stat, Row, Dot, Pill } from "./components";
-import { useSnapshot, useTaxHistory, useFloorHistory, useBeefy } from "./useReads";
+import { useSnapshot, useTaxHistory, useFloorHistory, useBeefy, useEthUsd } from "./useReads";
+import { usdOf, fmtUsd } from "./price";
 import { fmtSig, fmtGrouped, bpsToPct, signedPct, shortAddr, DASH } from "./format";
 import { V4, PONS, AGORA, ZERO, explorerAddr, AGORA_TAX_BPS, ETH_USD_FEED, GMGN_URL } from "./chain";
 import { readCurveState, type CurveState } from "./curve";
@@ -20,6 +21,8 @@ export default function Floor() {
   // The operator wallet is what holds the deployed positions, so that is the
   // address to scan — the Treasury itself never touches Beefy today.
   const beefy = useBeefy(s?.reserve.operator ?? AGORA.deployer);
+
+  const ethUsd = useEthUsd();
 
   /** NAV plus whatever is deployed. The number a holder actually cares about. */
   const totalBacking =
@@ -131,18 +134,21 @@ export default function Floor() {
               k="Total backing"
               value={totalBacking != null ? fmtSig(totalBacking) : null}
               unit="ETH"
-              note="NAV plus capital deployed at Beefy"
+              usd={usdOf(totalBacking, ethUsd)}
+              note="NAV plus capital deployed at Beefy · the protocol's TVL"
             />
             <Stat
               k="In the Treasury"
               value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null}
               unit="ETH"
+              usd={usdOf(s?.reserve.navWad, ethUsd)}
               note="NAV — what the floor is computed from"
             />
             <Stat
               k="Deployed at Beefy"
               value={beefy.total != null ? fmtSig(beefy.total) : beefy.loading ? null : "0"}
               unit="ETH"
+              usd={usdOf(beefy.total, ethUsd)}
               note="live value of the operator's positions"
             />
             <Stat
@@ -160,12 +166,14 @@ export default function Floor() {
               k="Cumulative tax"
               value={s?.reserve.cumulativeTaxReceived != null ? fmtSig(s.reserve.cumulativeTaxReceived) : null}
               unit="ETH"
+              usd={usdOf(s?.reserve.cumulativeTaxReceived, ethUsd)}
               note="everything the 4% has ever collected"
             />
             <Stat
               k="Paid to stakers"
               value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
               unit="ETH"
+              usd={usdOf(s?.reserve.cumulativeIncomeDistributed, ethUsd)}
               note="90% stAGORA · 10% staked Suits"
             />
             <Stat
@@ -173,6 +181,57 @@ export default function Floor() {
               value={s?.reserve.incomeShareBps != null ? String(Number(s.reserve.incomeShareBps) / 100) : null}
               unit="%"
               note="rest compounds into the floor"
+            />
+          </div>
+        </div>
+
+        {/* ---- valuation ----
+             Dollar figures throughout come from the WETH/USDG pool's spot
+             price, which is a DEX quote and not an oracle. It is fine for a
+             readout and is deliberately kept away from anything that decides
+             money — see `price.ts`. */}
+        <div className="section">
+          <p className="label">
+            Valuation <span className="id">USD derived from the WETH/USDG pool</span>
+          </p>
+          <div className="grid c4">
+            <Stat
+              k="TVL"
+              value={totalBacking != null ? fmtSig(totalBacking) : null}
+              unit="ETH"
+              usd={usdOf(totalBacking, ethUsd)}
+              note="reserve + deployed, what the protocol holds"
+            />
+            <Stat
+              k="Market cap"
+              value={
+                s?.pool.priceWad != null && s?.reserve.eligibleSupply != null
+                  ? fmtSig((s.pool.priceWad * s.reserve.eligibleSupply) / 10n ** 18n)
+                  : null
+              }
+              unit="ETH"
+              usd={
+                s?.pool.priceWad != null && s?.reserve.eligibleSupply != null
+                  ? usdOf((s.pool.priceWad * s.reserve.eligibleSupply) / 10n ** 18n, ethUsd)
+                  : null
+              }
+              note="price × eligible supply"
+            />
+            <Stat
+              k="Staked"
+              value={s?.staking.totalAssets != null ? fmtGrouped(s.staking.totalAssets, 0) : null}
+              unit="AGORA"
+              usd={
+                s?.staking.totalAssets != null && s?.pool.priceWad != null
+                  ? usdOf((s.staking.totalAssets * s.pool.priceWad) / 10n ** 18n, ethUsd)
+                  : null
+              }
+              note="locked in the stAGORA vault"
+            />
+            <Stat
+              k="ETH price"
+              value={ethUsd != null ? fmtUsd(ethUsd) : null}
+              note="spot from WETH/USDG · display only, never priced into the floor"
             />
           </div>
         </div>

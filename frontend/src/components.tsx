@@ -32,12 +32,15 @@ export function Panel({
  * a reader could mistake for a measurement.
  */
 export function Stat({
-  k, value, note, unit,
+  k, value, note, unit, usd,
 }: {
   k: string;
   value: string | null;
   note?: string;
   unit?: string;
+  /** Optional dollar line under the readout. Display only — never a source of
+   *  truth, because the rate behind it is a spot DEX price. */
+  usd?: string | null;
 }) {
   const na = value === null || value === DASH;
   return (
@@ -48,6 +51,7 @@ export function Stat({
           {na ? "unavailable" : value}
           {!na && unit && <span className="unit">{unit}</span>}
         </div>
+        {usd && <div className="usd">≈ {usd}</div>}
         {note && <div className="note">{note}</div>}
       </div>
     </Panel>

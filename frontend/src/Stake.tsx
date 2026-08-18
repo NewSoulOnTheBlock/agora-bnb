@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther, parseEther } from "ethers";
 import { Panel, Row, Stat, Pill, Dot } from "./components";
+import StakePitch from "./StakePitch";
 import { AwaitingDeployment } from "./Layout";
 import { fmtGrouped, fmtSig, DASH } from "./format";
 import { AGORA, ZERO, explorerAddr, SUITS_SHARE_BPS } from "./chain";
@@ -71,6 +72,8 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           phase="Treasury + FeeSink → launch → stAGORA, Redeemer, StakedSuits, Distributor"
         />
       )}
+
+      <StakePitch />
 
       <div className="two">
         <Panel

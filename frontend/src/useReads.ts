@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { readSnapshot, type Snapshot } from "./reads";
 import { readTaxHistory, readFloorHistory, findFloorRegressions, type TaxEvent, type FloorPoint } from "./history";
 import { readBeefyPositions, totalDeployedWei, readOperatorHoldings, type BeefyPosition, type OperatorHoldings } from "./beefy";
+import { readEthUsd } from "./price";
 
 type Async<T> = { data: T | null; loading: boolean; error: string | null };
 
@@ -91,13 +92,17 @@ export function useBeefy(holder: string | null | undefined, intervalMs = 60_000)
   useEffect(() => {
     if (!holder) return;
     let alive = true;
+    // The registry sweep is the heaviest read on the page — 66 balances, then a
+    // per-vault pass, then price routing. Held back so the figures everyone
+    // looks at first are not queued behind it.
+    let warmup: number | undefined;
     const go = () =>
       readBeefyPositions(holder)
         .then((d) => alive && setState({ data: d, loading: false, error: null }))
         .catch((e) => alive && setState({ data: null, loading: false, error: String(e?.message ?? e) }));
-    go();
+    warmup = window.setTimeout(go, 1200);
     const t = setInterval(go, intervalMs);
-    return () => { alive = false; clearInterval(t); };
+    return () => { alive = false; clearTimeout(warmup); clearInterval(t); };
   }, [holder, intervalMs]);
 
   return { ...state, total: state.data ? totalDeployedWei(state.data) : null };
@@ -126,4 +131,24 @@ export function useOperatorHoldings(
   }, [holder, agoraToken, stAgoraVault, priceWad, intervalMs]);
 
   return data;
+}
+
+/**
+ * USD per ETH, from the WETH/USDG pool.
+ *
+ * Display only — see the note in `price.ts`. Polled slowly because a dollar
+ * line does not need block-level freshness.
+ */
+export function useEthUsd(intervalMs = 60_000) {
+  const [usd, setUsd] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const go = () => readEthUsd().then((v) => alive && setUsd(v)).catch(() => {});
+    go();
+    const t = setInterval(go, intervalMs);
+    return () => { alive = false; clearInterval(t); };
+  }, [intervalMs]);
+
+  return usd;
 }

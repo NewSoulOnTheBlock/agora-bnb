@@ -1911,3 +1911,22 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
   overflow: auto;
 }
 .notepad-body:focus { outline: none; }
+
+/* The dollar line under a readout. Quieter than the ETH figure on purpose —
+   the protocol is ETH-denominated and the dollar value is a convenience. */
+.stat .usd {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--vw-cyan);
+  letter-spacing: 0.3px;
+}
+
+/* The dollar line under the Stake page headline — larger than the stat-tile
+   version because it sits under a hero number, not a tile. */
+.pitch-usd {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--vw-cyan);
+  margin-top: 6px;
+  letter-spacing: 0.4px;
+}

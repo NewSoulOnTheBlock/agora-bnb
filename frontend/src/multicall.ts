@@ -46,6 +46,43 @@ const MC3_ABI = [
 export type Call = { target: string; callData: string };
 
 /**
+ * A gate on how many aggregate3 calls are in flight at once.
+ *
+ * The public endpoint rate-limits, and the Reserve page mounts a lot of readers
+ * together — the snapshot's six, the Beefy registry sweep, the candle scan and
+ * the ETH price. Fired simultaneously, some come back 429 and the page renders
+ * a wall of "unavailable" while every individual call, tested alone, works
+ * perfectly. That is a concurrency problem wearing a data problem's clothes.
+ *
+ * Three at a time, with one retry, costs a few hundred milliseconds and removes
+ * the failure. Multicall already collapsed each reader to a single round-trip,
+ * so there is very little left to parallelise anyway.
+ *
+ * Two was too strict: the Beefy sweep is a chain of eight gated calls, and at a
+ * width of two it starved the cheap ones behind it — the ETH price, all of two
+ * reads, sat in the queue and never landed. The heavy scan is also delayed on
+ * mount (see `useBeefy`) so it stops competing with first paint.
+ */
+const MAX_INFLIGHT = 3;
+let inflight = 0;
+const waiting: (() => void)[] = [];
+
+async function gate<T>(fn: () => Promise<T>): Promise<T> {
+  if (inflight >= MAX_INFLIGHT) {
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  }
+  inflight++;
+  try {
+    return await fn();
+  } finally {
+    inflight--;
+    waiting.shift()?.();
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
  * Run every call in one request.
  *
  * `allowFailure` is always true and a failed call comes back as `null` rather
@@ -57,15 +94,30 @@ export type Call = { target: string; callData: string };
  */
 export async function aggregate3(calls: Call[]): Promise<(string | null)[]> {
   if (!calls.length) return [];
-  try {
+
+  const send = async () => {
     const mc = new Contract(MULTICALL3, MC3_ABI, readProvider);
     const res: { success: boolean; returnData: string }[] = await mc.aggregate3(
       calls.map((c) => ({ target: c.target, allowFailure: true, callData: c.callData }))
     );
     return res.map((r) => (r.success && r.returnData !== "0x" ? r.returnData : null));
-  } catch {
-    return calls.map(() => null);
-  }
+  };
+
+  return gate(async () => {
+    try {
+      return await send();
+    } catch {
+      // One retry after a short pause. A rate-limited endpoint answers happily
+      // a moment later, and the alternative is a panel of "unavailable" for a
+      // failure that was never about the data.
+      await sleep(450);
+      try {
+        return await send();
+      } catch {
+        return calls.map(() => null);
+      }
+    }
+  });
 }
 
 /** Convenience: encode one function against many targets, decode a single value. */

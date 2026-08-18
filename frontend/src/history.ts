@@ -227,3 +227,63 @@ export function findFloorRegressions(points: FloorPoint[]): FloorPoint[] {
 /** Unused-but-exported guard so the hook ABI stays wired for the sweep event. */
 export const HOOK_CONTRACT = () =>
   new Contract(PONS.memeHook, MEME_HOOK_ABI, readProvider);
+
+// ---------------------------------------------------------------------------
+// Income history — what stakers have actually been paid, and over what window
+// ---------------------------------------------------------------------------
+
+export type IncomeHistory = {
+  /** Every `IncomeDistributed` amount, summed. */
+  total: bigint;
+  /** How many distributions have happened. */
+  count: number;
+  /** Seconds between the first and the last one. */
+  windowSec: number;
+};
+
+/**
+ * Reads the distribution history so the Stake page can state a **measured**
+ * return rather than a projected one.
+ *
+ * The distinction matters and the repo already took a side on it: the Stake
+ * page's own copy says no projected APY is shown because "a forecast would be
+ * fiction". A trailing figure is not a forecast — it is arithmetic on events
+ * that already happened — so long as the window is stated next to it and never
+ * annualised. Eighteen hours of launch volume extrapolated to a year is exactly
+ * the fiction that rule exists to prevent.
+ */
+export async function readIncomeHistory(maxChunks = 5): Promise<IncomeHistory | null> {
+  if (!deployed(AGORA.treasury)) return null;
+
+  const logs = await scanLogsBackwards({
+    address: AGORA.treasury,
+    topics: [topicId("IncomeDistributed(uint256)")],
+    maxChunks,
+  });
+  if (!logs.length) return null;
+
+  const sorted = [...logs].sort((a, b) => a.blockNumber - b.blockNumber);
+  let total = 0n;
+  for (const l of sorted) {
+    try {
+      total += BigInt(l.data);
+    } catch {
+      // A malformed entry should not void the series.
+    }
+  }
+
+  let windowSec = 0;
+  if (sorted.length > 1) {
+    const [a, b] = await Promise.all([
+      readProvider.getBlock(sorted[0].blockNumber).catch(() => null),
+      readProvider.getBlock(sorted[sorted.length - 1].blockNumber).catch(() => null),
+    ]);
+    if (a && b) windowSec = Math.max(0, b.timestamp - a.timestamp);
+  }
+
+  return { total, count: sorted.length, windowSec };
+}
+
+function deployed(a: string): boolean {
+  return !!a && a !== ZERO;
+}
