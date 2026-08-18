@@ -1,825 +1,1439 @@
-/* ===========================================================================
-   AGORA — neoclassical.
-   Deep charcoal ground, aged marble plaques, gold-leaf rules, Greek meander.
+/* ==========================================================================
+   AGORA 98
+   --------------------------------------------------------------------------
+   A Windows 98 interface for the AGORA reserve.
 
-   Everything is drawn with CSS and inline SVG data-URIs. No web fonts, no
-   images, no external requests: the page must render identically whether or
-   not a CDN is reachable, and nothing here should be able to leak a referrer.
-   Typography leans on a high-contrast system serif stack with wide tracking
-   and small caps, which is what carries the inscription feel.
-   =========================================================================== */
+   The rule that shaped this file: **the data layer was not touched.** Every
+   class the pages already used (`panel`, `stat`, `row`, `grid`, `notice`,
+   `hero`, `big`, `sub`, `qrow`, `field`, `chips`, …) is redefined here in the
+   98 idiom, and `components.tsx` keeps its exact prop API. So the pages render
+   unchanged and simply arrive dressed differently.
 
+   Everything below is drawn in CSS. No image assets, no icon fonts, no
+   third-party stylesheet — the bevels, the title-bar gradient, the scrollbars
+   and the tab control are all borders and box-shadows.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1 · Palette
+   The 16-colour VGA set Windows 98 actually used, named for what they do.
+   -------------------------------------------------------------------------- */
+/* Windows 98 shipped alternate colour schemes — Spruce, Desert, Eggplant,
+   Rainy Day — and changing the 3D object colour was part of what a scheme did.
+   This is one of those: Spruce's green chrome over Desert's warm control face.
+   The structure is untouched; only the palette moved.
+
+   The reason it moved: the readouts are dark green, and against the stock
+   silver-and-navy they read as a second, unrelated palette fighting the first.
+   One family throughout is what makes a dense page of numbers calm. */
 :root {
-  /* Ground — the night sky and stone behind everything */
-  --ink-900: #070a0e;
-  --ink-800: #0b0f15;
-  --ink-700: #11161f;
-  --ink-600: #171d28;
-  --ink-500: #1e2532;
-  --ink-400: #2a3243;
+  /* ---- vaporwave ----------------------------------------------------------
+     The brief was Greek marble, phalanxes, columns, katakana, video games and
+     vapourwave. Those are not six aesthetics, they are one: vapourwave's whole
+     visual vocabulary is Greco-Roman statuary plus obsolete computer chrome
+     plus Japanese type. Which is why the Windows 98 structure below survives
+     the repaint intact — the bevels, the title bars and the taskbar ARE part
+     of the look, not something being replaced by it.
 
-  /* Marble / parchment */
-  --marble-100: #f2ede1;
-  --marble-200: #e6dfd0;
-  --marble-300: #d3cab7;
-  --marble-400: #b3a992;
-  --marble-500: #8c8371;
+     It also happens to be the right costume for this particular product: the
+     token is called AGORA. The columns were always on-brand. */
+  --vw-pink: #ff71ce;
+  --vw-magenta: #ff2fb9;
+  --vw-cyan: #01cdfe;
+  --vw-mint: #05ffa1;
+  --vw-lav: #b967ff;
+  --vw-violet: #7b2ff7;
+  --vw-cream: #fffb96;
+  --vw-sun-1: #ffe36b;
+  --vw-sun-2: #ff2f87;
 
-  /* Gold leaf */
-  --gold-100: #f0dda6;
-  --gold-200: #e0c47c;
-  --gold-300: #c9a227;
-  --gold-400: #a8871f;
-  --gold-500: #6d5715;
+  --sky-1: #0d0525;    /* zenith */
+  --sky-2: #3b0f6b;    /* mid */
+  --sky-3: #a02a8f;    /* horizon haze */
 
-  --ok: #7fa86a;
-  --warn: #c98a2a;
-  --bad: #b4553f;
+  --silver: #cdc2e4;   /* control face — pale lavender chrome */
+  --white: #ffffff;    /* top-left highlight */
+  --light: #eae3f8;    /* inner highlight */
+  --gray: #7a6a9c;     /* inner shadow */
+  --black: #2a1140;    /* outer shadow, and body text */
+  --navy: var(--vw-violet);   /* active title bar start, selection */
+  --blue: var(--vw-magenta);  /* title bar gradient end */
+  --teal: #150a2e;     /* the desktop, behind the sky */
+  --teal-2: #0d0520;
+  --disabled: #7a6a9c;
 
-  --text: var(--marble-200);
-  --text-dim: #9a927f;
-  --text-faint: #6c6555;
+  /* Readout colours. Deliberately NOT terminal green any more — a wall of
+     phosphor is exactly the "too computery" the brief pushed back on. Pink on
+     near-black keeps the readouts legible while reading as neon rather than
+     as a trading terminal. */
+  --crt-bg: #1a0730;
+  --crt: #ff8fdc;
+  --crt-dim: #b06ac0;
+  --crt-off: #6b4785;
 
-  --rule: rgba(201, 162, 39, 0.28);
-  --rule-soft: rgba(201, 162, 39, 0.14);
+  --ok: #0b8f5a;
+  --warn: #b85a00;
+  --bad: #d11f6a;
 
-  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
-    Georgia, "Times New Roman", serif;
-  --mono: "SFMono-Regular", ui-monospace, "Cascadia Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  /* Bevel recipes. Four insets each: outer shadow, outer highlight, inner
+     shadow, inner highlight — the exact order Win98 painted them. */
+  --out:
+    inset -1px -1px var(--black),
+    inset 1px 1px var(--white),
+    inset -2px -2px var(--gray),
+    inset 2px 2px var(--light);
 
-  --r: 2px; /* stone does not have rounded corners */
+  --in:
+    inset -1px -1px var(--white),
+    inset 1px 1px var(--black),
+    inset -2px -2px var(--light),
+    inset 2px 2px var(--gray);
+
+  /* Sunken well — text fields, list boxes, anything you read out of. */
+  --well:
+    inset -1px -1px var(--white),
+    inset 1px 1px var(--gray),
+    inset -2px -2px var(--light),
+    inset 2px 2px var(--black);
+
+  /* The thin etched line used for group boxes and separators. */
+  --etch-d: var(--gray);
+  --etch-l: var(--white);
+
+  --font: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, Geneva, Verdana, sans-serif;
+  --mono: "Lucida Console", "Courier New", Courier, monospace;
+
+  --fs: 12px;
+  --title-h: 20px;
+  --taskbar-h: 30px;
 }
 
-/* Greek meander (key) band, gold on transparent. */
-:root {
-  --meander: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='14' viewBox='0 0 28 14'><path d='M0 12.5h3.5V3.5h9v6H7v-3h3' fill='none' stroke='%23c9a227' stroke-width='1.3' stroke-linecap='square' opacity='0.55'/><path d='M14 12.5h3.5V3.5h9v6H21v-3h3' fill='none' stroke='%23c9a227' stroke-width='1.3' stroke-linecap='square' opacity='0.55'/></svg>");
-  /* Fine grain, used to age the marble and break up flat fills. */
-  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.5'/></svg>");
-  /* Moonlit vista behind the whole UI. Dimming is baked into the JPEG, so the
-     page never flashes a bright image before CSS filters would apply. */
-  --vista: url("/vista.jpg");
-}
-
-/* A fifth of the bytes for small screens, where it is cropped hard anyway. */
-@media (max-width: 900px) {
-  :root { --vista: url("/vista-sm.jpg"); }
-}
-
-* { box-sizing: border-box; }
+/* --------------------------------------------------------------------------
+   2 · Reset and the desktop
+   -------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--ink-900);
-  color: var(--text);
-  font-family: var(--serif);
-  font-size: 15px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  font-family: var(--font);
+  font-size: var(--fs);
+  color: var(--black);
+  background: var(--teal);
+  /* Win98 rendered type without antialiasing; turning it off is most of what
+     makes a modern browser read as period-correct. */
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
+  overflow: hidden;
 }
 
-/* --------------------------------------------------------------------------
-   Atmosphere. Two fixed layers behind the content: a cold moonlit wash, and
-   the meander band that frames the whole page like a carved border.
-   -------------------------------------------------------------------------- */
-
-/**
- * Layer order, top to bottom: moonlight bloom, two gold corner glows, a
- * near-opaque scrim, then the vista.
- *
- * The scrim is the load-bearing part. Panels are opaque so they are safe
- * regardless, but `.sub`, `.label` and `.foot` text sits directly on this
- * background — so the image is pushed far enough back that contrast never
- * depends on which part of the artwork a paragraph happens to land on.
- */
-.atmos {
+/* The desktop is a sunset sky: indigo at the zenith, magenta at the horizon,
+   and night below it. The sun and the grid are separate layers so each can be
+   positioned against the horizon line at 63%. */
+.desktop {
   position: fixed;
   inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-color: var(--ink-900);
-  background-image:
-    radial-gradient(1100px 600px at 50% -10%, rgba(146, 163, 190, 0.14), transparent 62%),
-    radial-gradient(700px 420px at 12% 8%, rgba(201, 162, 39, 0.07), transparent 60%),
-    radial-gradient(760px 460px at 88% 4%, rgba(201, 162, 39, 0.06), transparent 60%),
-    linear-gradient(180deg,
-      rgba(11, 15, 21, 0.30) 0%,
-      rgba(7, 10, 14, 0.46) 42%,
-      rgba(5, 7, 10, 0.72) 74%,
-      rgba(5, 7, 10, 0.94) 100%),
-    var(--vista);
-  background-repeat: no-repeat;
-  background-position: center, center, center, center, top center;
-  background-size: auto, auto, auto, auto, cover;
+  background: linear-gradient(
+    180deg,
+    var(--sky-1) 0%,
+    #24094a 28%,
+    var(--sky-2) 46%,
+    var(--sky-3) 62%,
+    #2a0b3f 63.2%,
+    var(--teal) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* Vignette + grain, kept separate so the grain can be very subtle. */
-.atmos::after {
+/* Legacy hooks from the previous theme. Neutralised rather than deleted, so a
+   page still referencing them cannot punch a hole in the layout. */
+.atmos, .rails, .frieze { display: none !important; }
+
+/* --------------------------------------------------------------------------
+   2c · The scene — sun, grid, columns, frieze
+   All decorative, all `pointer-events: none`, all behind the window. Drawn in
+   CSS rather than shipped as images so it costs nothing and scales anywhere.
+   -------------------------------------------------------------------------- */
+.scene { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+
+.vw-sun {
+  position: absolute;
+  left: 50%;
+  top: 63%;
+  width: min(380px, 60vw);
+  aspect-ratio: 1;
+  transform: translate(-50%, -55%);
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--vw-sun-1) 0%, #ff9a3c 45%, var(--vw-sun-2) 100%);
+  box-shadow: 0 0 90px 30px rgba(255, 47, 135, 0.35);
+}
+
+/* The slats across the lower half. Widening the gaps toward the bottom is what
+   makes it read as the vapourwave sun rather than a striped ball. */
+.vw-sun::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 54%;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  background:
+    linear-gradient(180deg,
+      transparent 0 6%,
+      var(--sky-2) 6% 9%,
+      transparent 9% 20%,
+      var(--sky-2) 20% 25%,
+      transparent 25% 38%,
+      var(--sky-2) 38% 45%,
+      transparent 45% 58%,
+      var(--sky-2) 58% 68%,
+      transparent 68% 80%,
+      var(--sky-2) 80% 100%);
+}
+
+/* The receding grid. `perspective` + `rotateX` is the whole trick; the
+   over-wide box keeps the vanishing lines from ending inside the viewport. */
+.vw-grid {
+  position: absolute;
+  left: -60%;
+  right: -60%;
+  top: 63%;
+  bottom: -10%;
+  transform: perspective(340px) rotateX(64deg);
+  transform-origin: 50% 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 113, 206, 0.55) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(1, 205, 254, 0.42) 1px, transparent 1px);
+  background-size: 58px 58px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, transparent 78%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, transparent 78%);
+}
+
+/* A hot line right on the horizon, which is what sells the two halves as one
+   scene rather than two stacked gradients. */
+.vw-horizon {
+  position: absolute;
+  left: 0; right: 0;
+  top: 63%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--vw-cyan), var(--vw-pink), var(--vw-cyan), transparent);
+  box-shadow: 0 0 18px 3px rgba(1, 205, 254, 0.5);
+}
+
+/* The frieze the repo already shipped, duotoned into the palette. It is a
+   Greek temple scene with statuary and a spear-bearing Athena, which is
+   exactly the brief, and it was sitting unused in `public/`. */
+.frieze-band {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 104px;
+  overflow: hidden;
+  border-bottom: 2px solid var(--vw-magenta);
+  box-shadow: 0 0 26px rgba(255, 47, 185, 0.45);
+}
+.frieze-band img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  /* Sepia → hard duotone. The source is monochrome, so a hue rotate lands it
+     cleanly in the palette without needing a second asset. */
+  filter: grayscale(1) sepia(1) hue-rotate(238deg) saturate(4.5) contrast(1.15) brightness(0.82);
+  mix-blend-mode: screen;
+  opacity: 0.9;
+}
+.frieze-band::after {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: var(--grain);
-  background-size: 140px 140px;
-  opacity: 0.035;
-  mix-blend-mode: overlay;
+  background: linear-gradient(180deg, rgba(13, 5, 37, 0.15), rgba(13, 5, 37, 0.85));
 }
 
-.rails {
-  position: fixed;
-  inset: 0;
+/* Doric columns flanking the window. Fluting is a repeating gradient; the
+   capital and base are two blocks. Cheap, and it holds up at any height. */
+.column {
+  position: absolute;
+  top: 104px;
+  bottom: var(--taskbar-h);
+  width: 54px;
+  opacity: 0.75;
+}
+.column.left { left: 10px; }
+.column.right { right: 10px; }
+
+.column .shaft {
+  position: absolute;
+  inset: 26px 4px 20px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.16) 0 2px,
+      rgba(185, 103, 255, 0.30) 2px 5px,
+      rgba(20, 8, 40, 0.55) 5px 8px
+    ),
+    linear-gradient(90deg, #6a4a94, #d8ccec 40%, #a98fd0 70%, #4a2f70);
+}
+.column .cap,
+.column .base {
+  position: absolute;
+  left: 0; right: 0;
+  height: 22px;
+  background: linear-gradient(90deg, #5c3f85, #e4dbf4 45%, #a98fd0 72%, #422a63);
+  box-shadow: 0 0 14px rgba(185, 103, 255, 0.5);
+}
+.column .cap { top: 4px; }
+.column .base { bottom: 0; height: 18px; }
+
+/* The Greek key. Used as a divider rule wherever a section needs a lid. */
+.meander {
+  height: 12px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='12' shape-rendering='crispEdges'><path d='M0 10h20V2H4v6h12V4H8v2h6' fill='none' stroke='%23ff71ce' stroke-width='2'/></svg>");
+  background-repeat: repeat-x;
+  background-size: 24px 12px;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vw-horizon { animation: horizonPulse 4s ease-in-out infinite; }
+}
+@keyframes horizonPulse {
+  50% { box-shadow: 0 0 26px 5px rgba(255, 47, 185, 0.6); }
+}
+
+::selection { background: var(--navy); color: var(--white); }
+
+/* --------------------------------------------------------------------------
+   2b · Pointers
+   The cursors are drawn as inline SVG rather than downloaded, for the same
+   reason as the icons: the originals are Microsoft's artwork. SVG also means
+   they stay sharp on a HiDPI display, which a 32×32 .cur never does.
+
+   The hotspot coordinates after the URL matter — get them wrong and every
+   click lands a few pixels from where the tip appears to be.
+   -------------------------------------------------------------------------- */
+:root {
+  --cur-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='19' shape-rendering='crispEdges'><path d='M0 0v16.5l4-3.6 2.7 6 2.6-1.1-2.7-5.9H12z' fill='%23000'/><path d='M1 2.3v11.6l3.5-3.1 2.5 5.6 1-.4-2.6-5.7h4z' fill='%23fff'/></svg>") 0 0;
+
+  --cur-hand: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='20' shape-rendering='crispEdges'><path d='M6 0h2v8h1V3h2v5h1V4h2v5h1v7l-2 4H7l-4-6 1-2 2 2z' fill='%23000'/><path d='M6.8 1h.5v8.6h1.3V4h.6v5.6h1.4V5h.6v5.6h1.4v5.2l-1.7 3.2H7.5l-3.4-5.2.3-.6 2.4 2.3z' fill='%23fff'/></svg>") 5 0;
+
+  --cur-text: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='16' shape-rendering='crispEdges'><path d='M1 0h5v1H4v14h2v1H1v-1h2V1H1z' fill='%23000'/></svg>") 3 8;
+
+  --cur-wait: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><path d='M3 0h10v3l-3 5 3 5v3H3v-3l3-5-3-5z' fill='%23000'/><path d='M4 1h8v1.8L8.8 8 12 13.2V15H4v-1.8L7.2 8 4 2.8z' fill='%23fff'/><path d='M5.6 2.6h4.8L8 6.4z' fill='%23ffd700'/><path d='M5.6 13.4h4.8L8 9.6z' fill='%23ffd700'/></svg>") 8 8;
+}
+
+/* Applied to the desktop rather than `*` so a page that legitimately wants a
+   different cursor can still say so. */
+.desktop,
+.desktop button,
+.desktop a,
+.win,
+.taskbar,
+.titlebar { cursor: var(--cur-arrow), default; }
+
+.desktop a,
+.link,
+.tab,
+.btn,
+button.mini,
+.desk-icon,
+.start-btn,
+.task-btn,
+.menu-item,
+.tbtn,
+.tray button,
+.menu-pop button,
+.start-items button { cursor: var(--cur-hand), pointer; }
+
+.desktop input,
+.desktop textarea,
+.stat .v,
+.big,
+.rv { cursor: var(--cur-text), text; }
+
+.desktop button:disabled,
+.desktop input:disabled { cursor: var(--cur-arrow), not-allowed; }
+
+/* Anything mid-flight gets the hourglass, which is the one piece of Win98
+   feedback vocabulary that still needs no explanation. */
+[aria-busy="true"], [aria-busy="true"] * { cursor: var(--cur-wait), wait; }
+
+/* --------------------------------------------------------------------------
+   3 · Scrollbars — square, bevelled, with arrow buttons
+   -------------------------------------------------------------------------- */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: var(--silver) #d8d8d8;
+}
+
+::-webkit-scrollbar { width: 16px; height: 16px; }
+
+::-webkit-scrollbar-track {
+  background-color: #d8d8d8;
+  background-image:
+    linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%),
+    linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%);
+  background-size: 2px 2px;
+  background-position: 0 0, 1px 1px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+}
+
+::-webkit-scrollbar-corner { background: var(--silver); }
+
+/* The little end buttons. Arrows are drawn with a CSS triangle via
+   background-image so no glyph font is needed. */
+::-webkit-scrollbar-button:single-button {
+  background: var(--silver);
+  box-shadow: var(--out);
+  display: block;
+  height: 16px;
+  width: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4'><path d='M3.5 0 7 4H0z' fill='%230a0a0a'/></svg>");
+}
+::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='4'><path d='M3.5 4 0 0h7z' fill='%230a0a0a'/></svg>");
+}
+::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7'><path d='M0 3.5 4 0v7z' fill='%230a0a0a'/></svg>");
+}
+::-webkit-scrollbar-button:single-button:horizontal:increment {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='7'><path d='M4 3.5 0 7V0z' fill='%230a0a0a'/></svg>");
+}
+::-webkit-scrollbar-button:single-button:active { box-shadow: var(--in); }
+
+/* --------------------------------------------------------------------------
+   4 · Desktop icons
+   -------------------------------------------------------------------------- */
+.desk-icons {
+  position: absolute;
+  /* Below the frieze band, and to the right of the left column. */
+  top: 116px;
+  left: 74px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   z-index: 1;
-  pointer-events: none;
-  box-shadow: inset 0 0 220px 60px rgba(0, 0, 0, 0.72);
 }
 
-/* Meander bands, top and bottom. */
-.rails::before,
-.rails::after {
-  content: "";
+.desk-icon {
+  width: 78px;
+  padding: 4px 2px 5px;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--white);
+  text-align: center;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.desk-icon svg { image-rendering: pixelated; }
+
+.desk-icon span {
+  /* The 1px black halo Win98 put behind desktop labels so they stayed legible
+     over any wallpaper. */
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.75);
+  padding: 1px 3px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.desk-icon:focus-visible { outline: 1px dotted var(--white); outline-offset: -2px; }
+.desk-icon[aria-current="true"] svg { filter: drop-shadow(0 0 0 var(--navy)); }
+.desk-icon[aria-current="true"] span {
+  background: var(--navy);
+  outline: 1px dotted var(--white);
+  outline-offset: -1px;
+}
+
+/* --------------------------------------------------------------------------
+   5 · Window chrome
+   -------------------------------------------------------------------------- */
+.win {
+  background: var(--silver);
+  box-shadow: var(--out);
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The application window sits between the desktop icons and the right edge,
+   but is capped and centred inside that region. Letting it run the full width
+   of a 2000px monitor is what made the first pass unreadable: `.rv` pushes
+   values to the right edge, so a two-word row stretched a metre wide. */
+.win-main {
+  position: absolute;
+  /* Clears the frieze band, and sits inside the two columns. */
+  top: 118px;
+  left: 80px;
+  right: 80px;
+  bottom: calc(var(--taskbar-h) + 12px);
+  width: min(1120px, 100%);
+  /* left + right + width all set, margins auto → the box centres in the gap. */
+  margin: 0 auto;
+  z-index: 2;
+  box-shadow:
+    var(--out),
+    0 0 34px rgba(255, 47, 185, 0.35),
+    0 0 90px rgba(1, 205, 254, 0.18);
+}
+
+.titlebar {
+  height: var(--title-h);
+  flex: 0 0 auto;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 100%);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px 0 3px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+.titlebar.inactive {
+  background: linear-gradient(90deg, var(--gray) 0%, #b5b5b5 100%);
+}
+
+.titlebar .t-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar .t-btns { display: flex; gap: 2px; }
+
+/* Title-bar buttons are 16×14 with the glyph drawn in CSS, not text — a real
+   character never lines up on the pixel grid the way these did. */
+.tbtn {
+  width: 16px;
+  height: 14px;
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+  padding: 0;
+  position: relative;
+  cursor: default;
+  color: var(--black);
+}
+.tbtn:active { box-shadow: var(--in); }
+.tbtn:focus-visible { outline: 1px dotted var(--black); outline-offset: -4px; }
+.tbtn::before, .tbtn::after { content: ""; position: absolute; background: var(--black); }
+
+/* — minimise: a bar at the bottom */
+.tbtn.min::before { left: 3px; bottom: 3px; width: 8px; height: 2px; }
+
+/* — maximise: an outlined box with a heavy top edge */
+.tbtn.max::before {
+  left: 3px; top: 2px; width: 9px; height: 8px;
+  background: none; border: 1px solid var(--black); border-top-width: 2px;
+}
+
+/* — close: two crossed strokes */
+.tbtn.close::before,
+.tbtn.close::after {
+  left: 7px; top: 3px; width: 1px; height: 9px;
+}
+.tbtn.close::before { transform: rotate(45deg); }
+.tbtn.close::after { transform: rotate(-45deg); }
+
+/* --------------------------------------------------------------------------
+   6 · Menu bar
+   -------------------------------------------------------------------------- */
+.menubar {
+  display: flex;
+  gap: 0;
+  padding: 1px 0 2px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid transparent;
+}
+
+.menu-item {
+  background: none;
+  border: none;
+  font: inherit;
+  padding: 2px 7px;
+  cursor: default;
+  color: var(--black);
+}
+.menu-item:hover, .menu-item[aria-expanded="true"] {
+  background: var(--navy);
+  color: var(--white);
+}
+/* The underlined access key, Win98's Alt-navigation affordance. */
+.menu-item u { text-decoration: underline; text-underline-offset: 1px; }
+
+.menu-pop {
+  position: absolute;
+  z-index: 60;
+  min-width: 168px;
+  background: var(--silver);
+  box-shadow: var(--out);
+  padding: 2px;
+}
+
+.menu-pop button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  padding: 3px 18px 3px 8px;
+  cursor: default;
+  color: var(--black);
+}
+.menu-pop button:hover:not(:disabled) { background: var(--navy); color: var(--white); }
+.menu-pop button:disabled { color: var(--gray); text-shadow: 1px 1px 0 var(--white); }
+.menu-pop .sep { height: 0; margin: 3px 2px; border-top: 1px solid var(--gray); border-bottom: 1px solid var(--white); }
+.menu-pop .accel { margin-left: auto; opacity: 0.85; }
+
+/* --------------------------------------------------------------------------
+   7 · Tab control
+   The trapezoid look comes from the tab sitting 2px taller when selected and
+   overlapping the panel's top border.
+   -------------------------------------------------------------------------- */
+.tabstrip {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 3px 0 0 3px;
+  margin-bottom: -2px;
+  position: relative;
+  z-index: 2;
+  flex-wrap: wrap;
+}
+
+/* Base `.tab` is an ordinary small button. Pages use the class for things like
+   Floor's "retry", which is not part of any tab strip and must not inherit the
+   trapezoid geometry or the -2px overlap. */
+.tab {
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+  border-radius: 0;
+  font: inherit;
+  padding: 3px 11px;
+  cursor: default;
+  color: var(--black);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  position: static;
+}
+.tab:active { box-shadow: var(--in); }
+.tab:focus-visible { outline: 1px dotted var(--black); outline-offset: -4px; }
+.tab svg { image-rendering: pixelated; }
+
+/* A route whose underlying action cannot succeed — currently Suits staking,
+   which the collection's operator allowlist blocks. Greyed the Win98 way:
+   the label is drawn twice, dark over a white offset, so it reads as
+   engraved-out rather than merely faded. */
+.tab:disabled,
+.desk-icon:disabled,
+.start-items button:disabled {
+  color: var(--gray);
+  text-shadow: 1px 1px 0 var(--white);
+  cursor: var(--cur-arrow), not-allowed;
+}
+.tab:disabled svg,
+.desk-icon:disabled svg,
+.start-items button:disabled svg { opacity: 0.4; filter: grayscale(1); }
+.desk-icon:disabled span { opacity: 0.55; }
+
+/* Only inside the strip does it become a tab. */
+.tabstrip .tab {
+  box-shadow:
+    inset 1px 1px var(--white),
+    inset -1px 0 var(--black),
+    inset -2px 0 var(--gray);
+  border-radius: 3px 3px 0 0;
+  padding: 3px 11px 4px;
+  position: relative;
+  top: 2px;
+}
+.tabstrip .tab:active { box-shadow: inset 1px 1px var(--white), inset -1px 0 var(--black), inset -2px 0 var(--gray); }
+
+.tabstrip .tab[aria-selected="true"] {
+  top: 0;
+  padding: 5px 13px;
+  font-weight: 700;
+  z-index: 3;
+}
+
+/* --------------------------------------------------------------------------
+   8 · Client area
+   -------------------------------------------------------------------------- */
+.client {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--silver);
+  box-shadow: var(--out);
+  padding: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+/* A measure the eye can actually track. Rows here are label-left / value-right,
+   so an unbounded width turns every one into a dotted line across a monitor. */
+.page {
+  max-width: 940px;
+  margin: 0 auto;
+  padding-bottom: 4px;
+}
+
+.statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px 0 0;
+  margin-top: 3px;
+}
+
+.status-pane {
+  box-shadow: var(--well);
+  padding: 2px 6px;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.status-pane.grow { flex: 1; }
+.status-pane.mono { font-family: var(--mono); }
+
+/* --------------------------------------------------------------------------
+   9 · Taskbar and Start menu
+   -------------------------------------------------------------------------- */
+.taskbar {
   position: absolute;
   left: 0;
   right: 0;
-  height: 14px;
-  background-image: var(--meander);
-  background-repeat: repeat-x;
-  opacity: 0.5;
-}
-.rails::before { top: 0; }
-.rails::after { bottom: 0; transform: scaleY(-1); }
-
-.shell {
-  position: relative;
-  z-index: 2;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 34px 26px 70px;
-}
-
-/* --------------------------------------------------------------------------
-   Navigation — a lintel across the top
-   -------------------------------------------------------------------------- */
-
-.nav { margin-bottom: 26px; }
-
-.nav-inner {
+  bottom: 0;
+  height: var(--taskbar-h);
+  background: var(--silver);
+  box-shadow: inset 0 1px var(--white), inset 0 2px var(--light);
+  border-top: 1px solid var(--gray);
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 14px 4px 16px;
-  border-bottom: 1px solid var(--rule);
-  position: relative;
+  gap: 4px;
+  padding: 2px 3px;
+  z-index: 50;
 }
 
-/* The doubled rule under the lintel — a classical detail, one hairline apart. */
-.nav-inner::after {
-  content: "";
-  position: absolute;
-  left: 0; right: 0; bottom: -4px;
-  border-bottom: 1px solid var(--rule-soft);
-}
-
-.brand {
-  display: inline-flex;
+.start-btn {
+  display: flex;
   align-items: center;
-  gap: 13px;
-  font-size: 26px;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  color: var(--marble-100);
-  font-weight: 400;
-  text-decoration: none;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.9), 0 0 22px rgba(224, 196, 124, 0.12);
+  gap: 4px;
+  font: inherit;
+  font-weight: 700;
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+  padding: 3px 7px 3px 4px;
+  cursor: default;
+  color: var(--black);
+  height: 24px;
+}
+.start-btn[aria-expanded="true"] { box-shadow: var(--in); padding: 4px 6px 2px 5px; }
+.start-btn svg { image-rendering: pixelated; }
+
+.task-sep {
+  width: 0;
+  height: 22px;
+  border-left: 1px solid var(--gray);
+  border-right: 1px solid var(--white);
+  margin: 0 2px;
 }
 
-/* The medallion. A faint gold ring picks up its own border so it reads as a
-   struck coin rather than a pasted-on image. */
-.brand .mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  box-shadow:
-    0 0 0 1px rgba(201, 162, 39, 0.34),
-    0 2px 12px -2px rgba(0, 0, 0, 0.8);
+.task-btns { display: flex; gap: 3px; flex: 1; min-width: 0; overflow: hidden; }
+
+.task-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+  padding: 3px 8px;
+  height: 24px;
+  min-width: 0;
+  max-width: 180px;
+  cursor: default;
+  color: var(--black);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.brand span {
-  font-size: 11px;
-  letter-spacing: 0.28em;
-  color: var(--gold-300);
-  margin-left: 10px;
-  vertical-align: 3px;
+.task-btn[aria-pressed="true"] {
+  box-shadow: var(--in);
+  font-weight: 700;
+  /* The 50% dither Win98 used to mark the focused task. */
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.6) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.6) 75%),
+    linear-gradient(45deg, rgba(255,255,255,0.6) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.6) 75%);
+  background-size: 2px 2px;
+  background-position: 0 0, 1px 1px;
 }
 
-.nav-spacer { flex: 1; }
-
-.tabs { display: flex; gap: 2px; }
-
-.tab {
-  appearance: none;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-dim);
-  font-family: var(--serif);
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: color 0.18s, border-color 0.18s, background 0.18s;
+.tray {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--in);
+  padding: 2px 7px;
+  height: 24px;
 }
-.tab:hover { color: var(--marble-100); }
-.tab[aria-selected="true"] {
-  color: var(--gold-100);
-  border-color: var(--rule);
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.10), rgba(201, 162, 39, 0.02));
+.tray button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  color: var(--black);
 }
-.tab:disabled { opacity: 0.45; cursor: not-allowed; }
+.tray .clock { font-variant-numeric: tabular-nums; min-width: 54px; text-align: center; }
+
+/* — the speaker glyph, drawn rather than typed */
+.spk { width: 14px; height: 12px; position: relative; display: inline-block; }
+.spk::before {
+  content: "";
+  position: absolute; left: 0; top: 3px;
+  width: 3px; height: 6px;
+  background: var(--black);
+}
+.spk::after {
+  content: "";
+  position: absolute; left: 3px; top: 0;
+  border: 6px solid transparent;
+  border-right: 5px solid var(--black);
+  border-left-width: 0;
+}
+.spk.on { box-shadow: 9px 0 0 -5px var(--black), 12px 0 0 -5px var(--black); }
+.spk.off::before, .spk.off::after { opacity: 0.45; }
+
+.start-menu {
+  position: absolute;
+  left: 3px;
+  bottom: var(--taskbar-h);
+  z-index: 55;
+  display: flex;
+  background: var(--silver);
+  box-shadow: var(--out);
+  padding: 3px;
+  min-width: 232px;
+}
+
+/* The vertical banner down the left edge. */
+.start-banner {
+  width: 24px;
+  background: linear-gradient(0deg, var(--navy) 0%, var(--blue) 100%);
+  color: var(--white);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: left;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 8px 3px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+.start-banner b { font-weight: 400; opacity: 0.85; }
+
+.start-items { flex: 1; display: flex; flex-direction: column; padding: 1px; }
+
+.start-items button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  padding: 5px 22px 5px 6px;
+  cursor: default;
+  color: var(--black);
+}
+.start-items button:hover { background: var(--navy); color: var(--white); }
+.start-items button svg { image-rendering: pixelated; flex: 0 0 auto; }
+.start-items .sep { height: 0; margin: 3px 2px; border-top: 1px solid var(--gray); border-bottom: 1px solid var(--white); }
 
 /* --------------------------------------------------------------------------
-   Panels — dark stone slabs with a gold hairline
+   10 · Controls — buttons, fields, links
    -------------------------------------------------------------------------- */
+button { font-family: inherit; font-size: inherit; }
 
-/**
- * Panels are translucent so the vista reads THROUGH the UI, not only around
- * it. The blur is what makes that safe: it removes the high-frequency detail
- * that would otherwise fight the text, leaving only the artwork's tone.
- *
- * The `background` shorthand below is a deliberate fallback — browsers without
- * `backdrop-filter` get the opaque gradient instead of unreadable text over
- * raw artwork, and the @supports block only opts in once blur is available.
- */
+.btn {
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+  font: inherit;
+  padding: 5px 14px;
+  min-width: 84px;
+  cursor: default;
+  color: var(--black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn:active:not(:disabled) { box-shadow: var(--in); padding: 6px 13px 4px 15px; }
+.btn:focus-visible { outline: 1px dotted var(--black); outline-offset: -4px; }
+.btn:disabled { color: var(--gray); text-shadow: 1px 1px 0 var(--white); }
+
+/* The OK-button convention: a heavier outer ring marks the default action. */
+.btn.primary { font-weight: 700; box-shadow: var(--out), 0 0 0 1px var(--black); margin: 1px; }
+.btn.danger { color: var(--bad); font-weight: 700; }
+.btn.ghost { min-width: 0; padding: 3px 9px; }
+
+.link {
+  color: var(--navy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link:hover { color: var(--blue); }
+
+input[type="text"],
+input[type="number"],
+input:not([type]),
+select,
+textarea {
+  background: var(--white);
+  box-shadow: var(--well);
+  border: none;
+  font: inherit;
+  font-family: var(--mono);
+  padding: 4px 5px;
+  color: var(--black);
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: none; }
+input:disabled { background: var(--silver); color: var(--gray); }
+
+/* Numeric spinners are removed: every amount field here is a decimal string. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+/* --------------------------------------------------------------------------
+   11 · Group boxes — the app's `panel`
+   A Win98 group box is an etched 1px rectangle with the label breaking the
+   top edge. That maps exactly onto the existing Panel component.
+   -------------------------------------------------------------------------- */
 .panel {
   position: relative;
-  background: linear-gradient(180deg, var(--ink-600), var(--ink-700));
-  border: 1px solid rgba(201, 162, 39, 0.24);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.5) inset,
-    0 18px 40px -28px rgba(0, 0, 0, 0.9);
+  margin-top: 8px;
+  border: 1px solid var(--gray);
+  border-right-color: var(--white);
+  border-bottom-color: var(--white);
+  background: transparent;
 }
-
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .panel {
-    background: linear-gradient(180deg, rgba(23, 29, 40, 0.80), rgba(17, 22, 31, 0.86));
-    -webkit-backdrop-filter: blur(9px) saturate(0.85);
-    backdrop-filter: blur(9px) saturate(0.85);
-  }
-}
-
-/* Inner keyline, offset — the "frame within a frame" of a carved cartouche. */
-.panel::before {
+.panel::after {
+  /* The second etched line, offset by 1px, that gives the groove its depth. */
   content: "";
   position: absolute;
-  inset: 4px;
-  border: 1px solid rgba(201, 162, 39, 0.10);
+  inset: 1px;
+  border: 1px solid var(--white);
+  border-right-color: var(--gray);
+  border-bottom-color: var(--gray);
   pointer-events: none;
 }
 
-.panel-inner { padding: 20px 20px 22px; position: relative; }
-.panel-inner.tight { padding: 15px 16px; }
+.panel-inner { padding: 13px 11px 11px; position: relative; z-index: 1; }
+.panel-inner.tight { padding: 9px 9px 8px; }
 
-/* Section headers use this class OUTSIDE a panel, directly over the vista, so
-   it carries a shadow. Harmless where it appears inside a panel. */
+/* The label sits on the border line, with the background punched out behind it. */
 .label {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  margin: 0;
+  padding: 0 5px;
+  background: var(--silver);
+  font-weight: 700;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 0 14px;
-  font-size: 10.5px;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: var(--gold-300);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.7);
+  gap: 7px;
+  max-width: calc(100% - 20px);
 }
 .label .id {
+  font-weight: 400;
+  color: var(--gray);
   font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  color: var(--text-faint);
-  text-transform: none;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --------------------------------------------------------------------------
-   Stats — marble inlays. These are the plaques from the reference.
+   12 · Stats, rows, readouts
    -------------------------------------------------------------------------- */
-
-.stat { position: relative; }
-
+.stat { display: flex; flex-direction: column; gap: 4px; }
 .stat .k {
-  font-size: 10px;
-  letter-spacing: 0.24em;
+  color: #5c5a4e;
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--text-faint);
-  margin-bottom: 7px;
 }
 
+/* The readout treatment, shared with `.big`.
+ *
+ * The rule is deliberate and worth stating: **a dark readout means a measured
+ * value**. Prose, labels, row lists and the quote breakdown all stay on
+ * silver. Putting every element on green would read as decoration and would
+ * cost the hierarchy — the two hero numbers keep their emphasis through size
+ * and glow, not through being the only dark thing on the page.
+ */
 .stat .v {
-  font-size: 25px;
-  line-height: 1.15;
-  color: var(--marble-100);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  /* Engraved: a dark cut above, a light catch below. */
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85);
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--crt);
+  background: var(--crt-bg);
+  box-shadow: var(--well);
+  padding: 5px 7px;
+  overflow-x: auto;
+  white-space: nowrap;
 }
 .stat .v.na {
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--crt-off);
   font-style: italic;
+  font-size: 12px;
+  background: #06170d;
 }
-.stat .v .unit {
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: var(--gold-400);
-  margin-left: 8px;
-  text-transform: uppercase;
-}
-.stat .note {
-  margin-top: 8px;
-  font-size: 11.5px;
-  color: var(--text-faint);
-  line-height: 1.5;
-}
-
-/* The hero figure — the one number the page is about. */
-.hero .v { font-size: 46px; }
-.big .v { font-size: 34px; }
-
-/* --------------------------------------------------------------------------
-   Rows
-   -------------------------------------------------------------------------- */
-
-.rows { display: flex; flex-direction: column; }
+.stat .v .unit { font-size: 11px; color: var(--crt-dim); margin-left: 6px; }
+.stat .note { color: #3a3a3a; line-height: 1.35; }
 
 .row {
   display: flex;
+  gap: 10px;
   align-items: baseline;
-  gap: 14px;
-  padding: 9px 0;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.09);
+  padding: 3px 0;
+  border-bottom: 1px dotted #a8a8a8;
 }
 .row:last-child { border-bottom: none; }
+.rk { color: #303030; flex: 0 0 auto; }
+.rv { margin-left: auto; text-align: right; font-family: var(--mono); word-break: break-all; }
+.rv.na { color: var(--gray); font-style: italic; font-family: var(--font); }
 
-.rk {
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  flex: 0 0 auto;
-  min-width: 172px;
-}
-.rv {
-  flex: 1;
-  text-align: right;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  word-break: break-word;
-}
-.rv.na { color: var(--text-faint); font-style: italic; }
+.rows { display: flex; flex-direction: column; }
+.rows.mini { font-size: 11px; }
 
-a.rv, .link {
-  color: var(--gold-200);
-  text-decoration: none;
-  border-bottom: 1px solid var(--rule);
-}
-a.rv:hover, .link:hover { color: var(--gold-100); }
-
-/* --------------------------------------------------------------------------
-   Indicators
-   -------------------------------------------------------------------------- */
-
-.dot {
-  display: inline-block;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  margin-right: 7px;
-  vertical-align: 1px;
-}
-.dot.live { background: var(--gold-200); box-shadow: 0 0 9px var(--gold-300); }
-.dot.ok   { background: var(--ok); box-shadow: 0 0 8px rgba(127, 168, 106, 0.6); }
-.dot.warn { background: var(--warn); box-shadow: 0 0 8px rgba(201, 138, 42, 0.6); }
-.dot.off  { background: #4a5162; }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border: 1px solid var(--rule);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  background: rgba(0, 0, 0, 0.25);
-  white-space: nowrap;
-}
-.pill.warn { border-color: rgba(201, 138, 42, 0.4); color: var(--warn); }
-
-/* --------------------------------------------------------------------------
-   Notices
-   -------------------------------------------------------------------------- */
-
-.notice {
-  border: 1px solid rgba(201, 138, 42, 0.34);
-  border-left-width: 3px;
-  /* Opaque base under the tint: this used to sit on a near-black page, and now
-     sits on artwork. */
-  background:
-    linear-gradient(90deg, rgba(201, 138, 42, 0.12), rgba(201, 138, 42, 0.03)),
-    linear-gradient(180deg, rgba(17, 22, 31, 0.88), rgba(11, 15, 21, 0.9));
-  -webkit-backdrop-filter: blur(9px);
-  backdrop-filter: blur(9px);
-  padding: 14px 18px;
-  margin-bottom: 20px;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--marble-300);
-}
-.notice b { color: var(--gold-100); font-weight: 400; }
-.notice code, code {
+/* The two headline numbers, rendered as a hardware readout rather than a text
+   field. Win98 had no such control, but period instrument panels did, and the
+   contrast is what separates "the two numbers this product is about" from the
+   dozen supporting stats below — all of which stay white-on-silver. */
+.big {
   font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--gold-200);
-  background: rgba(0, 0, 0, 0.35);
-  padding: 1px 5px;
-  border: 1px solid var(--rule-soft);
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+  background:
+    radial-gradient(120% 160% at 50% 0%, #3a0f5e 0%, var(--crt-bg) 70%);
+  box-shadow: var(--well);
+  padding: 11px 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  position: relative;
+  /* Chromatic aberration: a magenta ghost one way, cyan the other. This is the
+     VHS misregistration the whole aesthetic is built on, and it is also why
+     the readouts stopped being terminal green — a phosphor wall was the
+     "too computery" the brief pushed back on. */
+  text-shadow:
+    2px 0 0 var(--vw-magenta),
+    -2px 0 0 var(--vw-cyan),
+    0 0 22px rgba(255, 113, 206, 0.75);
+}
+/* Faint scanlines. 1px at 50% opacity reads as a CRT without becoming a gimmick. */
+.big::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.22) 0 1px,
+    transparent 1px 3px
+  );
+}
+.big.muted { color: var(--crt-off); text-shadow: none; }
+.big .unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--crt-dim);
+  margin-left: 8px;
+  letter-spacing: 0;
+  text-shadow: none;
 }
 
-.notice.danger {
-  border-color: rgba(180, 85, 63, 0.45);
-  background: linear-gradient(90deg, rgba(180, 85, 63, 0.12), rgba(180, 85, 63, 0.02));
-}
-.notice.danger b { color: #e0a292; }
+.premium.pos { color: var(--ok); font-weight: 700; }
+.premium.neg { color: var(--bad); font-weight: 700; }
+
+.sub { margin: 7px 0 0; line-height: 1.45; color: #202020; }
+.note { color: #3a3a3a; }
+.muted { color: var(--gray); }
+.emph { font-weight: 700; }
+.n { font-family: var(--mono); }
+.ok { color: var(--ok); }
+.unit { color: var(--gray); }
+.denom { color: var(--gray); font-family: var(--mono); }
 
 /* --------------------------------------------------------------------------
-   Layout helpers
+   13 · Layout scaffolding
    -------------------------------------------------------------------------- */
+.section { margin-top: 18px; }
+.section > .label { position: static; background: none; padding: 0 0 6px; }
 
-.grid { display: grid; gap: 14px; }
+/* `align-items: start` throughout. Grid's default `stretch` was making a short
+   panel grow to the height of the tallest one beside it, which is where the
+   Stake page got its column of empty silver. */
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.grid { display: grid; gap: 10px; align-items: start; }
 .grid.c2 { grid-template-columns: repeat(2, 1fr); }
 .grid.c3 { grid-template-columns: repeat(3, 1fr); }
 .grid.c4 { grid-template-columns: repeat(4, 1fr); }
-
-.two {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.section { margin-top: 22px; }
-
-.sub {
-  margin: 14px 0 0;
-  font-size: 12.5px;
-  line-height: 1.65;
-  color: var(--text-faint);
-}
-
-.muted { color: var(--text-faint); }
-.emph { color: var(--marble-100); }
-.pos { color: var(--ok); }
-.neg { color: var(--bad); }
-.n { font-variant-numeric: tabular-nums; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 
 /* --------------------------------------------------------------------------
-   Forms
+   14 · Status indicators
    -------------------------------------------------------------------------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: var(--well);
+  background: var(--silver);
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.pill.warn { color: var(--warn); font-weight: 700; }
 
-.swapdir {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 16px;
-  border: 1px solid var(--rule-soft);
-  padding: 2px;
-  width: fit-content;
+.dot { width: 8px; height: 8px; display: inline-block; box-shadow: var(--in); }
+.dot.live { background: #00ff00; }
+.dot.ok { background: var(--ok); }
+.dot.warn { background: #ffff00; }
+.dot.off { background: var(--gray); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* --------------------------------------------------------------------------
+   15 · Notices — the inline message box
+   -------------------------------------------------------------------------- */
+/* Block, NOT flex. The pages pass bare text nodes mixed with <b> and <a> as
+   direct children, and a flex container turns every one of those into its own
+   column — the message shatters into four ragged blocks. The icon is absolutely
+   positioned instead so the prose stays a single flow. */
+.notice {
+  display: block;
+  position: relative;
+  background: #ffffe1;               /* the tooltip yellow */
+  border: 1px solid var(--black);
+  padding: 9px 11px 9px 34px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.notice::before {
+  /* An exclamation glyph, drawn so it needs no icon import. */
+  content: "!";
+  position: absolute;
+  left: 10px;
+  top: 9px;
+  width: 16px; height: 16px;
+  background: var(--navy);
+  color: var(--white);
+  font-weight: 700;
+  text-align: center;
+  line-height: 16px;
+  border-radius: 50%;
+}
+.notice code {
+  font-family: var(--mono);
+  background: var(--silver);
+  box-shadow: var(--well);
+  padding: 0 3px;
 }
 
-.mini {
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: var(--text-faint);
-  font-family: var(--serif);
-  font-size: 10.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding: 7px 16px;
-  cursor: pointer;
-  transition: color 0.18s, background 0.18s;
+/* Same reasoning as `.notice`: these receive a bare error string, sometimes
+   with inline markup, so they must stay a normal text flow. */
+.err {
+  color: var(--bad);
+  font-weight: 700;
+  display: block;
+  margin-top: 7px;
+  line-height: 1.45;
 }
-.mini:hover { color: var(--marble-200); }
-.mini[aria-selected="true"] {
-  color: var(--ink-900);
-  background: linear-gradient(180deg, var(--gold-200), var(--gold-300));
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
-}
+.blocked { color: var(--warn); font-weight: 700; }
+.danger { color: var(--bad); }
 
-.field { margin-bottom: 14px; }
-
+/* --------------------------------------------------------------------------
+   16 · Trade / stake form vocabulary
+   -------------------------------------------------------------------------- */
+.field { margin-top: 10px; }
 .field-top {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 4px;
 }
-.field-top .k {
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.bal { font-size: 11.5px; color: var(--text-faint); }
-.bal b { color: var(--marble-200); font-weight: 400; font-variant-numeric: tabular-nums; }
+.field-top .bal { margin-left: auto; color: #303030; font-family: var(--mono); font-size: 11px; }
 
 .input-wrap {
   display: flex;
-  align-items: center;
-  border: 1px solid var(--rule);
-  background: rgba(0, 0, 0, 0.4);
-  transition: border-color 0.18s, box-shadow 0.18s;
+  align-items: stretch;
+  gap: 6px;
 }
-.input-wrap:focus-within {
-  border-color: rgba(224, 196, 124, 0.55);
-  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.16);
-}
+.input-wrap input { flex: 1; }
 
-.input-wrap input {
-  flex: 1;
-  min-width: 0;
-  appearance: none;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--marble-100);
-  font-family: var(--serif);
-  font-size: 21px;
-  font-variant-numeric: tabular-nums;
-  padding: 13px 14px;
-}
-.input-wrap input::placeholder { color: #4d5361; }
-.input-wrap input:disabled { color: var(--text-faint); }
-
-.denom {
-  padding: 0 15px;
-  font-size: 10.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--gold-300);
-  border-left: 1px solid var(--rule-soft);
-  align-self: stretch;
+/* A segmented toggle: Buy/Sell, Stake/Unstake, and the slippage choices.
+   The first pass modelled this as a single square direction-flip button and
+   clipped every label to about four characters — "Sta|Unstake". It is a row of
+   toolbar toggles, so it sizes to its text. */
+.swapdir {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 2px 0 4px;
 }
 
-.btn {
-  display: block;
-  width: 100%;
-  appearance: none;
-  cursor: pointer;
-  font-family: var(--serif);
-  font-size: 12px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  padding: 14px 18px;
-  color: var(--ink-900);
-  background: linear-gradient(180deg, var(--gold-100), var(--gold-300) 60%, var(--gold-400));
-  border: 1px solid var(--gold-400);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
-  transition: filter 0.18s, opacity 0.18s;
+/* `button.mini`, not `.mini`: `.rows.mini` is an unrelated row-density
+   modifier on a div, and a bare `.mini` would style that as a button. */
+button.mini {
+  background: var(--silver);
+  box-shadow: var(--out);
+  border: none;
+  font: inherit;
+  padding: 3px 12px;
+  cursor: default;
+  color: var(--black);
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
-.btn:hover:not(:disabled) { filter: brightness(1.09); }
-.btn:disabled { opacity: 0.32; cursor: not-allowed; filter: grayscale(0.4); }
+button.mini:active:not(:disabled) { box-shadow: var(--in); padding: 4px 11px 2px 13px; }
+button.mini:focus-visible { outline: 1px dotted var(--black); outline-offset: -4px; }
+button.mini:disabled { color: var(--gray); text-shadow: 1px 1px 0 var(--white); }
 
-.btn.ghost {
-  color: var(--gold-200);
-  background: transparent;
-  border-color: var(--rule);
-  text-shadow: none;
-}
-.btn.ghost:hover:not(:disabled) {
-  background: rgba(201, 162, 39, 0.08);
-  color: var(--gold-100);
-}
-
-.btn.danger {
-  color: #f0d9d1;
-  background: linear-gradient(180deg, rgba(180, 85, 63, 0.85), rgba(140, 60, 42, 0.9));
-  border-color: rgba(180, 85, 63, 0.7);
-  text-shadow: none;
+/* The checked state of a toolbar toggle: pressed in, with the 50% dither
+   Win98 used so a latched button still read as latched at a glance. */
+button.mini[aria-selected="true"] {
+  box-shadow: var(--in);
+  font-weight: 700;
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.55) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.55) 75%),
+    linear-gradient(45deg, rgba(255,255,255,0.55) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.55) 75%);
+  background-size: 2px 2px;
+  background-position: 0 0, 1px 1px;
 }
 
-/* --------------------------------------------------------------------------
-   Quote block — the pre-trade summary
-   -------------------------------------------------------------------------- */
+/* The `max` button lives inside the field, so it matches the input's height. */
+.input-wrap button.mini { padding: 3px 10px; }
 
 .quote {
-  border: 1px solid var(--rule-soft);
-  background: rgba(0, 0, 0, 0.28);
-  padding: 12px 14px;
-  margin: 14px 0;
+  margin-top: 12px;
+  background: var(--white);
+  box-shadow: var(--well);
+  padding: 8px 10px;
 }
 .qrow {
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
   align-items: baseline;
-  padding: 5px 0;
-  font-size: 12.5px;
+  padding: 2px 0;
 }
-.qk { color: var(--text-faint); letter-spacing: 0.06em; }
-.qv { color: var(--marble-200); font-variant-numeric: tabular-nums; }
-.qv.tax { color: var(--warn); }
-
-.err {
-  margin-top: 12px;
-  padding: 10px 13px;
-  border: 1px solid rgba(180, 85, 63, 0.4);
-  background: rgba(180, 85, 63, 0.08);
-  color: #e0a292;
-  font-size: 12.5px;
-  line-height: 1.55;
-  word-break: break-word;
-}
+.qk { color: #303030; }
+.qv { margin-left: auto; font-family: var(--mono); text-align: right; word-break: break-all; }
 
 .txnote {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--ok);
-  word-break: break-all;
+  margin-top: 9px;
+  color: #303030;
+  line-height: 1.4;
+  font-size: 11px;
 }
 
-.blocked { opacity: 0.5; pointer-events: none; }
+.tax { color: var(--warn); font-weight: 700; }
 
 /* --------------------------------------------------------------------------
-   Explainer page
+   17 · Explainer page
    -------------------------------------------------------------------------- */
+.lede { font-size: 14px; line-height: 1.55; margin: 0; }
 
-/* The opening statement. Larger and lighter than body copy, because it is the
-   one paragraph a first-time reader will actually finish. */
-.lede {
-  margin: 0;
-  font-size: 19px;
-  line-height: 1.72;
-  color: var(--marble-200);
-  letter-spacing: 0.005em;
-}
-.lede b { color: var(--gold-100); font-weight: 400; }
-
-/* Roman-numeralled steps, given room to breathe. */
-.big-steps .step {
-  padding: 14px 0 14px 46px;
-  font-size: 14.5px;
-  line-height: 1.68;
-  color: var(--marble-300);
-}
-.big-steps .step::before {
-  top: 15px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: var(--gold-300);
-  width: 34px;
-}
-.big-steps .step b { color: var(--marble-100); font-weight: 400; }
-
-@media (max-width: 620px) {
-  .lede { font-size: 17px; }
-  .big-steps .step { padding-left: 34px; }
-  .big-steps .step::before { width: 26px; }
-}
-
-/* Numbered build steps */
-.steps { counter-reset: step; margin: 8px 0 0; padding: 0; list-style: none; }
-.step {
-  counter-increment: step;
-  position: relative;
-  padding: 7px 0 7px 34px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  border-bottom: 1px solid rgba(201, 162, 39, 0.08);
-}
-.step:last-child { border-bottom: none; }
-.step::before {
-  content: counter(step, upper-roman);
-  position: absolute;
-  left: 0;
-  top: 7px;
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  color: var(--gold-400);
-  width: 26px;
-}
-
-.premium { font-size: 12px; letter-spacing: 0.1em; }
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+.steps .step { line-height: 1.45; }
+.steps.big-steps { gap: 12px; }
+.steps.big-steps .step { font-size: 12.5px; }
 
 /* --------------------------------------------------------------------------
-   Token chips (Suits)
+   17b · Vapourwave type
    -------------------------------------------------------------------------- */
 
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--rule-soft);
-  background: rgba(0, 0, 0, 0.3);
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--marble-300);
-}
-.chip.yours { border-color: rgba(201, 162, 39, 0.42); color: var(--gold-100); }
-.chip.mine  { border-color: rgba(127, 168, 106, 0.42); color: #b6d0a6; }
-.chip.other { border-color: rgba(180, 85, 63, 0.35); color: #cf9f92; }
-
-/* --------------------------------------------------------------------------
-   Footer
-   -------------------------------------------------------------------------- */
-
-.foot {
-  margin-top: 42px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule-soft);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+/* Katakana runs as a secondary label everywhere a tab or heading has one. It
+   is set in a Japanese face explicitly, because falling back to a Latin font
+   renders tofu boxes rather than kana. */
+.kana {
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP",
+    "MS PGothic", "Meiryo", sans-serif;
+  letter-spacing: 2px;
+  font-weight: 400;
 }
 
-/* --------------------------------------------------------------------------
-   The frieze — full-bleed footer band
-   -------------------------------------------------------------------------- */
+.tabstrip .tab .kana { font-size: 9px; opacity: 0.75; margin-left: 2px; }
+.desk-icon .kana { display: block; font-size: 9px; opacity: 0.85; }
 
-.frieze {
-  position: relative;
-  z-index: 2;
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  line-height: 0; /* kill the inline-image descender gap */
-  border-top: 1px solid var(--rule);
-}
-
-.frieze img {
-  display: block;
-  width: 100%;
-  height: auto;
-  /* The art is already dark; this seats it against the page ground so the
-     seam at the top edge does not read as a hard cut. */
-  filter: saturate(0.92) brightness(0.86);
-}
-
-/* Fade the top edge into the page rather than butting it against the content,
-   and darken the very bottom so the meander rail sits on solid ground. */
-.frieze::before,
-.frieze::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  pointer-events: none;
-}
-.frieze::before {
-  top: 0;
-  height: 34%;
-  background: linear-gradient(180deg, #05070a 0%, rgba(5, 7, 10, 0.55) 45%, transparent 100%);
-}
-.frieze::after {
-  bottom: 0;
-  height: 22%;
-  background: linear-gradient(0deg, rgba(5, 7, 10, 0.9) 0%, transparent 100%);
+/* Chrome lettering: a vertical gradient clipped to the glyphs, which is the
+   one piece of the aesthetic that genuinely needs background-clip. */
+.chrome {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #d8f4ff 26%,
+    var(--vw-cyan) 44%,
+    var(--vw-magenta) 62%,
+    #ffd9f4 82%,
+    #ffffff 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.55));
 }
 
-/* --------------------------------------------------------------------------
-   Responsive
-   -------------------------------------------------------------------------- */
-
-@media (max-width: 900px) {
-  .two { grid-template-columns: 1fr; }
-  .grid.c4 { grid-template-columns: repeat(2, 1fr); }
-  .grid.c3 { grid-template-columns: repeat(2, 1fr); }
+/* The status-bar ticker. */
+.marquee { overflow: hidden; white-space: nowrap; flex: 1; min-width: 0; }
+.marquee > span {
+  display: inline-block;
+  padding-left: 100%;
+  animation: marq 34s linear infinite;
 }
-
-@media (max-width: 620px) {
-  .shell { padding: 22px 15px 54px; }
-  .grid.c2, .grid.c3, .grid.c4 { grid-template-columns: 1fr; }
-  .brand { font-size: 20px; letter-spacing: 0.24em; gap: 9px; }
-  .brand .mark { width: 30px; height: 30px; }
-  .hero .v { font-size: 34px; }
-  .rk { min-width: 0; }
-  .row { flex-direction: column; gap: 2px; align-items: flex-start; }
-  .rv { text-align: left; }
-}
+@keyframes marq { to { transform: translateX(-100%); } }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  .marquee > span { animation: none; padding-left: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   18 · Boot splash
+   -------------------------------------------------------------------------- */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #3b0f6b 0%, #0d0525 60%, #05010f 100%);
+  color: #d5b8ee;
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 26px 22px;
+  line-height: 1.6;
+  animation: bootout 0.25s ease-in 1.85s forwards;
+  overflow: hidden;
+}
+/* Scanlines over the whole boot screen — the CRT it is pretending to be. */
+.boot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0 1px, transparent 1px 3px);
+}
+.boot .cur { animation: blink 1s steps(1) infinite; }
+.boot .bright { color: #ffffff; }
+.boot .okc { color: var(--vw-mint); }
+
+.boot-art {
+  font-size: clamp(30px, 8vw, 74px);
+  font-weight: 700;
+  letter-spacing: 6px;
+  line-height: 1.1;
+}
+.boot-kana { color: var(--vw-cyan); margin: 2px 0 12px; font-size: 12px; }
+.boot-rule { max-width: 460px; margin-bottom: 16px; }
+
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes bootout { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .boot { animation-delay: 0.4s; }
+  .boot .cur { animation: none; }
+}
+
+/* --------------------------------------------------------------------------
+   19 · Dialog
+   -------------------------------------------------------------------------- */
+.modal-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+}
+
+.dialog { min-width: 300px; max-width: min(440px, calc(100vw - 32px)); }
+.dialog .client { padding: 14px; overflow: visible; }
+.dialog-body { display: flex; gap: 13px; align-items: flex-start; line-height: 1.45; }
+.dialog-body svg { flex: 0 0 auto; image-rendering: pixelated; }
+.dialog-btns { display: flex; gap: 8px; justify-content: center; margin-top: 15px; }
+
+/* --------------------------------------------------------------------------
+   20 · Responsive
+   The desktop metaphor stops paying rent on a phone: the window goes
+   full-bleed, the desktop icons move into the Start menu, and the tab strip
+   scrolls instead of wrapping into four rows.
+   -------------------------------------------------------------------------- */
+/* Below ~1500px there is no longer room for a column AND a row of desktop
+   icons outside the 1120px window, so the columns stand down first — they are
+   scenery, the icons are navigation. */
+@media (max-width: 1500px) {
+  .column { display: none; }
+  .desk-icons { left: 8px; }
+  .win-main { left: 96px; right: 12px; }
+}
+
+@media (max-width: 860px) {
+  .hero, .two, .grid.c4, .grid.c3, .grid.c2 { grid-template-columns: 1fr; }
+  .win-main { left: 6px; right: 6px; top: 78px; bottom: calc(var(--taskbar-h) + 6px); }
+  .desk-icons { display: none; }
+  .frieze-band { height: 70px; }
+  .vw-sun { width: 55vw; }
+  .big { font-size: 20px; }
+}
+
+@media (max-width: 560px) {
+  :root { --fs: 12px; }
+  .win-main { left: 0; right: 0; top: 0; bottom: var(--taskbar-h); }
+  .win { box-shadow: none; padding: 2px; }
+  .client { padding: 9px; }
+  .tabstrip { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .tab { flex: 0 0 auto; }
+  .task-btns { display: none; }
+  .statusbar .status-pane:not(.grow) { display: none; }
 }

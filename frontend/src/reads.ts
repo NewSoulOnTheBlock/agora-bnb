@@ -50,8 +50,12 @@ export async function readPoolState(token: string): Promise<PoolState> {
   const id = poolId(key);
   const sv = new Contract(V4.stateView, STATE_VIEW_ABI, readProvider);
 
-  const slot0 = await safe(() => sv.getSlot0(id));
-  const liquidity = await safe(() => sv.getLiquidity(id));
+  // One wave, not two: these are independent reads and awaiting them in
+  // sequence cost an extra round-trip on every poll.
+  const [slot0, liquidity] = await Promise.all([
+    safe(() => sv.getSlot0(id)),
+    safe(() => sv.getLiquidity(id)),
+  ]);
 
   const sqrtPriceX96: bigint | null = slot0 ? BigInt(slot0[0]) : null;
   const tick = slot0 ? Number(slot0[1]) : null;
@@ -180,6 +184,7 @@ export async function readReserve(): Promise<Reserve> {
     navWad, eligibleSupply, floorPerTokenWad, floorHighWaterMark, usdgBalance,
     ethBuffer, sleeveAssets, sleeveCorpus, unrealizedSurplus, sleeveCapBps,
     cumulativeTaxReceived, pendingIncome, incomeShareBps, cumulativeIncomeDistributed,
+    cumulativeWithdrawn, operator,
   ] = await Promise.all([
     safe(async () => BigInt(await t.nav())),
     safe(async () => BigInt(await t.eligibleSupply())),
@@ -195,8 +200,8 @@ export async function readReserve(): Promise<Reserve> {
     safe(async () => BigInt(await t.pendingIncome())),
     safe(async () => BigInt(await t.incomeShareBps())),
     safe(async () => BigInt(await t.cumulativeIncomeDistributed())),
-  ]);
-  const [cumulativeWithdrawn, operator] = await Promise.all([
+    // Folded into the same wave. These were a second `await Promise.all`, which
+    // bought a whole extra round-trip for two values nothing else depends on.
     safe(async () => BigInt(await t.cumulativeWithdrawn())),
     safe(() => t.operator() as Promise<string>),
   ]);

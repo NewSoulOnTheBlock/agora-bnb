@@ -154,8 +154,15 @@ async function main() {
   line();
   console.log(`deployed     ${eth(DEPOSIT)}`);
   console.log(`recovered    ${eth(roundTrip)}`);
+  const poolFee = await new ethers.Contract(
+    await adapter.pool(),
+    ["function fee() view returns (uint24)"],
+    ethers.provider
+  ).fee();
   const lossBps = ((DEPOSIT - roundTrip) * 10_000n) / DEPOSIT;
-  console.log(`cost         ${lossBps} bps  (two swaps through a 1% pool + CLM fees)`);
+  console.log(
+    `cost         ${lossBps} bps  (two swaps through a ${Number(poolFee) / 10_000}% pool + CLM fees)`
+  );
   line();
   console.log("PASS");
 }

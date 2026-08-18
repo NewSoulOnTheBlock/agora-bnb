@@ -33,24 +33,42 @@ export async function scanLogsBackwards(opts: {
   if (!address || address === ZERO) return [];
 
   const head = await readProvider.getBlockNumber();
-  const out: Log[] = [];
-  let to = head;
 
-  for (let i = 0; i < maxChunks; i++) {
+  // The ranges are a pure function of `head`, so they do not need to be walked
+  // one at a time. The previous version awaited each chunk before computing the
+  // next, which made the Reserve page pay `maxChunks` sequential round-trips of
+  // a 450k-block getLogs — and the page fires two of these scans at once, so
+  // the wait was up to ten heavy queries end to end. Issuing them together
+  // collapses that to a single wave.
+  const ranges: { from: number; to: number }[] = [];
+  let to = head;
+  for (let i = 0; i < maxChunks && to >= 0; i++) {
     const from = Math.max(0, to - spanPerChunk + 1);
-    try {
-      const logs = await readProvider.getLogs({ address, topics, fromBlock: from, toBlock: to });
-      // Chunks are walked newest-first, so prepend to keep overall ascending order.
-      out.unshift(...logs);
-      onProgress?.(i + 1, out.length);
-    } catch {
-      // A rejected chunk (rate limit, span) shouldn't discard what we have.
-      break;
-    }
-    if (out.length >= stopAfter || from === 0) break;
+    ranges.push({ from, to });
+    if (from === 0) break;
     to = from - 1;
   }
-  return out;
+
+  // A rejected chunk (rate limit, span too wide) contributes nothing rather
+  // than discarding the chunks that did succeed.
+  const settled = await Promise.all(
+    ranges.map(({ from, to: hi }) =>
+      readProvider
+        .getLogs({ address, topics, fromBlock: from, toBlock: hi })
+        .catch(() => [] as Log[])
+    )
+  );
+
+  // Ranges were built newest-first, so reverse to get overall ascending order.
+  const out: Log[] = [];
+  for (let i = settled.length - 1; i >= 0; i--) out.push(...settled[i]);
+
+  onProgress?.(ranges.length, out.length);
+
+  // `stopAfter` used to end the walk early. With the chunks in flight together
+  // there is nothing left to stop, so it now bounds what is returned — keeping
+  // the most recent events, which is what every caller charts.
+  return out.length > stopAfter ? out.slice(out.length - stopAfter) : out;
 }
 
 // ---------------------------------------------------------------------------

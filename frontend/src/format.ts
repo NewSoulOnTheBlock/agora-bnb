@@ -27,16 +27,90 @@ export function fmtGrouped(v: bigint | null | undefined, frac = 2): string {
   });
 }
 
+const SUBSCRIPTS = "₀₁₂₃₄₅₆₇₈₉";
+const subscript = (n: number) =>
+  String(n).split("").map((d) => SUBSCRIPTS[Number(d)]).join("");
+
 /**
  * Very small numbers (a fresh memecoin's ETH price) need significant digits,
  * not fixed decimals — 0.00 tells the reader nothing.
+ *
+ * ## Two things this had to fix
+ *
+ * **It was printing wrong numbers.** The previous implementation ended with
+ * `.toPrecision(sig).replace(/0+$/, "")`. On a small value `toPrecision` returns
+ * scientific notation — `"2.064e-10"` — and that trailing-zero strip then ate
+ * the zero *in the exponent*, rendering it as `2.064e-1`. The floor was being
+ * displayed nine orders of magnitude too large. This never touches an exponent
+ * because it never produces one.
+ *
+ * **Scientific notation is unreadable here anyway.** `7.392e-9 ETH` asks the
+ * reader to count zeros in their head. A run of four or more leading zeros is
+ * compressed into a subscript count instead — `0.0₈7392` — which is the
+ * convention DEX interfaces settled on for exactly this problem, and which
+ * keeps the unit honestly in ETH rather than silently switching to gwei.
+ *
+ * Everything is computed from the exact decimal string that `formatEther`
+ * produces, so no float rounding enters on the way.
  */
 export function fmtSig(v: bigint | null | undefined, sig = 4): string {
   if (v === null || v === undefined) return DASH;
-  const n = Number(formatEther(v));
-  if (!Number.isFinite(n) || n === 0) return n === 0 ? "0" : DASH;
-  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: sig });
-  return n.toPrecision(sig).replace(/0+$/, "").replace(/\.$/, "");
+
+  let s: string;
+  try {
+    s = formatEther(BigInt(v));
+  } catch {
+    return DASH;
+  }
+
+  const neg = s.startsWith("-");
+  if (neg) s = s.slice(1);
+  const sign = neg ? "-" : "";
+
+  const [int, frac = ""] = s.split(".");
+
+  // At or above 1: keep `sig` decimal places, rounded, and group the integer.
+  if (int !== "0") {
+    const [ri, rf] = roundFraction(int, frac, sig);
+    const whole = BigInt(ri).toLocaleString("en-US");
+    const d = rf.replace(/0+$/, "");
+    return sign + (d ? `${whole}.${d}` : whole);
+  }
+
+  let zeros = (frac.match(/^0*/)?.[0] ?? "").length;
+  const rest = frac.slice(zeros).replace(/0+$/, "");
+  if (!rest) return "0";
+
+  let digits = rest.slice(0, sig);
+  if (Number(rest[sig] ?? "0") >= 5) {
+    const bumped = (BigInt(digits) + 1n).toString();
+    if (bumped.length > digits.length) {
+      // 0.00009999 → 0.0001: rounding up carried into the zero run, so the run
+      // is one shorter. Missing this prints a value ten times too small.
+      zeros -= 1;
+      digits = bumped.slice(0, sig);
+    } else {
+      digits = bumped.padStart(digits.length, "0");
+    }
+  }
+  digits = digits.replace(/0+$/, "") || "0";
+
+  // Four or more leading zeros is where a plain decimal stops being countable.
+  if (zeros >= 4) return `${sign}0.0${subscript(zeros)}${digits}`;
+  return `${sign}0.${"0".repeat(zeros)}${digits}`;
+}
+
+/** Round `int.frac` to `decimals` places, carrying into the integer if needed. */
+function roundFraction(int: string, frac: string, decimals: number): [string, string] {
+  const padded = frac.padEnd(decimals + 1, "0");
+  const keep = padded.slice(0, decimals);
+  if (Number(padded[decimals]) < 5) return [int, keep];
+
+  const bumped = (BigInt(keep === "" ? "0" : keep) + 1n).toString();
+  if (bumped.length > decimals) {
+    return [(BigInt(int) + 1n).toString(), decimals ? bumped.slice(1) : ""];
+  }
+  return [int, bumped.padStart(decimals, "0")];
 }
 
 export function bpsToPct(bps: bigint | number | null | undefined): string {

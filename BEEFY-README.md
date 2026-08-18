@@ -10,6 +10,107 @@ Deploying corpus ETH into Beefy **without the ETH leaving the Treasury's account
 
 ---
 
+# ⚠ Read this first — recommendation
+
+**The yield leg is not where the value is right now. Do not lead with it.**
+
+Deriving ETH from the `weth-usdg` pool gives **1 ETH ≈ $1,907**. Cross-checked: that vault holds
+2.364 ETH, which values it at $4,509 against Beefy's own reported $4,518 — 0.2% apart, so the
+rate is sound. At that rate:
+
+| | ETH | ≈ USD |
+|---|---|---|
+| Tax earned, all time | 0.7806 | **$1,489** |
+| Withdrawn to the operator EOA | 0.34 | $649 — **44% of everything earned** |
+| Corpus remaining (`nav()`) | 0.2064 | **$394** |
+
+A $394 corpus, with half of it deployed at 30% APY, earns about **$59 a year**. A single
+round trip through the STONKBROKER vault costs **187 bps** — roughly $7. The yield leg at this
+size is a rounding error.
+
+The tax engine, meanwhile, produced $1,489 in days. **That is the business.** What needs
+optimising is not squeezing yield out of the corpus — it is not losing the corpus.
+
+In priority order:
+
+### 1. Stop withdrawing to the EOA — highest value, costs nothing
+
+44% of everything the tax has ever earned now sits outside `nav()`. The entire product is "a
+token with a reported floor", and nearly half of what backs that floor has left the contract.
+Every withdrawal fires `FloorRegression`. Stopping this repairs the floor immediately, with no
+deployment and no new code.
+
+### 2. Move ownership to a multisig — *before* the adapter, not after
+
+The Treasury owner and the operator are the same single EOA
+(`0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19`). That one key can call `withdraw`, `setRedeemer`,
+`setOperator`, `setDistributor` and every adapter function. Activating a yield sleeve enlarges
+what that key can reach. `LAUNCH.md` already lists this as the first post-launch decision —
+*"Do this early. Cheap now, awkward later."*
+
+### 3. If the adapter goes live, point it at `weth-usdg` — not `stonkbroker`
+
+Both round trips were **measured on a fork against the live vaults**, not estimated:
+
+| | `stonkbroker-weth` | **`weth-usdg`** |
+|---|---|---|
+| Pool fee | **1%** (`fee = 10000`) | **0.05%** (`fee = 500`) |
+| Entry cost | 98 bps | **3.5 bps** |
+| **Full round trip** | **187 bps** | **6 bps** |
+| Pair | memecoin | WETH / stablecoin |
+| Vault TVL | 1.78 ETH | 2.364 ETH |
+| 20% capacity cap | 0.356 ETH | **0.473 ETH** |
+
+**31× cheaper**, and the whole 0.2064 ETH corpus fits inside the capacity cap with room to
+spare. The fee difference alone justifies the choice before the memecoin-exposure argument is
+even raised — and §7 raises it.
+
+### 4. Do not automate the deposit step yet
+
+This is the opposite of what is usually asked for, and the reasoning is specific to the current
+size. At a $394 corpus you would call `depositToAdapter` perhaps once a week. Automating that
+means either an **unaudited Governor contract holding the Treasury's ownership**, or the owner
+key — which can also `withdraw` and `setOperator` — **sitting hot on a machine**. Both are a
+large amount of new attack surface to save one transaction a week.
+
+Revisit once the corpus is 10–50× larger *and* ownership has moved to a multisig. A keeper-role
+Governor genuinely makes sense then. The three options, for when that time comes:
+
+1. **Governor contract with a keeper role.** Treasury ownership moves to a small Governor. Its
+   owner (a multisig) can do everything; a separate keeper key can *only* call
+   `depositToAdapter` within `sleeveBps` and nothing else. A low-privilege bot then runs on a
+   cron. Separates who sets policy from who executes it. No Treasury redeploy needed — but
+   `transferOwnership` on a live treasury is a serious, awkward-to-reverse step.
+2. **Permissionless `deployIdle()`.** Anyone can push idle corpus ETH into the active adapter,
+   up to `sleeveBps`, while preserving a minimum redemption buffer. No bot at all. Most
+   automatic, but it opens principal movement to everyone — the adapter's TWAP band and
+   `isCalm()` guards are what would make that defensible.
+3. **Bot only, no contract change.** A cron script calling `depositToAdapter` with the owner
+   key. Works today, changes nothing — but that key must sit hot, and it can also `withdraw`,
+   `setRedeemer` and `setOperator`. Weakest of the three.
+
+Note that 1 and 2 both change who owns the live Treasury, which is why neither should happen
+before the multisig in step 2 above.
+
+### The two existing positions
+
+A separate decision. Withdrawing them on beefy.com and returning the ETH with `Treasury.fund()`
+repairs `nav()` and the floor immediately.
+
+- **STONKBROKER/WETH** — down 4.65%, and 78% of it has converted into the memecoin. Returning it
+  realizes the loss, but the position is already drifting that way.
+- **MSFT-USDG** — **9.97% of a $594 vault.** Size the exit carefully; that is a large share of a
+  thin pool.
+
+ETH returned through `fund()` did not come from the FeeSink, so it counts as a **donation**: it
+raises the floor and is not split with stakers.
+
+**In one line:** stop withdrawing → move to a multisig → deploy the adapter against `weth-usdg`
+with a small amount → defer automation. The adapter is written and tested and can wait; what is
+leaking is the corpus, not the yield.
+
+---
+
 ## 1. The problem this solves
 
 Corpus ETH currently reaches Beefy by this route:
@@ -243,18 +344,27 @@ two-asset LP, zero single-asset and zero stablecoin-only vaults.**
 A corpus that took 0.78 ETH of tax in its first days outgrows any one of these quickly. That is
 what `maxVaultShareBps` exists for, and why the default is 20% rather than something permissive.
 
-### Round-trip cost is 187 bps
+### Round-trip cost is dominated by the pool's fee tier
 
-Measured against the live STONKBROKER/WETH vault on a fork, for a 0.05 ETH round trip:
+Measured on a fork against the live vaults, 0.05 ETH in and back out:
 
-| Leg | Cost |
-|---|---|
-| Deposit (0.05 ETH → position) | 49 bps |
-| Full round trip (in and back out) | **187 bps** |
+| Vault | Pool fee | Entry | Full round trip |
+|---|---|---|---|
+| `stonkbroker-weth` | 1% (`fee = 10000`) | 98 bps | **187 bps** |
+| `weth-usdg` | 0.05% (`fee = 500`) | 3.5 bps | **6 bps** |
 
-Two swaps through a **1% fee pool** (`pool.fee() == 10000`) plus CLM fees. Yield has to clear
-187 bps before a deployment was worth making, so this is for positions held for a while — not
-for parking ETH overnight.
+The adapter swaps roughly half the deposit on the way in and the whole paired leg on the way
+out, so the cost tracks the pool's fee tier almost linearly — **a 31× spread between two vaults
+on the same chain**.
+
+This is the single largest controllable cost in the design, and it is decided entirely by which
+vault the adapter is deployed against. Yield has to clear it before a deployment was worth
+making. At 6 bps that is trivial; at 187 bps it is a real hurdle, and churning between vaults is
+out of the question.
+
+The `weth-usdg` run also exercises a **6-decimal token** (USDG) against 18-decimal WETH. The
+valuation and split math works in raw units off `sqrtPriceX96`, so decimals are handled
+implicitly — the fork run confirms that rather than assuming it.
 
 ### WETH-paired vaults only
 
