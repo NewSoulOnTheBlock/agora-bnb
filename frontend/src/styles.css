@@ -103,9 +103,9 @@
   --font: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, Geneva, Verdana, sans-serif;
   --mono: "Lucida Console", "Courier New", Courier, monospace;
 
-  --fs: 12px;
-  --title-h: 20px;
-  --taskbar-h: 30px;
+  --fs: 13px;
+  --title-h: 22px;
+  --taskbar-h: 32px;
 }
 
 /* --------------------------------------------------------------------------
@@ -482,7 +482,14 @@ button.mini,
   top: 118px;
   left: 80px;
   right: 80px;
-  bottom: calc(var(--taskbar-h) + 12px);
+  /* `bottom: auto` so the window is as tall as its content, like a real one.
+     Pinning it to the taskbar left a Stake page with ~700px of empty silver
+     under a short form. The cap keeps a long page inside the viewport, and
+     `.client` scrolls from there. `dvh` so a mobile URL bar sliding away does
+     not leave the window overhanging. */
+  bottom: auto;
+  max-height: calc(100vh - 118px - var(--taskbar-h) - 18px);
+  max-height: calc(100dvh - 118px - var(--taskbar-h) - 18px);
   width: min(1120px, 100%);
   /* left + right + width all set, margins auto → the box centres in the gap. */
   margin: 0 auto;
@@ -662,6 +669,7 @@ button.mini,
 
 /* Only inside the strip does it become a tab. */
 .tabstrip .tab {
+  min-height: 28px;
   box-shadow:
     inset 1px 1px var(--white),
     inset -1px 0 var(--black),
@@ -895,8 +903,9 @@ button { font-family: inherit; font-size: inherit; }
   box-shadow: var(--out);
   border: none;
   font: inherit;
-  padding: 5px 14px;
-  min-width: 84px;
+  padding: 7px 18px;
+  min-width: 92px;
+  min-height: 30px;
   cursor: default;
   color: var(--black);
   display: inline-flex;
@@ -904,7 +913,7 @@ button { font-family: inherit; font-size: inherit; }
   justify-content: center;
   gap: 6px;
 }
-.btn:active:not(:disabled) { box-shadow: var(--in); padding: 6px 13px 4px 15px; }
+.btn:active:not(:disabled) { box-shadow: var(--in); padding: 8px 17px 6px 19px; }
 .btn:focus-visible { outline: 1px dotted var(--black); outline-offset: -4px; }
 .btn:disabled { color: var(--gray); text-shadow: 1px 1px 0 var(--white); }
 
@@ -930,7 +939,8 @@ textarea {
   border: none;
   font: inherit;
   font-family: var(--mono);
-  padding: 4px 5px;
+  font-size: 15px;
+  padding: 8px 9px;
   color: var(--black);
   width: 100%;
 }
@@ -1016,7 +1026,7 @@ input[type="number"] { -moz-appearance: textfield; }
  */
 .stat .v {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 17px;
   color: var(--crt);
   background: var(--crt-bg);
   box-shadow: var(--well);
@@ -1028,7 +1038,7 @@ input[type="number"] { -moz-appearance: textfield; }
   color: var(--crt-off);
   font-style: italic;
   font-size: 12px;
-  background: #06170d;
+  background: #150525;
 }
 .stat .v .unit { font-size: 11px; color: var(--crt-dim); margin-left: 6px; }
 .stat .note { color: #3a3a3a; line-height: 1.35; }
@@ -1054,7 +1064,7 @@ input[type="number"] { -moz-appearance: textfield; }
    dozen supporting stats below — all of which stay white-on-silver. */
 .big {
   font-family: var(--mono);
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 700;
   color: #ffffff;
   background:
@@ -1232,13 +1242,15 @@ button.mini {
   box-shadow: var(--out);
   border: none;
   font: inherit;
-  padding: 3px 12px;
+  font-size: 13px;
+  padding: 6px 15px;
+  min-height: 28px;
   cursor: default;
   color: var(--black);
   white-space: nowrap;
   flex: 0 0 auto;
 }
-button.mini:active:not(:disabled) { box-shadow: var(--in); padding: 4px 11px 2px 13px; }
+button.mini:active:not(:disabled) { box-shadow: var(--in); padding: 7px 14px 5px 16px; }
 button.mini:focus-visible { outline: 1px dotted var(--black); outline-offset: -4px; }
 button.mini:disabled { color: var(--gray); text-shadow: 1px 1px 0 var(--white); }
 
@@ -1404,6 +1416,35 @@ button.mini[aria-selected="true"] {
 .dialog-btns { display: flex; gap: 8px; justify-content: center; margin-top: 15px; }
 
 /* --------------------------------------------------------------------------
+   19b · Touch
+   Keyed on the pointer, not the viewport — a tablet is wide and still has no
+   cursor to aim with.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  :root { --taskbar-h: 42px; --title-h: 26px; }
+
+  .btn, button.mini, .tabstrip .tab, .task-btn, .start-btn { min-height: 42px; }
+  .btn { padding: 10px 20px; }
+  button.mini { padding: 10px 16px; }
+  .tbtn { width: 24px; height: 21px; }
+  .menu-item { padding: 8px 12px; }
+  .menu-pop button, .start-items button { padding-top: 10px; padding-bottom: 10px; }
+  .desk-icon { width: 86px; padding: 8px 2px; }
+
+  /* iOS Safari zooms the whole page when a focused input is under 16px. This
+     is the single most common mobile bug in a form like this one. */
+  input[type="text"], input[type="number"], input:not([type]), select, textarea {
+    font-size: 16px;
+    padding: 11px 10px;
+  }
+
+  /* Hover styling on a touch device sticks after the tap and reads as a bug. */
+  .menu-item:hover { background: none; color: var(--black); }
+  .menu-pop button:hover:not(:disabled),
+  .start-items button:hover { background: var(--navy); color: var(--white); }
+}
+
+/* --------------------------------------------------------------------------
    20 · Responsive
    The desktop metaphor stops paying rent on a phone: the window goes
    full-bleed, the desktop icons move into the Start menu, and the tab strip
@@ -1420,20 +1461,73 @@ button.mini[aria-selected="true"] {
 
 @media (max-width: 860px) {
   .hero, .two, .grid.c4, .grid.c3, .grid.c2 { grid-template-columns: 1fr; }
-  .win-main { left: 6px; right: 6px; top: 78px; bottom: calc(var(--taskbar-h) + 6px); }
   .desk-icons { display: none; }
   .frieze-band { height: 70px; }
   .vw-sun { width: 55vw; }
-  .big { font-size: 20px; }
+  .big { font-size: 22px; }
+
+  /* `bottom` stays auto so the window still sizes to its content here — only
+     the offsets and the cap change. Re-pinning bottom would undo that. */
+  .win-main {
+    left: 6px;
+    right: 6px;
+    top: 78px;
+    max-height: calc(100vh - 78px - var(--taskbar-h) - 12px);
+    max-height: calc(100dvh - 78px - var(--taskbar-h) - 12px);
+  }
 }
 
 @media (max-width: 560px) {
-  :root { --fs: 12px; }
-  .win-main { left: 0; right: 0; top: 0; bottom: var(--taskbar-h); }
+  :root { --fs: 13px; }
+
+  /* Full-bleed under a shortened frieze. The window is the page here, so it
+     fills the viewport rather than shrinking to content. */
+  .win-main {
+    left: 0; right: 0;
+    top: 58px;
+    bottom: var(--taskbar-h);
+    max-height: none;
+    width: 100%;
+    margin: 0;
+    box-shadow: none;
+  }
   .win { box-shadow: none; padding: 2px; }
-  .client { padding: 9px; }
-  .tabstrip { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
-  .tab { flex: 0 0 auto; }
+  .client { padding: 10px; }
+  .page { max-width: none; }
+
+  .frieze-band { height: 56px; }
+
+  /* One row that scrolls sideways beats four wrapped rows of tabs. The kana
+     subtitle is the first thing to go — it is decoration, the label is not. */
+  .tabstrip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabstrip::-webkit-scrollbar { display: none; }
+  .tabstrip .tab { flex: 0 0 auto; }
+  .tabstrip .tab .kana { display: none; }
+
+  .titlebar .t-text .chrome { font-size: 12px; }
+  .titlebar .t-text .kana { display: none; }
+
   .task-btns { display: none; }
-  .statusbar .status-pane:not(.grow) { display: none; }
+  .statusbar { flex-wrap: wrap; }
+  .statusbar .status-pane.mono { display: none; }
+
+  .big { font-size: 22px; }
+  .stat .v { font-size: 15px; }
+
+  /* A long address must wrap rather than push the page sideways. */
+  .rv, .qv { word-break: break-all; }
+}
+
+/* Very short viewports — a phone in landscape. The frieze is the first thing
+   that can go; it is scenery and it costs a third of the screen. */
+@media (max-height: 480px) {
+  .frieze-band { display: none; }
+  .win-main { top: 4px; }
 }

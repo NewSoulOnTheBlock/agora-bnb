@@ -349,7 +349,15 @@ export default function Layout({
           className="win win-main"
           style={
             maximised
-              ? { top: 0, left: 0, right: 0, bottom: "var(--taskbar-h)", width: "100%", margin: 0 }
+              ? {
+                  top: 0, left: 0, right: 0,
+                  bottom: "var(--taskbar-h)",
+                  // The window is content-height by default; maximising has to
+                  // clear that cap or it stays short.
+                  maxHeight: "none",
+                  width: "100%",
+                  margin: 0,
+                }
               : undefined
           }
         >
