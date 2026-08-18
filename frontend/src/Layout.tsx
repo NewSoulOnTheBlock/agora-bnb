@@ -4,6 +4,10 @@ import { shortAddr } from "./format";
 import type { Wallet } from "./eth";
 import { PixelIcon, type IconName } from "./win98/pixel";
 import Dino from "./win98/Dino";
+import Screensaver from "./win98/Screensaver";
+import { useDrag, withDrag } from "./win98/useDrag";
+import TaxWatch from "./win98/TaxWatch";
+import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
 import { AGORA, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
 
@@ -226,9 +230,27 @@ export default function Layout({
   const [startOpen, setStartOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "close" | "about" | "bin" | "copied" | "dolphin">(null);
+  const mainDrag = useDrag(!maximised);
+  const gameDrag = useDrag();
+  const padDrag = useDrag();
+
   const [gameOpen, setGameOpen] = useState(false);
   const [padOpen, setPadOpen] = useState(false);
   const [tip, setTip] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
+  const [win, setWin] = useState<null | "sysprops" | "update" | "queue">(null);
+  const [crt, setCrt] = useState(() => {
+    try { return localStorage.getItem("agora98:crt") === "on"; } catch { return false; }
+  });
+
+  const toggleCrt = () => {
+    setCrt((on) => {
+      const next = !on;
+      try { localStorage.setItem("agora98:crt", next ? "on" : "off"); } catch { /* private mode */ }
+      play("click");
+      return next;
+    });
+  };
   const [sound, setSound] = useState(soundOn);
   const [clock, setClock] = useState(() => new Date());
   const shellRef = useRef<HTMLDivElement>(null);
@@ -305,7 +327,18 @@ export default function Layout({
   const time = clock.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   return (
-    <div className="desktop">
+    <div
+      className={`desktop${crt ? " crt" : ""}`}
+      onContextMenu={(e) => {
+        // Only the desktop itself, so a right-click inside the window still
+        // gets the browser's own menu.
+        if ((e.target as HTMLElement).closest(".win, .taskbar, .start-menu")) return;
+        e.preventDefault();
+        play("click");
+        setCtx({ x: e.clientX, y: e.clientY });
+      }}
+      onClick={() => ctx && setCtx(null)}
+    >
       {booting && <Boot />}
 
       {/* ---- the scene: sun, grid, horizon, frieze, columns ----
@@ -433,10 +466,15 @@ export default function Layout({
                   width: "100%",
                   margin: 0,
                 }
-              : undefined
+              : { transform: withDrag(mainDrag.offset) }
           }
         >
-          <div className="titlebar">
+          <div
+            className="titlebar"
+            {...mainDrag.handleProps}
+            onDoubleClick={() => { play("click"); mainDrag.reset(); }}
+            title="Drag to move · double-click to recentre"
+          >
             <PixelIcon name="computer" size={16} />
             <span className="t-text">
               <span className="chrome">ＡＧＯＲＡ ９８</span>
@@ -483,6 +521,7 @@ export default function Layout({
                 { kind: "item", label: "Minimise window", onClick: () => setMinimised(true) },
                 { kind: "sep" },
                 { kind: "item", label: sound ? "Sounds: On" : "Sounds: Off", onClick: toggleSound },
+                { kind: "item", label: crt ? "CRT mode: On" : "CRT mode: Off", onClick: toggleCrt },
               ]}
             />
             <Menu
@@ -508,6 +547,9 @@ export default function Layout({
               open={openMenu === "help"} setOpen={(v) => setOpenMenu(v ? "help" : null)}
               entries={[
                 { kind: "item", label: "What is this?", onClick: () => go("about") },
+                { kind: "item", label: "Windows Update…", onClick: () => setWin("update") },
+                { kind: "item", label: "Redemption Queue…", onClick: () => setWin("queue") },
+                { kind: "item", label: "System Properties…", onClick: () => setWin("sysprops") },
                 { kind: "sep" },
                 { kind: "item", label: "About AGORA 98…", onClick: () => setDialog("about") },
               ]}
@@ -621,8 +663,11 @@ export default function Layout({
       )}
 
       {gameOpen && (
-        <div className="win win-game" style={{ top: 130, left: "50%", transform: "translateX(-50%)" }}>
-          <div className="titlebar">
+        <div
+          className="win win-game"
+          style={{ top: 130, left: "50%", transform: withDrag(gameDrag.offset, "translateX(-50%)") }}
+        >
+          <div className="titlebar" {...gameDrag.handleProps} onDoubleClick={gameDrag.reset}>
             <PixelIcon name="dino" size={16} />
             <span className="t-text">No Internet — ランナー</span>
             <span className="t-btns">
@@ -640,8 +685,11 @@ export default function Layout({
       )}
 
       {padOpen && (
-        <div className="win win-game" style={{ top: 150, left: "50%", transform: "translateX(-50%)" }}>
-          <div className="titlebar">
+        <div
+          className="win win-game"
+          style={{ top: 150, left: "50%", transform: withDrag(padDrag.offset, "translateX(-50%)") }}
+        >
+          <div className="titlebar" {...padDrag.handleProps} onDoubleClick={padDrag.reset}>
             <PixelIcon name="rocket" size={16} />
             <span className="t-text">Launchpad — ローンチパッド</span>
             <span className="t-btns">
@@ -693,6 +741,33 @@ export default function Layout({
           </p>
         </Dialog>
       )}
+
+      {/* ---- desktop context menu ---- */}
+      {ctx && (
+        <div
+          className="menu-pop ctx-menu"
+          role="menu"
+          style={{ left: Math.min(ctx.x, window.innerWidth - 190), top: ctx.y }}
+        >
+          <button role="menuitem" onClick={() => { setCtx(null); play("click"); }}>Arrange Icons</button>
+          <button role="menuitem" onClick={() => { setCtx(null); window.location.reload(); }}>Refresh</button>
+          <div className="sep" />
+          <button role="menuitem" onClick={() => { setCtx(null); toggleCrt(); }}>
+            {crt ? "CRT mode: On" : "CRT mode: Off"}
+          </button>
+          <button role="menuitem" onClick={() => { setCtx(null); setWin("update"); play("open"); }}>
+            Windows Update…
+          </button>
+          <div className="sep" />
+          <button role="menuitem" onClick={() => { setCtx(null); setWin("sysprops"); play("open"); }}>
+            <b>Properties</b>
+          </button>
+        </div>
+      )}
+
+      {win === "sysprops" && <SystemProperties onClose={() => { play("close"); setWin(null); }} />}
+      {win === "update" && <WindowsUpdate onClose={() => { play("close"); setWin(null); }} />}
+      {win === "queue" && <PrintQueue onClose={() => { play("close"); setWin(null); }} />}
 
       {/* ---- start menu ---- */}
       {startOpen && (
@@ -752,6 +827,11 @@ export default function Layout({
           </div>
         </div>
       )}
+
+      {/* Announcements from the chain, and the idle takeover. Both sit above
+          the desktop and outside every window. */}
+      <TaxWatch enabled={!booting} />
+      <Screensaver />
 
       {/* ---- taskbar ---- */}
       <div className="taskbar">
