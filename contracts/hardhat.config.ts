@@ -10,6 +10,7 @@ const {
   BSC_RPC_URL,
   BSC_TESTNET_RPC_URL,
   DEPLOYER_PRIVATE_KEY,
+  ETHERSCAN_API_KEY,
 } = process.env;
 
 /**
@@ -107,6 +108,45 @@ const config: HardhatUserConfig = {
       accounts,
     },
   },
+  /**
+   * Block-explorer source verification.
+   *
+   * One Etherscan V2 key covers BscScan as well — the V2 API is multichain and
+   * routes by chainId, so there is no separate BscScan key to manage. Get one at
+   * etherscan.io/apidashboard and put it in .env as ETHERSCAN_API_KEY.
+   *
+   * Verification matters more than usual here: this is a public reserve holding
+   * other people's money, and the whole argument for trusting it — immutable
+   * destinations, no privileged caller on the distributor, a launch guard that
+   * cannot be bypassed — is only checkable if the source is on the explorer.
+   * Unverified bytecode asks people to take that on faith.
+   *
+   * Robinhood Chain runs Blockscout, which takes no API key; `apiKey` is ignored
+   * for that entry and the URLs are what matter.
+   */
+  etherscan: {
+    /**
+     * A PLAIN STRING, not a per-network map. This is the whole switch between
+     * API versions and it is not documented anywhere obvious:
+     *
+     *   hardhat-verify/internal/etherscan.js:58
+     *     const isV2 = typeof apiKey === "string";
+     *
+     * Given an object, the plugin falls back to the per-chain **V1** endpoints,
+     * which Etherscan has deprecated — verification then fails with "You are
+     * using a deprecated V1 endpoint". Given a string, it posts to
+     * api.etherscan.io/v2/api with `chainid`, which is what works today.
+     *
+     * The cost of the string form is that it applies to every network: line 34
+     * routes anything with a known chainId to the Etherscan V2 URL, so a
+     * Blockscout `customChains` entry cannot coexist with it. Robinhood Chain
+     * verification therefore is not configured here — Blockscout takes uploads
+     * directly at robinhoodchain.blockscout.com/contract-verification, and the
+     * live 4663 contracts are already deployed and unaffected.
+     */
+    apiKey: ETHERSCAN_API_KEY ?? "",
+  },
+  sourcify: { enabled: false },
   paths: {
     sources: "./contracts",
     tests: "./test",
