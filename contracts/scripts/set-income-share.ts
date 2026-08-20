@@ -59,12 +59,32 @@ async function main() {
   console.log(`cap        ${cap} bps  (${Number(cap) / 100}%)`);
   if (bps > Number(cap)) throw new Error(`Above the contract cap of ${cap} bps.`);
 
+  // How the staker share is split depends on which Distributor is wired in, and
+  // that differs by chain: Robinhood runs the two-sink version (Suits + stTORII),
+  // BNB runs the single-sink one. Probing beats assuming — printing a Suits line
+  // on BNB would state something simply untrue about where the money goes.
+  let suitsSplit: number | null = null;
+  try {
+    const dist = await ethers.getContractAt(
+      ["function stakedSuits() view returns (address)", "function suitsBps() view returns (uint16)"],
+      await t.distributor()
+    );
+    await dist.stakedSuits();
+    suitsSplit = Number(await dist.suitsBps()) / 10_000;
+  } catch {
+    suitsSplit = null; // single-sink distributor, or none wired yet
+  }
+
   line();
-  console.log("effect on every 1 ETH of trade tax from here on:");
-  console.log(`  → corpus (raises the floor)    ${(1 - bps / 10000).toFixed(4)} ETH`);
-  console.log(`  → stakers + staked Suits       ${(bps / 10000).toFixed(4)} ETH`);
-  console.log(`      of which staked Suits 10%  ${((bps / 10000) * 0.1).toFixed(4)} ETH`);
-  console.log(`      of which stTORII      90%  ${((bps / 10000) * 0.9).toFixed(4)} ETH`);
+  console.log("effect on every 1 unit of trade tax from here on:");
+  console.log(`  → corpus (raises the floor)    ${(1 - bps / 10000).toFixed(4)}`);
+  console.log(`  → stakers                      ${(bps / 10000).toFixed(4)}`);
+  if (suitsSplit !== null) {
+    console.log(`      of which staked Suits      ${((bps / 10000) * suitsSplit).toFixed(4)}`);
+    console.log(`      of which stTORII           ${((bps / 10000) * (1 - suitsSplit)).toFixed(4)}`);
+  } else {
+    console.log(`      all of it to stTORII — single-sink distributor, no Suits vault`);
+  }
   console.log("");
   console.log("This is NOT retroactive — tax already collected stays corpus.");
   console.log(`  tax collected so far  ${ethers.formatEther(taxSoFar)} ETH`);
