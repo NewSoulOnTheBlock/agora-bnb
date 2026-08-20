@@ -7,6 +7,8 @@ dotenv.config();
 const {
   RH_RPC_URL,
   RH_CHAIN_ID,
+  BSC_RPC_URL,
+  BSC_TESTNET_RPC_URL,
   DEPLOYER_PRIVATE_KEY,
 } = process.env;
 
@@ -46,7 +48,17 @@ const config: HardhatUserConfig = {
      * `isCalm()` gate passes, whether the in-ratio split actually mints shares,
      * how much the pool's own fee eats. Only the live state can.
      */
-    hardhat: process.env.FORK
+    /**
+     * `BNB_TEST=1` runs the in-process node as chain 56.
+     *
+     * This is not cosmetic. Flap's `VaultBase` resolves the Portal and Guardian
+     * from `block.chainid` against a hardcoded table (56 / 97 / 4663) and
+     * reverts `UnsupportedChain` on anything else — including Hardhat's default
+     * 31337. Without this, every Guardian-gated test fails for the wrong reason.
+     */
+    hardhat: process.env.BNB_TEST
+      ? { chainId: 56 }
+      : process.env.FORK
       ? {
           forking: {
             url: RH_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
@@ -71,6 +83,27 @@ const config: HardhatUserConfig = {
     robinhood: {
       url: RH_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
       chainId: RH_CHAIN_ID ? Number(RH_CHAIN_ID) : 4663,
+      accounts,
+    },
+    /**
+     * BNB Chain. The AGORA deployment here is NOT a port of the Robinhood Chain
+     * one: there is no Pons, so the tax comes from Flap instead, `FeeSink` is
+     * replaced by `bnb/AgoraVault`, the rate is 5% rather than 4% (Flap offers
+     * 1/3/5/10% only), and the Suits vault is dropped entirely because that
+     * collection has no BNB deployment.
+     *
+     * Test on `bscTestnet` first. Flap's Portal, Guardian and vault addresses
+     * are all chain-keyed inside `flap/VaultBase.sol`, so chain 97 exercises the
+     * same code paths as 56 without mainnet BNB at risk.
+     */
+    bsc: {
+      url: BSC_RPC_URL || "https://bsc-dataseed.bnbchain.org",
+      chainId: 56,
+      accounts,
+    },
+    bscTestnet: {
+      url: BSC_TESTNET_RPC_URL || "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+      chainId: 97,
       accounts,
     },
   },
