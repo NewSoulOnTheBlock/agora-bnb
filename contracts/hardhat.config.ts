@@ -10,6 +10,7 @@ const {
   BSC_RPC_URL,
   BSC_TESTNET_RPC_URL,
   DEPLOYER_PRIVATE_KEY,
+  ETHERSCAN_API_KEY,
 } = process.env;
 
 /**
@@ -107,6 +108,40 @@ const config: HardhatUserConfig = {
       accounts,
     },
   },
+  /**
+   * Block-explorer source verification.
+   *
+   * One Etherscan V2 key covers BscScan as well — the V2 API is multichain and
+   * routes by chainId, so there is no separate BscScan key to manage. Get one at
+   * etherscan.io/apidashboard and put it in .env as ETHERSCAN_API_KEY.
+   *
+   * Verification matters more than usual here: this is a public reserve holding
+   * other people's money, and the whole argument for trusting it — immutable
+   * destinations, no privileged caller on the distributor, a launch guard that
+   * cannot be bypassed — is only checkable if the source is on the explorer.
+   * Unverified bytecode asks people to take that on faith.
+   *
+   * Robinhood Chain runs Blockscout, which takes no API key; `apiKey` is ignored
+   * for that entry and the URLs are what matter.
+   */
+  etherscan: {
+    apiKey: {
+      bsc: ETHERSCAN_API_KEY ?? "",
+      bscTestnet: ETHERSCAN_API_KEY ?? "",
+      robinhood: "blockscout-needs-no-key",
+    },
+    customChains: [
+      {
+        network: "robinhood",
+        chainId: 4663,
+        urls: {
+          apiURL: "https://robinhoodchain.blockscout.com/api",
+          browserURL: "https://robinhoodchain.blockscout.com",
+        },
+      },
+    ],
+  },
+  sourcify: { enabled: false },
   paths: {
     sources: "./contracts",
     tests: "./test",
