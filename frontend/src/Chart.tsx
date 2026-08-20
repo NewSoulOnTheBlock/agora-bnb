@@ -25,6 +25,8 @@ function fmtClock(t: number, bucket: Bucket) {
 export default function Chart() {
   const [bucket, setBucket] = useState<Bucket>(60);
   const [candles, setCandles] = useState<Candle[] | null>(null);
+  /** True when the RPC refused part of the range — see `history.ts`. */
+  const [wall, setWall] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -33,7 +35,11 @@ export default function Chart() {
     setCandles(null);
     setErr(null);
     readCandles(bucket)
-      .then((c) => alive && setCandles(c))
+      .then((r) => {
+        if (!alive) return;
+        setCandles(r.candles);
+        setWall(r.reachedWall);
+      })
       .catch((e) => alive && setErr(String(e?.message ?? e)));
     return () => { alive = false; };
   }, [bucket]);
@@ -58,7 +64,14 @@ export default function Chart() {
     if (!candles.length) {
       ctx.fillStyle = "#8a6aa8";
       ctx.font = "11px 'Lucida Console', monospace";
-      ctx.fillText("no swaps in range", 12, H / 2);
+      // "Nothing traded" and "the node would not answer" are different facts,
+      // and drawing an empty chart for the second is how a limitation starts
+      // reading as a measurement.
+      ctx.fillText(
+        wall ? "the RPC would not serve this range" : "no swaps in range",
+        12,
+        H / 2
+      );
       return;
     }
 
@@ -95,7 +108,9 @@ export default function Chart() {
     candles.forEach((c, i) => {
       const cx = PAD.l + step * (i + 0.5);
       const up = c.c >= c.o;
-      const colour = up ? "#05ffa1" : "#ff2fb9";
+      // Jade rises, cinnabar falls — the Chinese convention is the
+      // opposite of the Western one, and this page is Chinese.
+      const colour = up ? "#12836b" : "#c8102e";
 
       // wick
       ctx.strokeStyle = colour;
@@ -136,7 +151,7 @@ export default function Chart() {
     ctx.lineTo(PAD.l + plotW, y(last.c) + 0.5);
     ctx.stroke();
     ctx.setLineDash([]);
-  }, [candles, bucket]);
+  }, [candles, bucket, wall]);
 
   const last = candles?.length ? candles[candles.length - 1] : null;
   const first = candles?.length ? candles[0] : null;
@@ -180,8 +195,13 @@ export default function Chart() {
         ) : (
           <>
             {candles.length} candles · {candles.reduce((a, c) => a + c.trades, 0)} swaps ·{" "}
-            {candles.reduce((a, c) => a + c.v, 0).toFixed(4)} ETH volume · built from
-            PoolManager logs, no third-party feed
+            {candles.reduce((a, c) => a + c.v, 0).toFixed(4)} BNB volume · built from pair
+            logs, no third-party feed
+            {wall && (
+              <span className="warnline">
+                {" "}· range truncated: free BSC nodes serve about 75 minutes of logs
+              </span>
+            )}
           </>
         )}
       </div>

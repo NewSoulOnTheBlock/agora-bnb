@@ -77,7 +77,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
       {!deployed && (
         <AwaitingDeployment
           what="stTORII"
-          why="An ERC-4626 vault over TORII. Stakers receive the protocol's income stream in ETH; passive holders keep the redemption floor."
+          why="An ERC-4626 vault over TORII. Stakers receive the protocol's income stream in BNB; passive holders keep the redemption floor."
           phase="Treasury + FeeSink → launch → stTORII, Redeemer, StakedSuits, Distributor"
         />
       )}
@@ -86,7 +86,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
 
       <div className="two">
         <Panel
-          label={mode === "stake" ? "Stake TORII" : "Unstake TORII"}
+          label={mode === "stake" ? "Stake TORII 質押" : "Unstake TORII 贖回"}
           id="ERC-4626"
           right={
             <Pill warn={!deployed}>
@@ -96,8 +96,8 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           }
         >
           <div className="swapdir">
-            <button className="mini" aria-selected={mode === "stake"} onClick={() => setMode("stake")}>Stake</button>
-            <button className="mini" aria-selected={mode === "unstake"} onClick={() => setMode("unstake")}>Unstake</button>
+            <button className="mini" aria-selected={mode === "stake"} onClick={() => setMode("stake")}>Stake<span className="gloss">質押</span></button>
+            <button className="mini" aria-selected={mode === "unstake"} onClick={() => setMode("unstake")}>Unstake<span className="gloss">贖回</span></button>
           </div>
 
           <div className="field">
@@ -130,7 +130,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               </div>
               <div className="qrow">
                 <span className="qk">Unclaimed yield (kept on unstake)</span>
-                <span className="qv">{pos.pendingYield != null ? `${fmtSig(pos.pendingYield)} ETH` : DASH}</span>
+                <span className="qv">{pos.pendingYield != null ? `${fmtSig(pos.pendingYield)} BNB` : DASH}</span>
               </div>
             </div>
           )}
@@ -171,7 +171,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
             {busy === "claim"
               ? "Claiming…"
               : pos?.pendingYield && pos.pendingYield > 0n
-                ? `Claim ${fmtSig(pos.pendingYield)} ETH`
+                ? `Claim ${fmtSig(pos.pendingYield)} BNB`
                 : "Nothing to claim"}
           </button>
 
@@ -181,7 +181,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           <p className="sub">
             Eligible supply for income is simply <code>stTORII.totalSupply()</code>. The alternative —
             accruing to every holder through a transfer hook — is not even possible here: TORII is deployed
-            by the Pons factory with no hooks and no way to add them.
+            at launch with no hooks and no way to add them.
           </p>
         </Panel>
 
@@ -191,7 +191,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               k="Your position"
               value={pos?.shares != null ? fmtGrouped(pos.shares, 2, ST_TORII_DECIMALS) : null}
               unit="stTORII"
-              note={pos?.pendingYield != null ? `${fmtSig(pos.pendingYield)} ETH unclaimed` : undefined}
+              note={pos?.pendingYield != null ? `${fmtSig(pos.pendingYield)} BNB unclaimed` : undefined}
             />
             <Stat
               k="Total staked"
@@ -206,12 +206,12 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
             <div className="rows">
               <Row k="Paid to stakers" na={s?.staking.cumulativeRewards == null}>
                 {s?.staking.cumulativeRewards != null
-                  ? `${formatEther(s.staking.cumulativeRewards)} ETH`
+                  ? `${formatEther(s.staking.cumulativeRewards)} BNB`
                   : "unavailable"}
               </Row>
               <Row k="Claimed so far" na={s?.staking.cumulativeClaimed == null}>
                 {s?.staking.cumulativeClaimed != null
-                  ? `${formatEther(s.staking.cumulativeClaimed)} ETH`
+                  ? `${formatEther(s.staking.cumulativeClaimed)} BNB`
                   : "unavailable"}
               </Row>
               <Row k="Your share of income">
@@ -219,7 +219,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               </Row>
               <Row k="Awaiting distribution" na={s?.reserve.pendingIncome == null}>
                 {s?.reserve.pendingIncome != null
-                  ? `${formatEther(s.reserve.pendingIncome)} ETH`
+                  ? `${formatEther(s.reserve.pendingIncome)} BNB`
                   : "unavailable"}
               </Row>
               <Row k="stTORII contract" na={!deployed}>
@@ -232,9 +232,9 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
             </div>
 
             <p className="sub">
-              Rewards are ETH and stay <em>outside</em> <code>totalAssets()</code>, so the share price never
+              Rewards are BNB and stay <em>outside</em> <code>totalAssets()</code>, so the share price never
               moves — shares track deposits one-to-one and yield accrues separately. Inflating the share
-              price with ETH income would make <code>convertToAssets</code> report TORII the vault does not
+              price with BNB income would make <code>convertToAssets</code> report TORII the vault does not
               hold.
             </p>
           </Panel>
@@ -255,7 +255,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               </Row>
               <Row k="Unrealised sleeve gain" na={s?.reserve.unrealizedSurplus == null}>
                 {s?.reserve.unrealizedSurplus != null
-                  ? `${formatEther(s.reserve.unrealizedSurplus)} ETH`
+                  ? `${formatEther(s.reserve.unrealizedSurplus)} BNB`
                   : "unavailable"}
               </Row>
             </div>

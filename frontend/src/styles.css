@@ -27,56 +27,69 @@
    silver-and-navy they read as a second, unrelated palette fighting the first.
    One family throughout is what makes a dense page of numbers calm. */
 :root {
-  /* ---- vaporwave ----------------------------------------------------------
-     The brief was Greek marble, phalanxes, columns, katakana, video games and
-     vapourwave. Those are not six aesthetics, they are one: vapourwave's whole
-     visual vocabulary is Greco-Roman statuary plus obsolete computer chrome
-     plus Japanese type. Which is why the Windows 98 structure below survives
-     the repaint intact — the bevels, the title bars and the taskbar ARE part
-     of the look, not something being replaced by it.
+  /* ---- the shrine ---------------------------------------------------------
+     The BNB build is not the Robinhood one in a different colour. That build's
+     brief was Greek marble and vapourwave, and the two fused because they are
+     the same vocabulary — statuary, dead computer chrome, Japanese type. This
+     one is a Chinese temple, and the fusion has to be found again rather than
+     assumed.
 
-     It also happens to be the right costume for this particular product: the
-     token is called TORII. The columns were always on-brand. */
-  --vw-pink: #ff71ce;
-  --vw-magenta: #ff2fb9;
-  --vw-cyan: #01cdfe;
-  --vw-mint: #05ffa1;
-  --vw-lav: #b967ff;
-  --vw-violet: #7b2ff7;
-  --vw-cream: #fffb96;
-  --vw-sun-1: #ffe36b;
-  --vw-sun-2: #ff2f87;
+     It is there, and it is closer than it looks. Windows 98's chrome is beige
+     panels, hard bevels and a coloured title bar; a shrine is timber frames,
+     lacquered panels and a painted lintel. Both are flat planes with a raised
+     edge and a stated hierarchy. So the bevels below survive untouched again —
+     what changes is the material they are cut from: rice paper and sandalwood
+     instead of lavender plastic, cinnabar and gold instead of neon.
 
-  --sky-1: #0d0525;    /* zenith */
-  --sky-2: #3b0f6b;    /* mid */
-  --sky-3: #a02a8f;    /* horizon haze */
+     The token is TORII, a gate. Its ancestor is the Chinese 牌坊, which is the
+     structure standing behind the window on every page. The name still fits.
 
-  --silver: #cdc2e4;   /* control face — pale lavender chrome */
-  --white: #ffffff;    /* top-left highlight */
-  --light: #eae3f8;    /* inner highlight */
-  --gray: #7a6a9c;     /* inner shadow */
-  --black: #2a1140;    /* outer shadow, and body text */
-  --navy: var(--vw-violet);   /* active title bar start, selection */
-  --blue: var(--vw-magenta);  /* title bar gradient end */
-  --teal: #150a2e;     /* the desktop, behind the sky */
-  --teal-2: #0d0520;
-  --disabled: #7a6a9c;
+     Palette taken from the traditional set rather than invented:
+       朱红  zhūhóng    cinnabar, the pillar lacquer
+       金    jīn        leaf gold, the lintel and the readouts
+       青    qīng       jade, used only for "good" states
+       墨    mò         ink, all text and every outer bevel
+       宣纸  xuānzhǐ    rice paper, the control face
+     -------------------------------------------------------------------------- */
+  --cn-cinnabar: #c8102e;   /* 朱红 — lacquer */
+  --cn-vermillion: #e2401f; /* the lighter face of a pillar */
+  --cn-gold: #e8b530;       /* 金 — leaf */
+  --cn-gold-deep: #a97817;  /* its shadow side */
+  --cn-jade: #12836b;       /* 青 */
+  --cn-ink: #241611;        /* 墨 */
+  --cn-paper: #efe3c8;      /* 宣纸 */
+  --cn-paper-2: #ded0af;
 
-  /* Readout colours. Deliberately NOT terminal green any more — a wall of
-     phosphor is exactly the "too computery" the brief pushed back on. Pink on
-     near-black keeps the readouts legible while reading as neon rather than
-     as a trading terminal. */
-  --crt-bg: #1a0730;
-  --crt: #ff8fdc;
-  --crt-dim: #b06ac0;
-  --crt-off: #6b4785;
+  --sky-1: #150d1c;    /* zenith — night over the mountains */
+  --sky-2: #3a1720;    /* mid, plum */
+  --sky-3: #8a2c22;    /* horizon haze, warm */
 
-  --ok: #0b8f5a;
-  --warn: #b85a00;
-  --bad: #d11f6a;
+  --silver: #ded0af;   /* control face — aged paper over timber */
+  --white: #fbf6e9;    /* top-left highlight */
+  --light: #efe3c8;    /* inner highlight */
+  --gray: #9b8256;     /* inner shadow — worn sandalwood */
+  --black: var(--cn-ink);
+  --navy: #8c1c13;     /* active title bar start — lacquer */
+  --blue: var(--cn-gold-deep);  /* title bar gradient end — gilt */
+  --teal: #120a10;     /* the desktop, behind the sky */
+  --teal-2: #0b0509;
+  --disabled: #9b8256;
+
+  /* Readout colours. Gold on black lacquer, which is what a temple plaque
+     actually is — and it keeps the figures as the brightest thing on the page
+     without reaching for phosphor green or neon pink. */
+  --crt-bg: #1b0f0a;
+  --crt: var(--cn-gold);
+  --crt-dim: #a8823a;
+  --crt-off: #6b563a;
+
+  --ok: var(--cn-jade);
+  --warn: #b8651a;
+  --bad: var(--cn-cinnabar);
 
   /* Bevel recipes. Four insets each: outer shadow, outer highlight, inner
-     shadow, inner highlight — the exact order Win98 painted them. */
+     shadow, inner highlight — the exact order Win98 painted them. Unchanged
+     from the other build; only the colours feeding them moved. */
   --out:
     inset -1px -1px var(--black),
     inset 1px 1px var(--white),
@@ -154,153 +167,263 @@ body {
 .atmos, .rails, .frieze { display: none !important; }
 
 /* --------------------------------------------------------------------------
-   2c · The scene — sun, grid, columns, frieze
+   2c · The scene — moon, mountains, the 牌坊, lanterns
    All decorative, all `pointer-events: none`, all behind the window. Drawn in
-   CSS rather than shipped as images so it costs nothing and scales anywhere.
+   CSS and inline SVG rather than shipped as images, so it costs no request and
+   holds up at any size. Real artwork can replace any one layer without
+   touching the others.
    -------------------------------------------------------------------------- */
 .scene { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 
-.vw-sun {
+/* 月 — the moon. A flat gold disc with a soft halo and nothing else: the
+   vapourwave sun was sliced into slats because that is its signature, and
+   copying the slats here would just be the old scene in new paint. */
+.cn-moon {
   position: absolute;
   left: 50%;
-  top: 63%;
-  width: min(380px, 60vw);
+  top: 12%;
+  width: min(150px, 22vw);
   aspect-ratio: 1;
-  transform: translate(-50%, -55%);
+  transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: linear-gradient(180deg, var(--vw-sun-1) 0%, #ff9a3c 45%, var(--vw-sun-2) 100%);
-  box-shadow: 0 0 90px 30px rgba(255, 47, 135, 0.35);
+  background:
+    radial-gradient(circle at 38% 34%, #fff6dc 0%, var(--cn-gold) 46%, var(--cn-gold-deep) 100%);
+  box-shadow:
+    0 0 70px 26px rgba(232, 181, 48, 0.24),
+    inset -10px -12px 26px rgba(120, 74, 12, 0.35);
 }
 
-/* The slats across the lower half. Widening the gaps toward the bottom is what
-   makes it read as the vapourwave sun rather than a striped ball. */
-.vw-sun::after {
+/* 云 — cloud bands crossing the disc. Two soft ellipses, low opacity, which is
+   enough to read as cloud without becoming a texture. */
+.cn-moon::after {
   content: "";
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 54%;
-  border-radius: 0 0 50% 50% / 0 0 100% 100%;
-  background:
-    linear-gradient(180deg,
-      transparent 0 6%,
-      var(--sky-2) 6% 9%,
-      transparent 9% 20%,
-      var(--sky-2) 20% 25%,
-      transparent 25% 38%,
-      var(--sky-2) 38% 45%,
-      transparent 45% 58%,
-      var(--sky-2) 58% 68%,
-      transparent 68% 80%,
-      var(--sky-2) 80% 100%);
+  left: -18%; right: -18%;
+  top: 52%;
+  height: 13%;
+  border-radius: 50%;
+  background: rgba(58, 23, 32, 0.55);
+  box-shadow: 0 -26px 0 -4px rgba(58, 23, 32, 0.38);
 }
 
-/* The receding grid. `perspective` + `rotateX` is the whole trick; the
-   over-wide box keeps the vanishing lines from ending inside the viewport. */
-.vw-grid {
+/* 远山 — distant mountains. Two SVG ridges at different opacities; the far one
+   sits higher and paler, which is the whole depth cue. */
+.cn-hills {
   position: absolute;
-  left: -60%;
-  right: -60%;
-  top: 63%;
-  bottom: -10%;
-  transform: perspective(340px) rotateX(64deg);
-  transform-origin: 50% 0;
-  background-image:
-    linear-gradient(to right, rgba(255, 113, 206, 0.55) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(1, 205, 254, 0.42) 1px, transparent 1px);
-  background-size: 58px 58px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, transparent 78%);
-  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, transparent 78%);
+  left: -2%; right: -2%;
+  top: 30%;
+  height: 30%;
+  background-repeat: repeat-x;
+  background-position: bottom center;
+  background-size: 1200px 100%;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='200' preserveAspectRatio='none'><path d='M0 200V126l90-46 74 40 66-64 88 70 96-52 84 62 92-74 104 86 78-50 92 58 86-40 74 46 76-30v68z' fill='%233a1720' opacity='.85'/><path d='M0 200v-38l104 26 88-44 92 52 96-30 88 44 106-56 92 60 88-34 84 40 96-52 76 42v-10 50z' fill='%23241016' opacity='.95'/></svg>");
 }
 
-/* A hot line right on the horizon, which is what sells the two halves as one
-   scene rather than two stacked gradients. */
-.vw-horizon {
+/* 牌坊 — the gate. Chinese, not Japanese: the token is TORII and a torii is the
+   descendant of this structure, so drawing the ancestor keeps the name honest
+   while putting the page in the right country.
+
+   ## Proportion is the whole problem here
+
+   The first attempt stretched one roof SVG across the full viewport with
+   `preserveAspectRatio: none`. At 1560x132 the eave curves flattened into a red
+   smear and the pillars became slabs — it read as a wall, not a gate, and it
+   fought the window instead of framing it.
+
+   So the roof now has a fixed aspect (7:1, its natural drawing ratio) and is
+   sized from its own width, the pillars are thin, and the whole thing sits at
+   reduced opacity behind the window. Scenery should be legible at a glance and
+   invisible while reading; those are not in tension if the proportions are
+   right. */
+.cn-gate {
   position: absolute;
-  left: 0; right: 0;
-  top: 63%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--vw-cyan), var(--vw-pink), var(--vw-cyan), transparent);
-  box-shadow: 0 0 18px 3px rgba(1, 205, 254, 0.5);
+  left: 50%;
+  bottom: var(--taskbar-h);
+  transform: translateX(-50%);
+  width: min(1420px, 98vw);
+  height: calc(100% - var(--taskbar-h) - 30px);
+  opacity: 0.62;
 }
 
-/* The frieze the repo already shipped, duotoned into the palette. It is a
-   Greek temple scene with statuary and a spear-bearing Athena, which is
-   exactly the brief, and it was sitting unused in `public/`. */
-.frieze-band {
+/* 飞檐 — the upturned eave. One SVG, drawn at its true 7:1 ratio and scaled by
+   width alone, so the curve at the tips stays a curve. Three tiers of tile, a
+   gilt ridge, and the two ornaments that sit at either end of it. */
+.cn-gate .roof {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 104px;
-  overflow: hidden;
-  border-bottom: 2px solid var(--vw-magenta);
-  box-shadow: 0 0 26px rgba(255, 47, 185, 0.45);
+  aspect-ratio: 7 / 1;
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% 100%;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1400 200'><path d='M62 150C300 74 520 48 700 48s400 26 638 102c-52-4-96-2-140 6 28-20 44-36 52-52-176-52-346-72-550-72s-374 20-550 72c8 16 24 32 52 52-44-8-88-10-140-6z' fill='%23a3121f'/><path d='M120 130C330 70 520 50 700 50s370 20 580 80c-190-46-372-64-580-64s-390 18-580 64z' fill='%23c8102e'/><path d='M150 152c180-34 366-50 550-50s370 16 550 50c-186-24-368-34-550-34s-364 10-550 34z' fill='%23a97817'/><rect x='470' y='158' width='460' height='9' rx='4' fill='%23e8b530'/><path d='M62 150c-16-10-30-24-38-40 22 6 42 18 56 34zM1338 150c16-10 30-24 38-40-22 6-42 18-56 34z' fill='%23e8b530'/></svg>");
+  filter: drop-shadow(0 4px 0 rgba(36, 22, 17, 0.5));
 }
-.frieze-band img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 42%;
-  /* Sepia → hard duotone. The source is monochrome, so a hue rotate lands it
-     cleanly in the palette without needing a second asset. */
-  filter: grayscale(1) sepia(1) hue-rotate(238deg) saturate(4.5) contrast(1.15) brightness(0.82);
-  mix-blend-mode: screen;
-  opacity: 0.9;
+
+/* 匾额 — the plaque. A gold-edged lacquer board hung under the ridge; the
+   characters live in the markup so they can be read and translated rather than
+   baked into an image. Positioned from the roof's own height so it stays put
+   when the viewport changes the roof's size. */
+.cn-gate .plaque {
+  position: absolute;
+  top: calc(min(1420px, 98vw) / 7 * 0.86);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 20px;
+  background: linear-gradient(180deg, #3b1108, #250a05);
+  border: 2px solid var(--cn-gold);
+  border-radius: 2px;
+  color: var(--cn-gold);
+  font-size: 16px;
+  letter-spacing: 7px;
+  text-indent: 7px;
+  white-space: nowrap;
+  box-shadow: 0 0 16px rgba(232, 181, 48, 0.3);
 }
-.frieze-band::after {
+
+/* 柱 — the pillars. Thin, because a paifang's pillars are thin relative to its
+   span, and because anything wider reads as architecture the page has to work
+   around rather than scenery it sits inside. */
+.cn-gate .pillar {
+  position: absolute;
+  top: calc(min(1420px, 98vw) / 7 * 0.78);
+  bottom: 0;
+  width: 26px;
+  background:
+    linear-gradient(90deg, #6d0d14 0 16%, var(--cn-cinnabar) 16% 50%, var(--cn-vermillion) 50% 64%, #8c1410 64% 100%);
+  box-shadow: inset 0 0 0 1px rgba(36, 22, 17, 0.45);
+}
+.cn-gate .pillar.left { left: 2%; }
+.cn-gate .pillar.right { right: 2%; }
+
+/* 柱础 — the stone base, and a gilt band near the top. Pseudo-elements rather
+   than two more divs: a pillar is one thing and should be one element. */
+.cn-gate .pillar::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(13, 5, 37, 0.15), rgba(13, 5, 37, 0.85));
+  left: -5px; right: -5px;
+  top: 38px;
+  height: 10px;
+  background: linear-gradient(180deg, var(--cn-gold), var(--cn-gold-deep));
+}
+.cn-gate .pillar::after {
+  content: "";
+  position: absolute;
+  left: -9px; right: -9px;
+  bottom: 0;
+  height: 22px;
+  background: linear-gradient(180deg, #6d6153, #423a31);
+  box-shadow: inset 0 2px 0 rgba(251, 246, 233, 0.2);
 }
 
-/* Doric columns flanking the window. Fluting is a repeating gradient; the
-   capital and base are two blocks. Cheap, and it holds up at any height. */
-.column {
+/* 对联 — the couplet.
+
+   A real paifang carries a vertical inscription down each pillar: a matched
+   pair of lines, equal length, read right pillar first. These are written to
+   the form and say what the contract does — the right line is the tax going in,
+   the left is the floor coming out. Seven characters each, which is the
+   classic 七言 length.
+
+   Set as text, not as an image, so it is selectable and translatable. */
+.cn-couplet {
   position: absolute;
-  top: 104px;
-  bottom: var(--taskbar-h);
-  width: 54px;
+  top: 92px;
+  width: 26px;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 15px;
+  line-height: 26px;
+  letter-spacing: 5px;
+  color: var(--cn-gold);
+  text-shadow: 0 1px 0 rgba(36, 22, 17, 0.9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 石狮 — the guardian lions at the foot of each pillar. A pair, one either
+   side, drawn small enough to read as a silhouette rather than as detail. */
+.cn-lion {
+  position: absolute;
+  bottom: 0;
+  width: 46px;
+  height: 52px;
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: contain;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 92 104'><g fill='%23514a3f'><rect x='6' y='86' width='80' height='18' rx='3'/><path d='M30 86V56c0-6 4-10 10-10h12c6 0 10 4 10 10v30z'/><circle cx='46' cy='34' r='22'/><path d='M24 30c-6-6-6-16 2-20 2 8 8 12 14 12zM68 30c6-6 6-16-2-20-2 8-8 12-14 12z'/><circle cx='70' cy='62' r='12'/></g><g fill='%23241611'><circle cx='38' cy='32' r='3.5'/><circle cx='54' cy='32' r='3.5'/><path d='M40 44h12v4H40z'/></g><circle cx='70' cy='62' r='6' fill='%23c8102e'/></svg>");
   opacity: 0.75;
 }
-.column.left { left: 10px; }
-.column.right { right: 10px; }
+.cn-lion.left { left: -10px; }
+.cn-lion.right { right: -10px; }
 
-.column .shaft {
+/* 灯笼 — lanterns hanging from the eaves. Pure CSS: a squashed circle for the
+   body, a gold cap above and a tassel below. */
+.cn-lantern {
   position: absolute;
-  inset: 26px 4px 20px;
+  top: calc(min(1420px, 98vw) / 7 * 0.82);
+  width: 34px;
+  height: 44px;
+  border-radius: 50% / 42%;
+  background: radial-gradient(circle at 34% 32%, #ff6a4d 0%, var(--cn-cinnabar) 52%, #7d0c14 100%);
+  box-shadow: 0 0 26px rgba(226, 64, 31, 0.45);
+}
+.cn-lantern::before {
+  content: "";
+  position: absolute;
+  left: 30%; right: 30%;
+  top: -7px;
+  height: 7px;
+  background: var(--cn-gold);
+}
+.cn-lantern::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -15px;
+  width: 3px;
+  height: 15px;
+  transform: translateX(-50%);
+  background: var(--cn-gold);
+}
+.cn-lantern.l1 { left: 12%; }
+.cn-lantern.l2 { right: 12%; }
+
+/* 祥云 — the auspicious-cloud band along the top of the page. It replaces the
+   Greek frieze photo, and unlike that photo it is a pattern rather than an
+   image, so it tiles at any width and needs no second asset for small screens. */
+.cn-clouds {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 86px;
+  border-bottom: 2px solid var(--cn-gold);
   background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.16) 0 2px,
-      rgba(185, 103, 255, 0.30) 2px 5px,
-      rgba(20, 8, 40, 0.55) 5px 8px
-    ),
-    linear-gradient(90deg, #6a4a94, #d8ccec 40%, #a98fd0 70%, #4a2f70);
+    linear-gradient(180deg, rgba(21, 13, 28, 0.2), rgba(21, 13, 28, 0.9)),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='86'><g fill='none' stroke='%23c8102e' stroke-width='3' opacity='.55'><path d='M0 62c14 0 18-12 30-12s16 12 30 12 18-12 30-12 16 12 30 12 18-12 30-12 16 12 30 12'/><path d='M8 34c10-14 26-14 34-4 6-10 22-12 30 0 8-10 24-8 30 4'/><circle cx='42' cy='30' r='7'/><circle cx='118' cy='30' r='7'/></g></svg>");
+  background-repeat: no-repeat, repeat-x;
+  background-size: 100% 100%, 160px 86px;
+  box-shadow: 0 0 26px rgba(200, 16, 46, 0.35);
 }
-.column .cap,
-.column .base {
-  position: absolute;
-  left: 0; right: 0;
-  height: 22px;
-  background: linear-gradient(90deg, #5c3f85, #e4dbf4 45%, #a98fd0 72%, #422a63);
-  box-shadow: 0 0 14px rgba(185, 103, 255, 0.5);
-}
-.column .cap { top: 4px; }
-.column .base { bottom: 0; height: 18px; }
 
-/* The Greek key. Used as a divider rule wherever a section needs a lid. */
+/* 回纹 — the Chinese key (meander's ancestor, and near-identical). Used as a
+   divider rule wherever a section needs a lid, exactly where the Greek key was. */
 .meander {
   height: 12px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='12' shape-rendering='crispEdges'><path d='M0 10h20V2H4v6h12V4H8v2h6' fill='none' stroke='%23ff71ce' stroke-width='2'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='12' shape-rendering='crispEdges'><path d='M0 10h20V2H4v6h12V4H8v2h6' fill='none' stroke='%23c8102e' stroke-width='2'/></svg>");
   background-repeat: repeat-x;
   background-size: 24px 12px;
   opacity: 0.85;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .vw-horizon { animation: horizonPulse 4s ease-in-out infinite; }
+  .cn-lantern { animation: lanternSway 6s ease-in-out infinite; transform-origin: 50% -7px; }
+  .cn-lantern.l2 { animation-delay: -3s; }
+  .cn-moon { animation: moonGlow 9s ease-in-out infinite; }
 }
-@keyframes horizonPulse {
-  50% { box-shadow: 0 0 26px 5px rgba(255, 47, 185, 0.6); }
+@keyframes lanternSway {
+  0%, 100% { transform: rotate(-3.5deg); }
+  50% { transform: rotate(3.5deg); }
+}
+@keyframes moonGlow {
+  50% { box-shadow: 0 0 96px 34px rgba(232, 181, 48, 0.34), inset -10px -12px 26px rgba(120, 74, 12, 0.35); }
 }
 
 ::selection { background: var(--navy); color: var(--white); }
@@ -417,7 +540,7 @@ button.mini,
    -------------------------------------------------------------------------- */
 .desk-icons {
   position: absolute;
-  /* Below the frieze band, and to the right of the left column. */
+  /* Below the cloud band, and clear of the gate's left pillar. */
   top: 116px;
   left: 74px;
   display: flex;
@@ -478,7 +601,7 @@ button.mini,
    values to the right edge, so a two-word row stretched a metre wide. */
 .win-main {
   position: absolute;
-  /* Clears the frieze band, and sits inside the two columns. */
+  /* Clears the cloud band, and sits between the gate's two pillars. */
   top: 118px;
   left: 80px;
   right: 80px;
@@ -1095,8 +1218,8 @@ input[type="number"] { -moz-appearance: textfield; }
      the readouts stopped being terminal green — a phosphor wall was the
      "too computery" the brief pushed back on. */
   text-shadow:
-    2px 0 0 var(--vw-magenta),
-    -2px 0 0 var(--vw-cyan),
+    2px 0 0 var(--cn-cinnabar),
+    -2px 0 0 var(--cn-gold),
     0 0 22px rgba(255, 113, 206, 0.75);
 }
 /* Faint scanlines. 1px at 50% opacity reads as a CRT without becoming a gimmick. */
@@ -1263,7 +1386,7 @@ input[type="number"] { -moz-appearance: textfield; }
   background: #d4d0c8;
   color: #303030;
 }
-.field-top button.bal:hover .maxtag { background: #ff2fb9; color: #fff; border-color: #0a0a0a; }
+.field-top button.bal:hover .maxtag { background: var(--cn-cinnabar); color: #fff; border-color: #0a0a0a; }
 
 .input-wrap {
   display: flex;
@@ -1355,18 +1478,18 @@ button.mini[aria-selected="true"] {
    17b · Vapourwave type
    -------------------------------------------------------------------------- */
 
-/* Katakana runs as a secondary label everywhere a tab or heading has one. It
+/* Katahanzi runs as a secondary label everywhere a tab or heading has one. It
    is set in a Japanese face explicitly, because falling back to a Latin font
-   renders tofu boxes rather than kana. */
-.kana {
+   renders tofu boxes rather than hanzi. */
+.hanzi {
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP",
     "MS PGothic", "Meiryo", sans-serif;
   letter-spacing: 2px;
   font-weight: 400;
 }
 
-.tabstrip .tab .kana { font-size: 9px; opacity: 0.75; margin-left: 2px; }
-.desk-icon .kana { display: block; font-size: 9px; opacity: 0.85; }
+.tabstrip .tab .hanzi { font-size: 9px; opacity: 0.75; margin-left: 2px; }
+.desk-icon .hanzi { display: block; font-size: 9px; opacity: 0.85; }
 
 /* Chrome lettering: a vertical gradient clipped to the glyphs, which is the
    one piece of the aesthetic that genuinely needs background-clip. */
@@ -1375,8 +1498,8 @@ button.mini[aria-selected="true"] {
     180deg,
     #ffffff 0%,
     #d8f4ff 26%,
-    var(--vw-cyan) 44%,
-    var(--vw-magenta) 62%,
+    var(--cn-gold) 44%,
+    var(--cn-cinnabar) 62%,
     #ffd9f4 82%,
     #ffffff 100%
   );
@@ -1427,7 +1550,7 @@ button.mini[aria-selected="true"] {
 }
 .boot .cur { animation: blink 1s steps(1) infinite; }
 .boot .bright { color: #ffffff; }
-.boot .okc { color: var(--vw-mint); }
+.boot .okc { color: var(--cn-jade); }
 
 .boot-art {
   font-size: clamp(30px, 8vw, 74px);
@@ -1435,7 +1558,7 @@ button.mini[aria-selected="true"] {
   letter-spacing: 6px;
   line-height: 1.1;
 }
-.boot-kana { color: var(--vw-cyan); margin: 2px 0 12px; font-size: 12px; }
+.boot-hanzi { color: var(--cn-gold); margin: 2px 0 12px; font-size: 12px; }
 .boot-rule { max-width: 460px; margin-bottom: 16px; }
 
 @keyframes blink { 50% { opacity: 0; } }
@@ -1498,11 +1621,12 @@ button.mini[aria-selected="true"] {
    full-bleed, the desktop icons move into the Start menu, and the tab strip
    scrolls instead of wrapping into four rows.
    -------------------------------------------------------------------------- */
-/* Below ~1500px there is no longer room for a column AND a row of desktop
-   icons outside the 1120px window, so the columns stand down first — they are
-   scenery, the icons are navigation. */
+/* Below ~1500px there is no longer room for the gate's pillars AND a row of
+   desktop icons outside the 1120px window, so the pillars stand down first —
+   they are scenery, the icons are navigation. The roof and plaque stay: they
+   are the silhouette, and losing them loses the whole picture. */
 @media (max-width: 1500px) {
-  .column { display: none; }
+  .cn-lantern { display: none; }
   .desk-icons { left: 8px; }
   .win-main { left: 96px; right: 12px; }
 }
@@ -1510,8 +1634,11 @@ button.mini[aria-selected="true"] {
 @media (max-width: 860px) {
   .hero, .two, .grid.c4, .grid.c3, .grid.c2 { grid-template-columns: 1fr; }
   .desk-icons { display: none; }
-  .frieze-band { height: 70px; }
-  .vw-sun { width: 55vw; }
+  .cn-clouds { height: 62px; }
+  .cn-moon { width: 46vw; top: 26%; }
+  .cn-gate { height: 46%; }
+  .cn-gate .roof { height: 74px; }
+  .cn-gate .plaque { top: 62px; font-size: 14px; letter-spacing: 5px; }
   .big { font-size: 22px; }
 
   /* `bottom` stays auto so the window still sizes to its content here — only
@@ -1529,7 +1656,7 @@ button.mini[aria-selected="true"] {
 @media (max-width: 560px) {
   :root { --fs: 13px; }
 
-  /* Full-bleed under a shortened frieze. The window is the page here, so it
+  /* Full-bleed under a shortened cloud band. The window is the page here, so it
      fills the viewport rather than shrinking to content. */
   .win-main {
     left: 0; right: 0;
@@ -1545,9 +1672,9 @@ button.mini[aria-selected="true"] {
   .client { padding: 10px; }
   .page { max-width: none; }
 
-  .frieze-band { height: 56px; }
+  .cn-clouds { height: 48px; }
 
-  /* One row that scrolls sideways beats four wrapped rows of tabs. The kana
+  /* One row that scrolls sideways beats four wrapped rows of tabs. The hanzi
      subtitle is the first thing to go — it is decoration, the label is not. */
   .tabstrip {
     flex-wrap: nowrap;
@@ -1560,10 +1687,10 @@ button.mini[aria-selected="true"] {
   }
   .tabstrip::-webkit-scrollbar { display: none; }
   .tabstrip .tab { flex: 0 0 auto; }
-  .tabstrip .tab .kana { display: none; }
+  .tabstrip .tab .hanzi { display: none; }
 
   .titlebar .t-text .chrome { font-size: 12px; }
-  .titlebar .t-text .kana { display: none; }
+  .titlebar .t-text .hanzi { display: none; }
 
   .task-btns { display: none; }
   .statusbar { flex-wrap: wrap; }
@@ -1576,10 +1703,10 @@ button.mini[aria-selected="true"] {
   .rv, .qv { word-break: break-all; }
 }
 
-/* Very short viewports — a phone in landscape. The frieze is the first thing
+/* Very short viewports — a phone in landscape. The cloud band is the first thing
    that can go; it is scenery and it costs a third of the screen. */
 @media (max-height: 480px) {
-  .frieze-band { display: none; }
+  .cn-clouds { display: none; }
   .win-main { top: 4px; }
 }
 
@@ -1642,7 +1769,7 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
   font-size: 11px;
 }
 .dino-hud { justify-content: space-between; }
-.dino-hud .kana { color: var(--vw-cyan); font-family: var(--font); letter-spacing: 2px; }
+.dino-hud .hanzi { color: var(--cn-gold); font-family: var(--font); letter-spacing: 2px; }
 .dino-score { color: var(--black); font-weight: 700; letter-spacing: 1px; }
 .dino-foot { justify-content: center; color: #4a3a5e; }
 .dino-foot b { color: var(--bad); letter-spacing: 2px; }
@@ -1740,27 +1867,8 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 }
 
 /* --------------------------------------------------------------------------
-   24 · Screensaver, balloons, context menu, CRT
+   24 · Balloons, context menu, CRT
    -------------------------------------------------------------------------- */
-.saver {
-  position: fixed;
-  inset: 0;
-  z-index: 900;
-  background: #090314;
-  cursor: none;
-}
-.saver canvas { display: block; width: 100%; height: 100%; }
-.saver-hint {
-  position: absolute;
-  left: 0; right: 0; bottom: 22px;
-  text-align: center;
-  color: rgba(255, 113, 206, 0.5);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 2px;
-  animation: saverFade 3.4s ease-in-out infinite;
-}
-@keyframes saverFade { 50% { opacity: 0.25; } }
 
 /* The tray balloon. Win98 anchored these bottom-right, above the clock. */
 .balloons {
@@ -1795,15 +1903,14 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 }
 .balloon-dot {
   width: 8px; height: 8px;
-  background: var(--vw-mint);
-  box-shadow: 0 0 6px var(--vw-mint);
+  background: var(--cn-jade);
+  box-shadow: 0 0 6px var(--cn-jade);
   border-radius: 50%;
 }
 .balloon-body { color: #3a2a50; line-height: 1.45; font-size: 11px; }
 
 @media (prefers-reduced-motion: reduce) {
   .balloon { animation: none; }
-  .saver-hint { animation: none; }
 }
 
 .ctx-menu { position: absolute; z-index: 85; min-width: 176px; }
@@ -1812,7 +1919,7 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 .sysprops { display: flex; gap: 16px; align-items: flex-start; }
 .sysprops-art { text-align: center; flex: 0 0 auto; }
 .sysprops-art img { image-rendering: auto; }
-.sysprops-art .kana { display: block; margin-top: 4px; font-size: 10px; color: var(--gray); }
+.sysprops-art .hanzi { display: block; margin-top: 4px; font-size: 10px; color: var(--gray); }
 
 /* The install bar. Win98 drew these as discrete blocks, not a smooth fill. */
 .progress {
@@ -1826,7 +1933,7 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
   height: 100%;
   background-image: linear-gradient(
     90deg,
-    var(--vw-mint) 0 10px,
+    var(--cn-jade) 0 10px,
     transparent 10px 13px
   );
   background-size: 13px 100%;
@@ -1950,7 +2057,7 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 .stat .usd {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--vw-cyan);
+  color: var(--cn-gold);
   letter-spacing: 0.3px;
 }
 
@@ -1959,7 +2066,7 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 .pitch-usd {
   font-family: var(--mono);
   font-size: 15px;
-  color: var(--vw-cyan);
+  color: var(--cn-gold);
   margin-top: 6px;
   letter-spacing: 0.4px;
 }
@@ -2108,4 +2215,134 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 @media (max-width: 640px) {
   .exp-body { height: 220px; }
   .exp-grid { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
+}
+
+
+/* ==========================================================================
+   The Chinese vocabulary, applied to the chrome
+   ==========================================================================
+   The window furniture stays Windows 98 — that is the joke and it is load
+   bearing. What changes is the ornament hung on it, and each of these is a
+   real motif doing a real job rather than decoration for its own sake. */
+
+/* 回纹 — the key fret. A panel's label rule, which used to be a plain etched
+   line. Same function, and the fret is what a lacquer panel's edge actually
+   carries. Drawn once as a data URI and tiled. */
+.panel .label::after {
+  content: "";
+  width: 48px;      /* exactly three 16px tiles — a partial tile reads as a glitch */
+  flex: none;
+  height: 8px;
+  margin-left: auto;
+  opacity: 0.45;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='8' shape-rendering='crispEdges'><path d='M0 7h13V1H3v4h7V3H6' fill='none' stroke='%23a97817' stroke-width='1'/></svg>");
+  background-repeat: repeat-x;
+  background-size: 16px 8px;
+}
+
+/* 窗棂 — window lattice. The ground behind the floating window, so the desktop
+   reads as a paper screen rather than as empty colour. Very low contrast: it
+   should be felt, not looked at. */
+.desktop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><g fill='none' stroke='%23e8b530' stroke-width='1.4'><rect x='.7' y='.7' width='62.6' height='62.6'/><path d='M32 0v64M0 32h64'/><path d='M16 16h32v32H16z'/><path d='M32 16 16 32l16 16 16-16z'/></g></svg>");
+  background-size: 64px 64px;
+}
+
+/* 印章 — the seal. Carved stone stamps are how a Chinese document says "this is
+   attested", which is exactly what the status pill on this page claims. Used
+   wherever the old build would have reached for a checkmark. */
+.statusbar .seal { width: 26px; height: 26px; font-size: 9px; }
+.seal br { line-height: 0; }
+
+.seal {
+  display: inline-flex;
+  font-family: var(--font);
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  background: var(--cn-cinnabar);
+  color: #fff6e6;
+  font-size: 11px;
+  line-height: 1.05;
+  letter-spacing: 0;
+  text-align: center;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px rgba(255, 246, 230, 0.55), 0 1px 0 rgba(36, 22, 17, 0.5);
+  /* Seal script is squarer and heavier than body type; faking the weight is
+     closer than leaving it in MS Sans Serif. */
+  font-weight: 700;
+  transform: rotate(-4deg);
+}
+.seal.lg { width: 48px; height: 48px; font-size: 15px; }
+
+/* 祥云 corner — a small cloud curl for the top-left of a notice block. */
+.notice { position: relative; }
+.notice::before {
+  content: "";
+  position: absolute;
+  top: 4px; right: 6px;
+  width: 26px; height: 14px;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='14'><g fill='none' stroke='%23c8102e' stroke-width='1.6'><path d='M1 12c5 0 6-8 11-8s5 5 9 5'/><circle cx='7' cy='6' r='3'/></g></svg>");
+  background-repeat: no-repeat;
+}
+
+/* The Chinese gloss shown beside a Latin label. Slightly dimmed so it reads as
+   a subtitle rather than as competing text. */
+.gloss {
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.62;
+  letter-spacing: 1px;
+}
+
+@media (max-width: 1900px) {
+  .cn-couplet { display: none; }
+}
+@media (max-width: 1500px) {
+  .cn-lion { display: none; }
+}
+
+
+/* The brand mark is cut to a circle with real alpha in the PNG itself, so the
+   favicon and the OG card are round too — CSS alone would have left those
+   square. The rule below is belt and braces for any place it gets a background. */
+.sysprops-art img,
+img[src^="/torii-"] {
+  border-radius: 50%;
+  background: transparent;
+}
+
+
+/* An icon that is present but not yet usable. Dimmed rather than removed: the
+   folder behind it is written and working, it just has no collection on this
+   chain to open. Saying "soon" is a claim about the roadmap; deleting the icon
+   would only be an absence. */
+.desk-icon.soon,
+.start-items button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.desk-icon.soon:hover { background: none; outline: none; }
+
+.soon-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cn-paper);
+  background: var(--cn-cinnabar);
+  border-radius: 2px;
+  vertical-align: middle;
 }

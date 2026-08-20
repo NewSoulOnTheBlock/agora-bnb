@@ -29,7 +29,7 @@ export default function About() {
   const taxPct = TORII_TAX_BPS / 100;
 
   // Worked example, computed from the live numbers so it can never drift.
-  const ex = 1; // 1 ETH traded
+  const ex = 1; // 1 BNB traded
   const exTax = ex * (taxPct / 100);
   const exCorpus = incomePct != null ? exTax * (1 - incomePct / 100) : null;
   const exIncome = incomePct != null ? exTax * (incomePct / 100) : null;
@@ -55,12 +55,12 @@ export default function About() {
           <ol className="steps big-steps">
             <li className="step">
               <b>Someone trades.</b> Every buy and every sell of TORII pays a{" "}
-              <b>{taxPct}% fee</b>. If you buy 1 ETH worth, about {taxPct} of every 100 goes to the
+              <b>{taxPct}% fee</b>. If you buy 1 BNB worth, about {taxPct} of every 100 goes to the
               protocol instead of to you. This is the only thing that funds everything below — no
               new tokens are ever printed.
             </li>
             <li className="step">
-              <b>The fee lands in the Treasury.</b> It arrives as ETH, automatically. Anyone can
+              <b>The fee lands in the Treasury.</b> It arrives as BNB, automatically. Anyone can
               press the button that moves it along; nobody special has to be online.
             </li>
             <li className="step">
@@ -76,7 +76,7 @@ export default function About() {
             </li>
             <li className="step">
               <b>Income goes to people who commit.</b> {100 - suitsPct}% to people who stake their
-              TORII, {suitsPct}% to people who stake a Suits NFT. Paid in ETH. You claim it whenever
+              TORII, {suitsPct}% to people who stake a Suits NFT. Paid in BNB. You claim it whenever
               you like — it does not expire.
             </li>
           </ol>
@@ -86,19 +86,19 @@ export default function About() {
       {/* ------------------------------------------------------------------ */}
       <div className="section">
         <p className="label">
-          If someone trades 1 ETH of TORII <span className="id">live numbers, not an illustration</span>
+          If someone trades 1 BNB of TORII <span className="id">live numbers, not an illustration</span>
         </p>
         <Panel>
           <div className="rows">
-            <Row k="Fee taken">{exTax.toFixed(4)} ETH ({taxPct}%)</Row>
+            <Row k="Fee taken">{exTax.toFixed(4)} BNB ({taxPct}%)</Row>
             <Row k="→ into the pot" na={exCorpus == null}>
-              {exCorpus != null ? `${exCorpus.toFixed(4)} ETH — raises what every token is worth` : DASH}
+              {exCorpus != null ? `${exCorpus.toFixed(4)} BNB — raises what every token is worth` : DASH}
             </Row>
             <Row k="→ to TORII stakers" na={exStakers == null}>
-              {exStakers != null ? `${exStakers.toFixed(4)} ETH` : DASH}
+              {exStakers != null ? `${exStakers.toFixed(4)} BNB` : DASH}
             </Row>
             <Row k="→ to staked Suits" na={exSuits == null}>
-              {exSuits != null ? `${exSuits.toFixed(4)} ETH, split across every staked Suit` : DASH}
+              {exSuits != null ? `${exSuits.toFixed(4)} BNB, split across every staked Suit` : DASH}
             </Row>
           </div>
           <p className="sub">
@@ -120,14 +120,14 @@ export default function About() {
           </Panel>
           <Panel label="Stake">
             <p className="sub" style={{ marginTop: 0 }}>
-              Lock TORII into the staking vault and receive a share of all income, paid in <b>ETH</b>,
+              Lock TORII into the staking vault and receive a share of all income, paid in <b>BNB</b>,
               not in more tokens. Unstake whenever you want — any income you already earned stays
               yours even after you leave.
             </p>
           </Panel>
           <Panel label="Redeem">
             <p className="sub" style={{ marginTop: 0 }}>
-              Hand your TORII back and take your share of the pot in ETH. Your tokens are destroyed,
+              Hand your TORII back and take your share of the pot in BNB. Your tokens are destroyed,
               which makes every remaining token worth slightly more.
             </p>
           </Panel>
@@ -204,12 +204,12 @@ export default function About() {
 
         <div className="notice danger">
           <b>The reserve is not a guarantee.</b> The person who controls the Treasury can withdraw
-          ETH from the pot to invest it elsewhere. That is intentional — it is how the pot is meant
+          BNB from the pot to invest it elsewhere. That is intentional — it is how the pot is meant
           to earn a return — but it means the amount backing each token can go <em>down</em> as well
           as up, and it is not a floor anyone is obliged to hold. Every withdrawal is recorded
           publicly on-chain.
           {r?.cumulativeWithdrawn != null && (
-            <> Taken out so far: <b>{formatEther(r.cumulativeWithdrawn)} ETH</b>.</>
+            <> Taken out so far: <b>{formatEther(r.cumulativeWithdrawn)} BNB</b>.</>
           )}
         </div>
 
@@ -264,10 +264,10 @@ export default function About() {
               </Row>
             ))}
             <Row k="Reserve right now" na={r?.navWad == null}>
-              {r?.navWad != null ? `${fmtSig(r.navWad)} ETH` : DASH}
+              {r?.navWad != null ? `${fmtSig(r.navWad)} BNB` : DASH}
             </Row>
             <Row k="Behind each token" na={r?.floorPerTokenWad == null}>
-              {r?.floorPerTokenWad != null ? `${fmtSig(r.floorPerTokenWad)} ETH` : DASH}
+              {r?.floorPerTokenWad != null ? `${fmtSig(r.floorPerTokenWad)} BNB` : DASH}
             </Row>
             <Row k="Tokens in circulation" na={r?.eligibleSupply == null}>
               {r?.eligibleSupply != null ? `${fmtGrouped(r.eligibleSupply, 0)} TORII` : DASH}

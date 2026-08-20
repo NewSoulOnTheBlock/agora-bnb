@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Panel, Stat, Row, Dot, Pill } from "./components";
-import { useSnapshot, useTaxHistory, useFloorHistory, useBeefy, useEthUsd } from "./useReads";
+import { useSnapshot, useFloorHistory, useBeefy, useEthUsd } from "./useReads";
 import { usdOf, fmtUsd } from "./price";
 import { fmtSig, fmtGrouped, bpsToPct, signedPct, shortAddr, DASH } from "./format";
-import { V4, PONS, TORII, ZERO, explorerAddr, TORII_TAX_BPS, ETH_USD_FEED, GMGN_URL } from "./chain";
+import {
+  PANCAKE, FLAP, TORII, ZERO, explorerAddr, TORII_TAX_BPS, CURVE_FEE_BPS,
+  ETH_USD_FEED, GMGN_URL, WBNB_ADDR,
+} from "./chain";
 import { readCurveState, type CurveState } from "./curve";
 
 export default function Floor() {
@@ -16,7 +19,6 @@ export default function Floor() {
     const t = setInterval(go, 15_000);
     return () => { alive = false; clearInterval(t); };
   }, []);
-  const tax = useTaxHistory(s?.pool.id, !!s?.pool.initialised);
 
   // The operator wallet is what holds the deployed positions, so that is the
   // address to scan — the Treasury itself never touches Beefy today.
@@ -31,7 +33,13 @@ export default function Floor() {
       : s?.reserve.navWad ?? null;
   const floor = useFloorHistory(TORII.treasury !== ZERO);
 
-  const cumulativeTax = tax.data?.length ? tax.data[tax.data.length - 1].cumulativeTax : null;
+  /**
+   * The cumulative-tax figure comes from the Treasury's own counter, not from a
+   * log scan. On this chain that is not a preference, it is the only correct
+   * option: free BSC endpoints serve about 75 minutes of history, so a scan
+   * would report a fraction of the total as though it were the total.
+   * `cumulativeTaxReceived` is complete by construction.
+   */
 
   return (
     <>
@@ -49,7 +57,7 @@ export default function Floor() {
 
         {curve && !curve.graduated && (
           <div className="notice">
-            <b>TORII is live on the Pons bonding curve.</b> Market price, the 4% creator tax and the
+            <b>TORII is live on the Flap bonding curve.</b> Market price, the 5% creator tax and the
             graduation figures below are read from the curve at{" "}
             <a className="link" href={explorerAddr(TORII.curve)} target="_blank" rel="noreferrer">
               {TORII.curve.slice(0, 10)}…
@@ -79,20 +87,20 @@ export default function Floor() {
           >
             <div className={`big${s?.reserve.floorPerTokenWad ? "" : " muted"}`}>
               {s?.reserve.floorPerTokenWad != null ? fmtSig(s.reserve.floorPerTokenWad) : DASH}
-              <span className="unit">ETH</span>
+              <span className="unit">BNB</span>
             </div>
             <p className="sub">
               Reported backing per token. Ratchets up on every taxed swap and every redemption, since
               the 5% haircut stays in the corpus. It is <b>not</b> a guaranteed floor — the operator can
-              withdraw corpus ETH to deploy into yield, so this reports what backs each token right now
+              withdraw corpus BNB to deploy into yield, so this reports what backs each token right now
               rather than a level the contract can hold.
             </p>
           </Panel>
 
-          <Panel label="Market price" id={s?.pool.initialised ? "uniswap v4 · StateView" : "pons curve"}>
+          <Panel label="Market price 市價" id={s?.pool.initialised ? "pancakeswap v2 · pair" : "flap curve"}>
             <div className={`big${(s?.pool.priceWad ?? curve?.priceWad) ? "" : " muted"}`}>
               {s?.pool.priceWad ? fmtSig(s.pool.priceWad) : curve ? fmtSig(curve.priceWad) : "—"}
-              <span className="unit">ETH</span>
+              <span className="unit">BNB</span>
             </div>
             <p className="sub">
               {s?.pool.initialised ? (
@@ -105,7 +113,7 @@ export default function Floor() {
                 </>
               ) : (
                 <>
-                  Priced from the bonding curve. Graduates into a Uniswap v4 pool at 4.2 ETH —
+                  Priced from the bonding curve. Graduates into a PancakeSwap V2 pair —
                   currently {curve ? `${curve.graduationPct.toFixed(2)}%` : "—"} of the way.
                 </>
               )}
@@ -133,21 +141,21 @@ export default function Floor() {
             <Stat
               k="Total backing"
               value={totalBacking != null ? fmtSig(totalBacking) : null}
-              unit="ETH"
+              unit="BNB"
               usd={usdOf(totalBacking, ethUsd)}
               note="NAV plus capital deployed at Beefy · the protocol's TVL"
             />
             <Stat
               k="In the Treasury"
               value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null}
-              unit="ETH"
+              unit="BNB"
               usd={usdOf(s?.reserve.navWad, ethUsd)}
               note="NAV — what the floor is computed from"
             />
             <Stat
               k="Deployed at Beefy"
               value={beefy.total != null ? fmtSig(beefy.total) : beefy.loading ? null : "0"}
-              unit="ETH"
+              unit="BNB"
               usd={usdOf(beefy.total, ethUsd)}
               note="live value of the operator's positions"
             />
@@ -165,16 +173,16 @@ export default function Floor() {
             <Stat
               k="Cumulative tax"
               value={s?.reserve.cumulativeTaxReceived != null ? fmtSig(s.reserve.cumulativeTaxReceived) : null}
-              unit="ETH"
+              unit="BNB"
               usd={usdOf(s?.reserve.cumulativeTaxReceived, ethUsd)}
-              note="everything the 4% has ever collected"
+              note="everything the 5% has ever collected"
             />
             <Stat
               k="Paid to stakers"
               value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
-              unit="ETH"
+              unit="BNB"
               usd={usdOf(s?.reserve.cumulativeIncomeDistributed, ethUsd)}
-              note="90% stTORII · 10% staked Suits"
+              note="100% stTORII — no Suits vault on this chain"
             />
             <Stat
               k="Tax to income"
@@ -186,19 +194,19 @@ export default function Floor() {
         </div>
 
         {/* ---- valuation ----
-             Dollar figures throughout come from the WETH/USDG pool's spot
+             Dollar figures throughout come from the WBNB/USDT pair's spot
              price, which is a DEX quote and not an oracle. It is fine for a
              readout and is deliberately kept away from anything that decides
              money — see `price.ts`. */}
         <div className="section">
           <p className="label">
-            Valuation <span className="id">USD derived from the WETH/USDG pool</span>
+            Valuation <span className="id">USD derived from the WBNB/USDT pair</span>
           </p>
           <div className="grid c4">
             <Stat
               k="TVL"
               value={totalBacking != null ? fmtSig(totalBacking) : null}
-              unit="ETH"
+              unit="BNB"
               usd={usdOf(totalBacking, ethUsd)}
               note="reserve + deployed, what the protocol holds"
             />
@@ -209,7 +217,7 @@ export default function Floor() {
                   ? fmtSig((s.pool.priceWad * s.reserve.eligibleSupply) / 10n ** 18n)
                   : null
               }
-              unit="ETH"
+              unit="BNB"
               usd={
                 s?.pool.priceWad != null && s?.reserve.eligibleSupply != null
                   ? usdOf((s.pool.priceWad * s.reserve.eligibleSupply) / 10n ** 18n, ethUsd)
@@ -229,34 +237,47 @@ export default function Floor() {
               note="locked in the stTORII vault"
             />
             <Stat
-              k="ETH price"
+              k="BNB price"
               value={ethUsd != null ? fmtUsd(ethUsd) : null}
-              note="spot from WETH/USDG · display only, never priced into the floor"
+              note="spot from WBNB/USDT · display only, never priced into the floor"
             />
           </div>
         </div>
 
-        {/* ---- the Pons fee pipeline: fully live today ---- */}
+        {/* ---- the Flap tax pipeline: pushed, not pulled ---- */}
         <div className="section">
           <p className="label">
-            Tax pipeline <span className="id">§14.4 · live from V2MemeHook</span>
+            Tax pipeline <span className="id">live from ToriiVault</span>
           </p>
           <div className="grid c3">
-            <Stat k="Accrued in hook"
+            {/* The three states tax passes through, in order. Named for what
+                the vault actually calls them — the old labels were "accrued in
+                hook" and "claimable in escrow", which describe a pull-based
+                pipeline that does not exist on this chain. */}
+            <Stat k="Waiting in the vault"
+              value={s?.fees.pendingFeesEth !== null && s?.fees.pendingFeesEth !== undefined
+                ? fmtSig(s.fees.pendingFeesEth) : null}
+              unit="BNB"
+              usd={usdOf(s?.fees.pendingFeesEth, ethUsd)}
+              note="pendingQuote() — recognised, awaiting forwardQuote()" />
+            <Stat k="Unsold tax token"
               value={s?.fees.pendingCreatorTaxEth !== null && s?.fees.pendingCreatorTaxEth !== undefined
-                ? fmtSig(s.fees.pendingCreatorTaxEth) : null}
-              unit="ETH"
-              note="pendingCreatorTax — only Pons's operator can sweep this" />
-            <Stat k="Claimable in escrow"
+                ? fmtGrouped(s.fees.pendingCreatorTaxEth, 0) : null}
+              unit="TORII"
+              note="taxed after graduation · worth nothing to the floor until sold" />
+            <Stat k="Forwarded to the Treasury"
               value={s?.fees.escrowBalanceEth !== null && s?.fees.escrowBalanceEth !== undefined
                 ? fmtSig(s.fees.escrowBalanceEth) : null}
-              unit="ETH"
-              note="V2FeeEscrow.balanceOf(FeeSink)" />
-            <Stat k="Cumulative tax"
-              value={cumulativeTax !== null ? fmtSig(cumulativeTax) : null}
-              unit="ETH"
-              note={tax.loading ? "scanning logs…" : `${tax.data?.length ?? 0} HookFeeCollected events`} />
+              unit="BNB"
+              usd={usdOf(s?.fees.escrowBalanceEth, ethUsd)}
+              note="cumulativeForwarded() — all time" />
           </div>
+          <p className="sub">
+            Flap <em>pushes</em> the {bpsToPct(TORII_TAX_BPS)} into <code>ToriiVault</code>, which
+            recognises it by balance delta. Nothing is gated on a keeper we do not control — but
+            <code> forwardQuote()</code> is still permissionless and still has to be called, so BNB
+            sitting in the first box has arrived and not yet moved. Anyone can move it.
+          </p>
         </div>
 
         {/* ---- proof: every input, traceable ---- */}
@@ -275,37 +296,53 @@ export default function Floor() {
                   {s?.token.name ?? DASH} {s?.token.symbol ? `(${s.token.symbol})` : ""}
                 </a>
               </Row>
-              <Row k="poolId (keccak256 of PoolKey)">{s?.pool.id ?? DASH}</Row>
-              <Row k="PoolKey.currency0">
-                {s?.pool.key.currency0 === ZERO ? "0x000…000 (native ETH)" : shortAddr(s?.pool.key.currency0)}
-              </Row>
-              <Row k="PoolKey.currency1">{shortAddr(s?.pool.key.currency1)}</Row>
-              <Row k="PoolKey.fee / tickSpacing">
-                {s?.pool.key.fee ?? DASH} / {s?.pool.key.tickSpacing ?? DASH} (dynamic fee via hook)
-              </Row>
-              <Row k="PoolKey.hooks">
-                <a className="rv" href={explorerAddr(PONS.memeHook)} target="_blank" rel="noreferrer">
-                  {shortAddr(PONS.memeHook)} · V2MemeHook
+              <Row k="PancakeSwap V2 pair">
+                <a className="rv" href={explorerAddr(s?.pool.id ?? ZERO)} target="_blank" rel="noreferrer">
+                  {shortAddr(s?.pool.id)}
                 </a>
               </Row>
-              <Row k="sqrtPriceX96">{s?.pool.sqrtPriceX96?.toString() ?? DASH}</Row>
-              <Row k="tick / liquidity">
-                {s?.pool.tick ?? DASH} / {s?.pool.liquidity?.toString() ?? DASH}
+              <Row k="token0">
+                {s?.pool.pair.token0 ? shortAddr(s.pool.pair.token0) : DASH}
+                {s?.pool.pair.token0?.toLowerCase() === WBNB_ADDR.toLowerCase() && " · WBNB"}
               </Row>
-              <Row k="Creator tax (set at launch)">{bpsToPct(TORII_TAX_BPS)} · cap {bpsToPct(PONS.maxCreatorTaxBps)}</Row>
-              <Row k="Pool fee → creator share">
-                {bpsToPct(s?.fees.hookFeeBps ?? PONS.hookFeeBps)} → {bpsToPct(PONS.creatorFeeShareBps)}
+              <Row k="token1">
+                {s?.pool.pair.token1 ? shortAddr(s.pool.pair.token1) : DASH}
+                {s?.pool.pair.token1?.toLowerCase() === WBNB_ADDR.toLowerCase() && " · WBNB"}
               </Row>
-              <Row k="feeSweepOperator (not ours)">
-                <a className="rv" href={explorerAddr(s?.fees.feeSweepOperator ?? PONS.feeSweepOperator)} target="_blank" rel="noreferrer">
-                  {shortAddr(s?.fees.feeSweepOperator ?? PONS.feeSweepOperator)}
+              <Row k="Reserves (token0 / token1)">
+                {s?.pool.reserve0?.toString() ?? DASH} / {s?.pool.reserve1?.toString() ?? DASH}
+              </Row>
+              <Row k="Factory">
+                <a className="rv" href={explorerAddr(PANCAKE.factory)} target="_blank" rel="noreferrer">
+                  {shortAddr(PANCAKE.factory)} · PancakeFactory
                 </a>
               </Row>
-              <Row k="StateView">
-                <a className="rv" href={explorerAddr(V4.stateView)} target="_blank" rel="noreferrer">{shortAddr(V4.stateView)}</a>
+              <Row k="Router">
+                <a className="rv" href={explorerAddr(PANCAKE.router)} target="_blank" rel="noreferrer">
+                  {shortAddr(PANCAKE.router)} · PancakeRouter02
+                </a>
               </Row>
-              <Row k="PoolManager">
-                <a className="rv" href={explorerAddr(V4.poolManager)} target="_blank" rel="noreferrer">{shortAddr(V4.poolManager)}</a>
+              <Row k="Creator tax (fixed at launch)">
+                {bpsToPct(TORII_TAX_BPS)} · Flap allows 1/3/5/10% only
+              </Row>
+              <Row k="Pool fee">{bpsToPct(PANCAKE.feeBps)} · constant product, charged by the pair</Row>
+              <Row k="Flap fee">{bpsToPct(CURVE_FEE_BPS)}</Row>
+              <Row k="Tax vault (Flap pushes here)">
+                {TORII.feeSink === ZERO ? (
+                  "not deployed"
+                ) : (
+                  <a className="rv" href={explorerAddr(TORII.feeSink)} target="_blank" rel="noreferrer">
+                    {shortAddr(TORII.feeSink)} · ToriiVault
+                  </a>
+                )}
+              </Row>
+              <Row k="Flap VaultPortal">
+                <a className="rv" href={explorerAddr(FLAP.vaultPortal)} target="_blank" rel="noreferrer">
+                  {shortAddr(FLAP.vaultPortal)} · deploys the vault at launch
+                </a>
+              </Row>
+              <Row k="Flap Portal">
+                <a className="rv" href={explorerAddr(FLAP.portal)} target="_blank" rel="noreferrer">{shortAddr(FLAP.portal)}</a>
               </Row>
               <Row k="Treasury" na={TORII.treasury === ZERO}>
                 {TORII.treasury === ZERO ? "not deployed" : shortAddr(TORII.treasury)}
@@ -316,7 +353,7 @@ export default function Floor() {
               <Row k="Redeemer" na={TORII.redeemer === ZERO}>
                 {TORII.redeemer === ZERO ? "not deployed" : shortAddr(TORII.redeemer)}
               </Row>
-              <Row k="ETH/USD feed" na={!ETH_USD_FEED}>
+              <Row k="BNB/USD feed" na={!ETH_USD_FEED}>
                 {ETH_USD_FEED ?? "unset — USD figures intentionally withheld"}
               </Row>
               <Row k="Floor history" na={!floor.data?.length}>

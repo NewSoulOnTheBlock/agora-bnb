@@ -61,7 +61,7 @@ export default function StakePitch() {
 
   const windowHours = income && income.windowSec > 0 ? income.windowSec / 3600 : null;
 
-  /** ETH per day, measured across the same window. Not extrapolated further. */
+  /** BNB per day, measured across the same window. Not extrapolated further. */
   const perDay =
     income && windowHours && windowHours > 0
       ? (Number(income.total) / 1e18 / windowHours) * 24
@@ -90,7 +90,7 @@ export default function StakePitch() {
         <Panel label="Paid to stakers, so far" id="not a projection — money already distributed">
           <div className={`big${paid ? "" : " muted"}`}>
             {paid !== null ? fmtSig(paid) : DASH}
-            <span className="unit">ETH</span>
+            <span className="unit">BNB</span>
           </div>
           {usdOf(paid, ethUsd) && (
             <div className="pitch-usd">≈ {usdOf(paid, ethUsd)}</div>
@@ -114,7 +114,7 @@ export default function StakePitch() {
             <Row k="Pace across that window">
               {perDay !== null ? (
                 <>
-                  {perDay.toFixed(4)} ETH/day
+                  {perDay.toFixed(4)} BNB/day
                   {ethUsd !== null && (
                     <span className="muted"> · {fmtUsd(perDay * ethUsd)}/day</span>
                   )}
@@ -124,7 +124,7 @@ export default function StakePitch() {
             <Row k="Sitting unclaimed">
               {unclaimed !== null ? (
                 <>
-                  {fmtSig(unclaimed)} ETH
+                  {fmtSig(unclaimed)} BNB
                   {usdOf(unclaimed, ethUsd) && (
                     <span className="muted"> · {usdOf(unclaimed, ethUsd)}</span>
                   )}
@@ -158,7 +158,7 @@ export default function StakePitch() {
           <Stat
             k="Your share pays"
             value={wouldHaveEarned !== null ? fmtSig(wouldHaveEarned) : null}
-            unit="ETH"
+            unit="BNB"
             usd={usdOf(wouldHaveEarned, ethUsd)}
             note="what the amount below would have earned"
           />
@@ -209,7 +209,7 @@ export default function StakePitch() {
                 Would have earned over {windowHours !== null ? `${windowHours.toFixed(1)}h` : "the window"}
               </span>
               <span className="qv">
-                {wouldHaveEarned !== null ? `${fmtSig(wouldHaveEarned)} ETH` : DASH}
+                {wouldHaveEarned !== null ? `${fmtSig(wouldHaveEarned)} BNB` : DASH}
               </span>
             </div>
             {ethUsd !== null && wouldHaveEarned !== null && (
@@ -222,7 +222,7 @@ export default function StakePitch() {
               <span className="qk">Cost to acquire, at the pool price</span>
               <span className="qv">
                 {parsed !== null && priceWad !== null
-                  ? `${fmtSig((parsed * priceWad) / 10n ** 18n)} ETH`
+                  ? `${fmtSig((parsed * priceWad) / 10n ** 18n)} BNB`
                   : DASH}
               </span>
             </div>
@@ -255,7 +255,7 @@ export default function StakePitch() {
               yours even after you unstake — accrual is settled before any transfer
             </Row>
             <Row k="Paid in">
-              ETH, not more TORII — so the reward is not diluting you
+              BNB, not more TORII — so the reward is not diluting you
             </Row>
           </div>
           <p className="sub">

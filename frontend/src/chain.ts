@@ -1,131 +1,296 @@
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, FetchRequest } from "ethers";
 
-// ---------------------------------------------------------------------------
-// Robinhood Chain (EVM, Arbitrum Orbit L2)
-// ---------------------------------------------------------------------------
-export const CHAIN_ID = 4663;
-export const CHAIN_ID_HEX = "0x1237";
+/**
+ * ---------------------------------------------------------------------------
+ * BNB Chain (56)
+ * ---------------------------------------------------------------------------
+ *
+ * This file is the whole difference between the two deployments. TORII on BNB
+ * is not the Robinhood Chain build with a different RPC — three of its four
+ * external dependencies are different contracts entirely:
+ *
+ *   Robinhood Chain (4663)          BNB Chain (56)
+ *   ─────────────────────────       ─────────────────────────
+ *   Pons v2 bonding curve           Flap
+ *   Uniswap v4 + StateView          PancakeSwap V2 pairs
+ *   FeeSink pulls tax               ToriiVault is pushed tax
+ *   4% creator tax                  5% (Flap offers 1/3/5/10 only)
+ *   Suits ERC-721 staking           — no BNB deployment, dropped
+ *
+ * Everything verified live against chain 56 on 2026-08-20; each address below
+ * says what was checked rather than only where it came from.
+ */
 
-// The PUBLIC endpoint is deliberately preferred over the Alchemy key used by
-// memebrokers-evm, for two reasons:
-//   1. No key ends up in the shipped bundle (the Memebrokers key leaked that way).
-//   2. Alchemy's free tier caps eth_getLogs at a 10-BLOCK range, which makes
-//      history scanning impossible. The public RPC accepts ~500k-block ranges.
-export const RPC_URL = "https://rpc.mainnet.chain.robinhood.com";
+export const CHAIN_ID = 56;
+export const CHAIN_ID_HEX = "0x38";
 
-// Largest eth_getLogs span the public RPC will accept. 1_000_000 fails.
-export const MAX_LOG_SPAN = 450_000;
+/**
+ * ## Reads work everywhere. Logs almost nowhere.
+ *
+ * `eth_call` is served by every public BSC endpoint, so balances, reserves and
+ * every contract getter are free and fast. `eth_getLogs` is a different story,
+ * and it was measured rather than assumed — eight public endpoints, 2026-08-20:
+ *
+ *   bsc-dataseed.bnbchain.org        eth_getLogs refused outright
+ *   bsc-dataseed1.defibit.io         refused
+ *   1rpc.io/bnb                      refused
+ *   bsc.blockrazor.xyz               refused
+ *   bsc-mainnet.public.blastapi.io   refused
+ *   bsc.meowrpc.com                  "method not supported"
+ *   rpc.ankr.com/bsc                 requires a key
+ *   bsc-rpc.publicnode.com           works, but only ~9,960 blocks deep
+ *
+ * BSC now produces a block every **0.45 seconds**, so that best case is about
+ * **1.2 hours** of history. Nothing that needs a day of events — the candle
+ * chart, the distribution history — can run on a free endpoint here. That is a
+ * property of the chain's public infrastructure, not of this code.
+ *
+ * So the app degrades honestly: everything read by `eth_call` is always live,
+ * and the log-backed views say what they are missing instead of rendering an
+ * empty chart as though the token had never traded. Point `VITE_BSC_RPC_URL` at
+ * an archive endpoint and they light up with no other change.
+ */
+export const RPC_URL =
+  (import.meta.env?.VITE_BSC_RPC_URL as string | undefined) ??
+  "https://bsc-dataseed.bnbchain.org";
 
-export const EXPLORER = "https://robinhoodchain.blockscout.com";
+/**
+ * The log endpoint, kept separate from the read endpoint on purpose.
+ *
+ * The fastest dataseed cannot serve logs at all, and the one that can is slower
+ * for everything else. Splitting them means the pages everyone looks at are not
+ * paying for a capability only two views need.
+ */
+export const LOG_RPC_URL =
+  (import.meta.env?.VITE_BSC_LOG_RPC_URL as string | undefined) ??
+  "https://bsc-rpc.publicnode.com";
+
+/**
+ * How far back logs can be requested.
+ *
+ * publicnode caps by **result count** — its own error is "query exceeds max
+ * results 20000, retry with the range X-Y" — and separately refuses anything
+ * older than roughly ten thousand blocks without a token. For a token as quiet
+ * as a fresh launch the result cap is not the binding one; the archive depth
+ * is. Scanners here split on the suggested range when the first bites and stop
+ * at the wall when the second does.
+ */
+export const MAX_LOG_SPAN = 9_000;
+
+/**
+ * Total depth a log scan may reach, in blocks.
+ *
+ * Without this the scanner walked its full `maxChunks` — six chunks of 9,000 —
+ * and five of them landed past the archive wall, so every page load fired five
+ * requests that could only ever come back **403 Archive requests require a
+ * personal token**. They were caught and ignored, which is worse than it
+ * sounds: the console filled with failures that looked like a bug in this code
+ * and were actually the endpoint doing exactly what it says it does.
+ *
+ * So the scan stops at the wall instead of knocking on it. Measured by binary
+ * search against publicnode: 9,960 blocks. 9,000 leaves headroom for the wall
+ * moving as the head advances mid-scan.
+ *
+ * A configured `VITE_BSC_LOG_RPC_URL` is assumed to be an archive node and is
+ * not clamped — that is the whole point of setting it.
+ */
+export const HAS_ARCHIVE = !!import.meta.env?.VITE_BSC_LOG_RPC_URL;
+export const MAX_LOG_DEPTH = HAS_ARCHIVE ? Number.MAX_SAFE_INTEGER : 9_000;
+
+/** Seconds per block, measured over 1000 blocks. Used to size log windows. */
+export const BLOCK_SECONDS = 0.45;
+
+export const EXPLORER = "https://bscscan.com";
 
 export const CHAIN_PARAMS = {
   chainId: CHAIN_ID_HEX,
-  chainName: "Robinhood Chain",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  chainName: "BNB Smart Chain",
+  nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
   rpcUrls: [RPC_URL],
   blockExplorerUrls: [EXPLORER],
 };
 
-export const readProvider = new JsonRpcProvider(RPC_URL, CHAIN_ID, {
-  staticNetwork: true,
-});
+function provider(url: string) {
+  const req = new FetchRequest(url);
+  // BSC public endpoints answer a single call quickly and a JSON-RPC batch with
+  // a 429. Multicall3 already collapses the reads that matter into one call, so
+  // there is nothing to gain from batching on top of it.
+  return new JsonRpcProvider(req, CHAIN_ID, { staticNetwork: true, batchMaxCount: 1 });
+}
+
+export const readProvider = provider(RPC_URL);
+
+/** Only for `eth_getLogs`. See `LOG_RPC_URL`. */
+export const logProvider = RPC_URL === LOG_RPC_URL ? readProvider : provider(LOG_RPC_URL);
 
 export const ZERO = "0x0000000000000000000000000000000000000000";
 
-// ---------------------------------------------------------------------------
-// Uniswap v4 — verified on chain 4663, 2026-08-17.
-// See docs/tithe-endowment-token-design.md §14 for how each was disambiguated.
-// This chain hosts 34 contracts named "PoolManager" and 36 named
-// "UniversalRouter"; do NOT resolve these by name search.
-// ---------------------------------------------------------------------------
-export const V4 = {
-  poolManager: "0x8366a39CC670B4001A1121B8F6A443A643e40951",
-  universalRouter: "0x8876789976dEcBfCbBbe364623C63652db8C0904",
-  permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-  positionManager: "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
-  stateView: "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
-
-  // RESOLVED 2026-08-17. All 12 candidates static-called quoteExactInputSingle
-  // against a live Pons pool and returned BYTE-IDENTICAL amountOut, so they are
-  // equivalent deployments and any one works. The quote came in 207 bps under
-  // spot, confirming the quoter executes the hook and includes its dynamic fee.
-  //
-  // NEVER call this inside a transaction: quoteExactInputSingle is non-view by
-  // declaration (it reverts internally and catches), so it must go through
-  // eth_call / staticCall only.
-  quoter: "0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94",
-} as const;
+/** Native BNB is spelled `address(0)` in this codebase, as ETH was on 4663. */
+export const NATIVE = ZERO;
 
 // ---------------------------------------------------------------------------
-// Pons v2
-// ---------------------------------------------------------------------------
-export const PONS = {
-  launchFactory: "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
-  memeHook: "0xE5e702641Ea86F4ae6cC3cDaeD2B886f976Be044", // PoolKey.hooks
-  feeEscrow: "0xd3AFEB2a57f70eF218Aa82451c51B2fb0416Ac9e",
-  feeSweepOperator: "0x49BbF2b70955Fb3a106e084D4BFDa92d334573d2", // Pons-controlled
-  locker: "0x267444D099b10fB5Ed7c3Cc7B7c767AdcA574952",
-
-  // Verified launch-config constants.
-  poolFee: 0, // no static LP fee — the hook applies fees dynamically
-  tickSpacing: 200,
-  graduationThresholdWei: 4_200_000_000_000_000_000n, // 4.2 ETH
-  maxCreatorTaxBps: 1000, // 10% cap; TITHE uses 400
-  hookFeeBps: 100, // 1% pool fee
-  creatorFeeShareBps: 7000, // creator's share of the pool fee
-  snipeTaxStartBps: 9900, // 99% for the first 3 seconds after launch
-  snipeTaxSeconds: 3,
-} as const;
-
-// VERIFIED on the live curve 2026-08-17: creatorTaxBps() == 400. Not an assumption.
-export const TORII_TAX_BPS = 400; // 4%
-export const CURVE_FEE_BPS = 100; // 1% — curve feeBps()
-
-// ---------------------------------------------------------------------------
-// TORII. The token and its bonding curve are LIVE. The reserve contracts are not
-// written yet, so they stay at the zero address and every read against them
-// resolves to `null` — the UI renders an honest "not deployed" instead of zeros.
+// PancakeSwap V2 — where TORII trades after it graduates off Flap
 // ---------------------------------------------------------------------------
 /**
- * ---------------------------------------------------------------------------
- * v2 — LIVE on chain 4663. Verified 2026-08-17, 18/18 checks.
- * ---------------------------------------------------------------------------
+ * V2, not V3, and not by accident: Flap graduates a token into a PancakeSwap
+ * **V2** pair, and `ToriiVault.convertAndForward` sells its token leg through
+ * the V2 router. Reading a V3 pool would be reading a market the protocol does
+ * not use.
  *
- * The v1 token (`0x6853618673D952Fe602616F6f896cC7be8e25fCc`) is **dead and must
- * never be wired back in.** `transferCreatorFeeRecipient` was pointed at the
- * Treasury rather than the FeeSink; because that call reassigns the curve's
- * `deployer` — the only address permitted to call `sweepFees` — the fee stream
- * became collectable only by a contract structurally incapable of collecting it,
- * and the change was not reversible.
+ * V2 is also the easier read. A pair is two `uint112` reserves — no
+ * `sqrtPriceX96`, no tick maths, no separate `StateView` contract, and no
+ * poolId to derive. Most of `poolkey.ts` simply has no counterpart here.
  *
- * v2 fixed it by ORDERING: contracts deployed first, then the token launched
- * with `params.creatorFeeRecipient` already set to the FeeSink, so no
- * post-launch transfer step ever existed to get wrong.
+ * Verified by behaviour rather than by bytecode presence, which is the lesson
+ * from `55f97ac`: the router was asked what it thinks it is.
  *
- * Confirmed on chain rather than assumed:
- *   curve.deployer()          == feeSink   (the check v1 failed)
- *   sweepFees from feeSink    ALLOWED
- *   sweepFees from the EOA    BLOCKED      (rights genuinely moved)
- *   FeeSink.owner()           == 0x0       (renounced by setCurve)
- *   Treasury.torii/redeemer/distributor all bound
+ *   router.WETH()    == 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c  (WBNB)
+ *   router.factory() == 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73
+ */
+export const PANCAKE = {
+  router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+  factory: "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+  /** 0.25% total, of which 0.17% goes to LPs. Constant-product after fee. */
+  feeBps: 25,
+} as const;
+
+/** Wrapped BNB. Confirmed `symbol() == "WBNB"`, `decimals() == 18`. */
+export const WBNB_ADDR = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
+
+/** Binance-Peg USDT on BSC. 18 decimals here, unlike the 6 it has on Ethereum. */
+export const USDT_ADDR = "0x55d398326f99059fF775485246999027B3197955";
+export const USDT_DECIMALS = 18;
+
+/**
+ * The WBNB/USDT PancakeSwap V2 pair — the dollar quote for BNB.
+ *
+ * Read live: `token0` is USDT and `token1` is WBNB, so the ratio is inverted
+ * relative to what the ordering suggests. Cross-checked at the time of writing
+ * against the pair's own reserves: **BNB ≈ $649.33**.
+ *
+ * Display only, exactly as on 4663. It is a spot DEX price, manipulable inside
+ * a block, and it must never reach the floor, redemption or any adapter NAV.
+ */
+export const WBNB_USDT_PAIR = "0x16b9a82891338f9bA80E2D6970FddA79D1eb0daE";
+
+// ---------------------------------------------------------------------------
+// Flap — the launchpad, and the source of the tax
+// ---------------------------------------------------------------------------
+/**
+ * Flap replaces Pons, and inverts the mechanism.
+ *
+ * On Pons the tax accrued inside a hook and had to be *pulled* by a keeper we
+ * did not control — which is how v1 stalled, with tax sitting unreachable in
+ * `pendingCreatorTax`. Flap **pushes** the tax into a vault we supply, so there
+ * is no sweep to wait on and no third party in the path.
+ *
+ * `ToriiVault` is that vault. Flap's VaultPortal deploys it during the launch
+ * from `ToriiVaultFactory`, so its address is not known until the token exists —
+ * it lands in `TORII.feeSink` below, keeping the same name the rest of the app
+ * already uses for "the contract the tax arrives at".
+ *
+ * Portal, Guardian and VaultPortal are all 2,882-byte proxies; the addresses
+ * are the ones `flap/VaultBase.sol` resolves for `block.chainid == 56`, so the
+ * frontend and the contracts cannot drift apart on them.
+ */
+export const FLAP = {
+  vaultPortal: "0x90497450f2a706f1951b5bdda52B4E5d16f34C06",
+  portal: "0xe2cE6ab80874Fa9Fa2aAE65D277Dd6B8e65C9De0",
+  guardian: "0x9e27098dcD8844bcc6287a557E0b4D09C86B8a4b",
+} as const;
+
+/**
+ * 5%, not 4%.
+ *
+ * Flap permits 1/3/5/10% only, so the 4% used on Robinhood Chain is not
+ * expressible here. `ToriiVaultFactory._validateBeforeLaunch` refuses to launch
+ * unless the split is 500/500 bps and `vaultBps` is 10000 — the v1 lesson
+ * enforced on-chain rather than left to whoever fills in the launch form.
+ */
+export const TORII_TAX_BPS = 500; // 5%
+
+/** Flap's own cut of a trade, separate from the creator tax. */
+export const CURVE_FEE_BPS = 100;
+
+// ---------------------------------------------------------------------------
+// TORII on BNB — LIVE. Verified on chain 56, 2026-08-20.
+// ---------------------------------------------------------------------------
+/**
+ * Token name is 神社 (shénshè, "shrine"); the symbol is TORII. Supply is a flat
+ * 1,000,000,000, eighteen decimals, and the token itself is a 45-byte minimal
+ * proxy deployed by Flap.
+ *
+ * ## There are TWO Treasury contracts on this chain, and only one is wired
+ *
+ * Both hold identical 11,051-byte bytecode and share the same owner, so nothing
+ * about either address tells you which is which. The difference is entirely in
+ * their state, read live:
+ *
+ *   0x2384b63A…  agora/feeSink/distributor/redeemer  all set     <- LIVE
+ *   0x9839E620…  every one of them address(0)                    <- empty
+ *
+ * And the satellites agree with the first: `Redeemer.treasury()` and
+ * `Vault.treasury()` both return `0x2384b63A…`.
+ *
+ * This matters more than a typo would, because wiring the empty one does not
+ * fail. `nav()`, `eligibleSupply()` and `floorPerToken()` all answer **0**
+ * rather than reverting, so the Reserve page would render a complete, confident
+ * dashboard reporting a protocol with nothing in it. That is the exact failure
+ * this codebase keeps designing against, and here it is available as a
+ * copy-paste mistake.
+ *
+ * If these ever need to change, take them from what the *satellites* point at,
+ * not from a deploy log — the satellites cannot be out of date about
+ * themselves.
  */
 export const TORII: {
   token: string; curve: string; deployer: string;
   feeSink: string; treasury: string; stakedAgora: string; redeemer: string;
   stakedSuits: string; distributor: string;
 } = {
-  token: "0x286b4b456Bd10FD1745A7b7B33f25a804DDf5F04",
-  curve: "0x05CDABCA3e464e00a91B81021dc881e2e8238fEE",
-  deployer: "0x2Fb89C8ce53E0527BC29e0861c4bEE1331d39d19",
+  /** 神社 · TORII. `Treasury.agora()` and `Vault.taxToken()` both name it. */
+  token: "0x5830D9306B7EDf396C1f3fc023fDDcc75Ae97777",
 
-  feeSink: "0xb8Bc3E208cAA463b96c0A62c23E88905a7CEbB7E",
-  treasury: "0x7A3B8322dd85C6e9F24D3A0a8D66514ad0E26C5c",
+  /**
+   * Flap's bonding curve. Not yet known to the frontend: the token has NOT
+   * graduated — `PancakeFactory.getPair` still returns address(0) for the
+   * TORII/WBNB pair — so trading is entirely on Flap's own contract, which is
+   * per-launch and not derivable from the token address.
+   */
+  curve: (import.meta.env?.VITE_TORII_CURVE as string) || ZERO,
 
-  stakedAgora: "0x92dEbC6a1A8afE872EEb6aBac05DC3Fb1347D463",
-  redeemer: "0x6315505083eBB08ABf26CC70123D2af6D49184C0",
-  stakedSuits: "0xE76Cb0cc3EcA2959a8384A5a0Fe00A3EA0E5e1A3",
-  distributor: "0xf422916f139CB003B0FDC36edC73a816D17B914b",
+  deployer: "0x442a46D9364abf5CE274956cC7563B1189541cF7",
+
+  /** `bnb/ToriiVault` — Flap pushes the 5% here. Holds real BNB already. */
+  feeSink: "0x0938F48DC611684F4f06C38471BfE8454d88c9A4",
+
+  /** The wired one. See the note above before changing this. */
+  treasury: "0x2384b63A5D58696FC01BceA32D5416b4864BBE1a",
+
+  /** stTORII — ERC-4626 over TORII. 21 decimals, see below. */
+  stakedAgora: "0x47c5608b9cA68Fd78F2bBAf89f29cc23887b55d6",
+  redeemer: "0xcF4894339cD07c9577e870ae213f4e9bd71e3fb1",
+
+  /** Permanently zero on BNB — the Suits collection is a 4663 contract. */
+  stakedSuits: ZERO,
+
+  /** `bnb/ToriiDistributor`. No `treasury()` getter: it has no owner and no
+   *  second sink, so there is nothing for it to be bound to. */
+  distributor: "0xE675ebE3Ee9764064652aa1d00fF60b4971Addcc",
 };
+
+/** `ToriiVaultFactory` — Flap constructs the vault from this at launch. */
+export const TORII_VAULT_FACTORY = "0xb7F484436fAc0E9BB341931250015d97A2Ca5Bb4";
+
+/**
+ * The pair TORII will trade in once Flap graduates it.
+ *
+ * Derived, not looked up — a PancakeSwap V2 pair address is a pure function of
+ * its two tokens, so this is knowable before the pair exists. `readPoolState`
+ * asks the factory whether it has been created yet, which is how "not
+ * graduated" stays distinguishable from "graduated but no liquidity".
+ */
+export const TORII_WBNB_PAIR = "0x38dfBf0cd27270375a7D9A7588a794B4e0995bCf";
 
 /**
  * stTORII does **not** have 18 decimals. It has 21.
@@ -134,7 +299,7 @@ export const TORII: {
  * defence against the classic 4626 first-depositor donation attack — and
  * ERC-4626 defines `decimals() = underlying decimals + offset`. So one whole
  * stTORII is `1e21`, and it is still worth exactly one TORII: the share price
- * never legitimately moves, because rewards are ETH and live outside
+ * never legitimately moves, because rewards are BNB and live outside
  * `totalAssets()`.
  *
  * Formatting a share balance through `formatEther` therefore prints it **1000×
@@ -143,186 +308,87 @@ export const TORII: {
  * Nothing on-chain is affected: the reward accumulator divides and multiplies
  * by the same supply, so the offset cancels, and the floor is computed from
  * TORII's own `totalSupply()`, never the vault's.
+ *
+ * This was a live display bug on the other chain before it was caught. The
+ * contract is the same source, so the trap is the same here.
  */
 export const ST_TORII_DECIMALS = 21;
 
+// ---------------------------------------------------------------------------
+// Suits — not on this chain
+// ---------------------------------------------------------------------------
 /**
- * The Suits ERC-721 — LIVE and independent of the relaunch.
- * SeaDrop clone, fully minted 1111/1111, chain 4663.
+ * The Suits collection lives on chain 4663 and has no BNB deployment, so the
+ * whole NFT side is off here: no tab, no folder, no share of income.
  *
- * Note it is NOT ERC721Enumerable, so the UI cannot list a wallet's token IDs
- * from the chain alone; holders enter IDs manually and the app verifies
- * ownership before offering to stake them.
- *
- * A Limit Break transfer validator is active at
- * `0xA000027A9B2802E1ddf7000061001e5c005A0000`. Its current policy permits
- * transfers into a contract, which is what staking needs, but the collection
- * owner can tighten it at any time.
+ * `ToriiDistributor` on BNB reflects that in the contract rather than only in
+ * the UI — losing the second sink removed the split, `suitsBps`, the reroute
+ * logic and `Ownable` with it, so that contract has no privileged caller at
+ * all. `SUITS_SHARE_BPS` is therefore 0 and stakers receive the whole income
+ * share, not 90% of it.
  */
-export const SUITS_NFT = "0x3ac7beb099c560f5a09bd822621327d8768f0625";
-export const SUITS_SUPPLY = 1111;
-export const SUITS_VALIDATOR = "0xA000027A9B2802E1ddf7000061001e5c005A0000";
-/** Secondary market. Where a would-be staker goes to acquire a Suit. */
-export const SUITS_MARKET = "https://opensea.io/collection/suitsonchain";
+export const SUITS_STAKING_ENABLED = false;
+export const SUITS_SHARE_BPS = 0;
+export const SUITS_NFT = ZERO;
+export const SUITS_SUPPLY = 0;
+export const SUITS_VALIDATOR = ZERO;
+export const SUITS_MARKET = "";
 
-/**
- * Suits staking is ENABLED — the transfer validator no longer blocks it.
- *
- * ## What used to be wrong
- *
- * The collection sat at Limit Break transfer-security **level 3**, "allowlisted
- * operators only". `StakedSuits.stake()` calls `suits.transferFrom(owner,
- * vault, id)` with the *vault* as `msg.sender`, which makes the vault an
- * operator, and it was not on the allowlist. Control tests at the time showed
- * an owner-initiated transfer into the vault succeeding and a vault-as-operator
- * transfer reverting — the operator policy, not the destination and not a
- * missing approval, so no amount of approving fixed it.
- *
- * ## Re-verified on chain 4663, and it now passes
- *
- * `eth_estimateGas` on `StakedSuits.stake([id])` from a holder returns
- * **150,821 gas** for every token tried, rather than reverting. The control
- * still holds — a caller with no rights reverts — so the node is enforcing
- * `msg.sender` and the simulation is meaningful. The collection owner has
- * either allowlisted the vault or dropped the security level.
- *
- * The validator address is unchanged and the owner can tighten the policy again
- * at any time, which is why the disclosure on the Suits page stays: unstaking
- * could be blocked later, and nothing in these contracts can prevent that.
- *
- * A holder still has to `setApprovalForAll(vault, true)` once — that is an
- * ordinary ERC-721 approval, not the thing that was broken.
- */
-export const SUITS_STAKING_ENABLED = true;
+/** No demo token on this chain: nothing is live to point at yet. */
+export const DEMO_TOKEN = ZERO;
 
-/** Share of yield routed to staked Suits. Mirrors Distributor.suitsBps default. */
-export const SUITS_SHARE_BPS = 1000;
-
-// A REAL, already-GRADUATED, ETH-paired Pons v2 pool, used only to prove the
-// read layer works against live chain data before TITHE exists. Override with
-// VITE_DEMO_TOKEN. Setting TITHE.token above takes precedence over this.
-//
-// Verified: currency0 = ETH, currency1 = this token, hooks = V2MemeHook, and
-// StateView.getSlot0 returns a live non-zero sqrtPriceX96. Most Pons tokens are
-// still on the bonding curve and would read as uninitialised.
-export const DEMO_TOKEN =
-  (import.meta.env?.VITE_DEMO_TOKEN as string | undefined) ??
-  "0xeB7dBef23947F67Ae8141CeCAeD90f8aD29A235C";
-
-/** The token the UI reads. TORII is live, so demo mode is off. */
+/** The token the UI reads. */
 export function activeToken(): { address: string; isDemo: boolean } {
-  if (TORII.token !== ZERO) return { address: TORII.token, isDemo: false };
-  return { address: DEMO_TOKEN, isDemo: true };
+  return { address: TORII.token, isDemo: false };
 }
 
 /**
- * ETH/USD price feed. Intentionally unset: no Chainlink ETH/USD aggregator on
- * chain 4663 has been verified, and inventing an address would silently produce
- * wrong dollar figures on a page whose entire job is to be verifiable.
- * Until this is filled in, the UI shows ETH-denominated values only.
+ * BNB/USD comes from the WBNB/USDT pair above, not from an oracle.
+ *
+ * Chainlink does publish a BNB/USD aggregator on 56, and it would be the better
+ * source if any of these numbers decided money. None of them do — the figure is
+ * a dollar line under an amount and nothing reads it back — so the pair keeps
+ * the page's one rule intact: every number on it is re-derivable from the RPC
+ * alone, with no third party and no key.
  */
 export const ETH_USD_FEED: string | null = null;
 
-/**
- * Graduation, and a trap worth recording.
- *
- * The Pons PoolKey — `fee = 0`, `hooks = V2MemeHook`, `tickSpacing = 200` — is
- * the correct key both before and after graduation, and `poolkey.ts` derives it
- * unchanged. There is no override here, and there should not be one.
- *
- * The trap: between the curve graduating and the locked LP actually being
- * seeded, `StateView.getSlot0` on that derived id returns **zero**. Reading a
- * zero there and concluding the derivation was wrong is a mistake — it happened
- * during this build, and led to a hunt through `Initialize` events that turned
- * up `0x716f4492…`, a pool with the same currencies but a different fee, no
- * hook, and **zero liquidity**. It was a decoy. The real pool is the derived
- * one, and it started answering as soon as the LP landed.
- *
- * If the price ever reads zero again after graduation, wait for the LP rather
- * than changing the key.
- */
-
-/** GMGN's page for the token — the chart people actually look at. */
-export const GMGN_URL =
-  "https://gmgn.ai/robinhood/token/0x286b4b456bd10fd1745a7b7b33f25a804ddf5f04";
-
+/** Where people actually look at the chart. DexScreener covers BSC. */
+export const GMGN_URL = TORII.token !== ZERO
+  ? `https://dexscreener.com/bsc/${TORII.token.toLowerCase()}`
+  : "https://dexscreener.com/bsc";
 
 // ---------------------------------------------------------------------------
-// Beefy — where withdrawn corpus ETH actually goes
+// Beefy
 // ---------------------------------------------------------------------------
 /**
- * `Treasury.withdraw()` sends corpus ETH to the operator wallet, which then
- * deploys it on beefy.com. Until the on-chain adapter is activated that is the
- * only route available, and it means the deployed ETH sits outside `nav()`.
+ * Empty, and it should stay empty until there is something to put in it.
  *
- * The dashboard used to report that as a bare "withdrawn" total and nothing
- * else, which read as though money had gone missing. It has not — it is in
- * these vaults, and every one of them is readable from the chain.
+ * The 4663 registry is baked in over there because the operator was already
+ * deploying corpus ETH by hand into 33 known vaults, and a stale three-entry
+ * list had silently read a real position as zero. Neither condition holds here:
+ * nothing has been withdrawn on BNB, so an invented list of BSC vaults would be
+ * 400 reads a page load that can only ever return zero, plus a standing
+ * invitation to mistake a guess for a holding.
  *
- * **The whole registry is here, not just the vaults in use.** A three-entry
- * list went stale within a day: the operator moved into
- * `up33-cow-robinhood-up-stonkbroker-rp`, which was not on it, and the position
- * silently read as zero. There is no way to enumerate an address's ERC-20
- * holdings on-chain, so the alternatives were to hard-code a guess or to call
- * Beefy's API at runtime. Neither is acceptable on a page whose point is that
- * every number is verifiable against the RPC alone — so the full list is baked
- * in and all of it is scanned. It is one cheap `balanceOf` per vault, batched.
- *
- * Snapshot of Beefy's registry for chain 4663, 2026-08-18. Re-run
- * `api.beefy.finance/gov-vaults` and add rows if Beefy launches more.
- *
- * Tuple order: [id, label, CLM vault, reward pool].
+ * Fill it from `api.beefy.finance/vaults?chain=bsc` when the sleeve is actually
+ * used here. Tuple order: [id, label, CLM vault, reward pool].
  */
-export const BEEFY_VAULTS: [string, string, string, string][] = [
-  ["uniswap-cow-robinhood-aapl-usdg-rp", "AAPL-USDG", "0x0B7dF93Bb66E13923a2153217B4a29Ec7CC3Efc1", "0x68a2E1Cf0007d28728774619d1aC89f66FA99894"],
-  ["uniswap-cow-robinhood-cashcat-usdg-rp", "CASHCAT-USDG", "0x104E6823bAB0be3fe9b48c5fB0F0413301d935a4", "0x8f6E62ac78B06F4f45DB8dE37C8A8B6e1F3e3a13"],
-  ["uniswap-cow-robinhood-cashcat-weth-rp", "CASHCAT-WETH", "0x0BF46176b181D8bB5bbF57C5d200c79daF416221", "0xA79fF9Ca6250A0ddEbc051dD898A4a892Caa4859"],
-  ["uniswap-cow-robinhood-frong-weth-rp", "FRONG-WETH", "0xd5319D37F56C70F10da99BFB3A38694D5BD1fF22", "0x5bc50ABa09C285529C14290179AC345D0baA033e"],
-  ["uniswap-cow-robinhood-gme-usdg-10000-rp", "GME-USDG", "0x3AB58808c6feC9CC0Ec56A04800e306C08fFB5e0", "0x28a7d169942bb50F51A2E53262Ca736980FE183f"],
-  ["uniswap-cow-robinhood-gme-usdg-rp", "GME-USDG", "0x4f95D85389de296869A5a815A1AA05ec32F7efb5", "0x0365ce42fbe05C07Cb835c06d3B68dD871E94Ae4"],
-  ["uniswap-cow-robinhood-msft-usdg-rp", "MSFT-USDG", "0xE36274737D99273d353d8d9F0a51c1AeA7426C31", "0xd9993b44E8d014F4ad979cb7706673386cd31520"],
-  ["uniswap-cow-robinhood-rddt-usdg-rp", "RDDT-USDG", "0x3Ca0b5eb3133982A982B72BfAD4dA71a6A6433Ef", "0x9eA8596752349525786e44d909432663B0680e7D"],
-  ["uniswap-cow-robinhood-spcx-usdg-rp", "SPCX-USDG", "0xc32834aC40a6529b2f7Bb2b9Af496aF0640Fc508", "0x7de04eD76BDE435df1526a994AC7f864274dc137"],
-  ["uniswap-cow-robinhood-spy-usdg-rp", "SPY-USDG", "0xe71389553681e8cC0b9164898D58b631fEd7586b", "0x18B52a793BC1261661236A7f39E7348659FbFD0a"],
-  ["uniswap-cow-robinhood-stonkbroker-weth-rp", "STONKBROKER-WETH", "0x9CcCE25f82f37ef777552E3BBB2A01BC5574AbE8", "0xDAceb29D88ee1b5eFE8ac134523dC93A35548703"],
-  ["uniswap-cow-robinhood-tendies-weth-rp", "TENDIES-WETH", "0xAAa8C1e4F75Ec7DF802607D827Ea0efE8dCDDbDD", "0xcD68b5A8850E5A10531bDE1BC657329575E40E2C"],
-  ["uniswap-cow-robinhood-tsla-usdg-rp", "TSLA-USDG", "0x6A5057a50178Cc9C90577d8Df401E7fBE79De9FD", "0xfE8585e7E1925C3Cf944772C75820c4DF47f1341"],
-  ["uniswap-cow-robinhood-usdg-intc-rp", "INTC-USDG", "0xBb18aCfeeB566E8549F83bF0F0E01Bd0B2a7BdD2", "0x8C241D00EE324162A1a727f0167EB470c5B456e5"],
-  ["uniswap-cow-robinhood-usdg-nvda-rp", "NVDA-USDG", "0xDaF08ca084DCbA9e801549803dE82160ADcAa1De", "0x11907281043B89F3b507159F37D254941B5f6525"],
-  ["uniswap-cow-robinhood-uso-usdg-rp", "USO-USDG", "0x1176141bdBe958576a2c064b15cA0e94f0A5981F", "0x7627E96758938951498F071988CB47c6bB52dD7F"],
-  ["uniswap-cow-robinhood-weth-coin-rp", "COIN-WETH", "0x83c2934FF42756e4FFaF0433c9E246e6888F3EF6", "0xC887326A6015f279FC68B5f6f93a1BE5899A5f2e"],
-  ["uniswap-cow-robinhood-weth-mstr-rp", "MSTR-WETH", "0x0151a001B2EAb292a36Ffd8c1A42396dAe221848", "0xC6A55D8E2a0700fFA760D1C8361A82Ec4DeE0Dfe"],
-  ["uniswap-cow-robinhood-weth-nvda-rp", "NVDA-WETH", "0xC61179279abB6cf3CEcCce23641B3d69986Ec777", "0x9776f496DFC4464df76B8503Ca1Ba95D116D1E02"],
-  ["uniswap-cow-robinhood-weth-pons-rp", "PONS-WETH", "0x4F702C76dd9D7841784922f87470E3F718aAF6DA", "0xedBAa34DCBA4250F6BF9582ddED03244e623268D"],
-  ["uniswap-cow-robinhood-weth-up-rp", "UP-WETH", "0xcB968f8382e3Fd875F47fbbde59Fdf46feB8b447", "0x41691Cb706ed97eF1AaF675D627EF5B01145E7d6"],
-  ["uniswap-cow-robinhood-weth-usdg-rp", "USDG-WETH", "0x1e8d576F71D5F416e7573b960fF59C4Fb77976ad", "0x72cF42d5951e3F2F9Da265601a064A075600d036"],
-  ["uniswap-cow-robinhood-weth-virtual-rp", "VIRTUAL-WETH", "0xc61b3b381C34A636451ba66A62792Bd84A78E112", "0x093f6613Dc96AF7c834A439F0a0aF18836B2dFdf"],
-  ["up33-cow-robinhood-cashcat-weth-rp", "CASHCAT-WETH", "0x137731B8B2D7Cd24aB4A4A9061f2D7b4Fd1aBFEE", "0x3B2162ea5C3F6f20Eb05818f40d54857d1Aa3B45"],
-  ["up33-cow-robinhood-up-stonkbroker-rp", "STONKBROKER-UP", "0xd922173C136443a1F7795A86B28Da964ea2BF6bc", "0x788D31D39da6252F228b5842d9215bb7abB83F8B"],
-  ["up33-cow-robinhood-usdg-intc-rp", "INTC-USDG", "0x599ac767099bB6f01712867BfA1Fc1Aa27DEFD37", "0x0e7fb97a89b20A682521c5D29868E50A7b693979"],
-  ["up33-cow-robinhood-usdg-nvda-rp", "NVDA-USDG", "0x63185DA98b76E7FA49d5d0611a6E211ee2988201", "0x6485817467Fd2129622e57b20577CF2697F3dDe2"],
-  ["up33-cow-robinhood-weth-frong-rp", "FRONG-WETH", "0x9818f01EDCcc3d8EB86B859931C3B877cf44A108", "0xa3EDa31c3d7C886a6Ff3ccB69D4045C05EAaf3b3"],
-  ["up33-cow-robinhood-weth-stonkbroker-rp", "STONKBROKER-WETH", "0x5794bB61E83397049c40D87BbF3d44AF583A27Ce", "0x10f9e8B973B5EA104618bd334f3CC2c0ff7E15F2"],
-  ["up33-cow-robinhood-weth-tendies-rp", "TENDIES-WETH", "0x9619bFB1f2D97E2B23F23310205e4c2089c1A45d", "0xF8AB44EA77cE06E9b42De8021449Af01B3De977d"],
-  ["up33-cow-robinhood-weth-up-rp", "UP-WETH", "0x36759534741E28Eb052238738963D684bFe719E4", "0xCC3DB04bB136A34E8569c1EfF2Ab19E3FA915d48"],
-  ["up33-cow-robinhood-weth-usdg-rp", "USDG-WETH", "0x4319C71984790f96ac190a7709B380F6F27DD238", "0x55fD3b49Ef7E5f9a31DA68051989F5f749658f99"],
-  ["up33-cow-robinhood-weth-virtual-rp", "VIRTUAL-WETH", "0x37698C12ecc727178617c5b7d694377eb98dE058", "0x5eD2B060b7f8809E6aC41DD769fE3528Fe44f424"],
-];
+export const BEEFY_VAULTS: [string, string, string, string][] = [];
 
-export const WETH_ADDR = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
-export const USDG_ADDR = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+/** Aliases the Beefy reader expects. On this chain the quote asset is WBNB. */
+export const WETH_ADDR = WBNB_ADDR;
+export const USDG_ADDR = USDT_ADDR;
+export const WETH_USDG_POOL = WBNB_USDT_PAIR;
 
-/**
- * The WETH/USDG Uniswap v3 pool, used only to price a USDG leg back into ETH.
- * Verified: token0 = WETH, token1 = USDG (6 decimals), fee 500.
- */
-export const WETH_USDG_POOL = "0x69BfaF19C9f377BB306a89aEd9F6B07e2c1a8d9a";
-
-/** Beefy's page for a vault, for anyone who wants to check the position. */
 export function beefyUrl(id: string): string {
   return `https://app.beefy.com/vault/${id}`;
 }
 
 export function explorerAddr(a: string): string {
   return `${EXPLORER}/address/${a}`;
+}
+
+export function explorerTx(h: string): string {
+  return `${EXPLORER}/tx/${h}`;
 }

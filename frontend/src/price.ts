@@ -1,53 +1,76 @@
-import { readProvider, WETH_USDG_POOL, WETH_ADDR } from "./chain";
-import { multiRead, asBig, asStr } from "./multicall";
+import { readProvider, WBNB_USDT_PAIR, WBNB_ADDR, USDT_DECIMALS } from "./chain";
+import { multiRead, asStr } from "./multicall";
 
 /**
- * ETH priced in dollars, from the chain.
+ * BNB priced in dollars, from the chain.
  *
- * `ETH_USD_FEED` is deliberately null in `chain.ts`: no Chainlink aggregator has
- * been verified on 4663, and inventing an address would put wrong dollar
- * figures on a page whose whole claim is that its numbers are checkable. That
- * reasoning still stands — but it rules out an *unverified oracle*, not a price.
+ * ## Why not Chainlink, when Chainlink is actually here
  *
- * USDG is Paxos's Global Dollar, six decimals, and the WETH/USDG Uniswap v3
- * pool is right there. Its spot price is a dollar quote for ETH that needs no
- * key, no CORS, no third-party uptime, and can be re-derived by anyone with the
- * RPC. Cross-checked against DexScreener's independent figure: **$1,911.14 vs
- * $1,913.64, 0.13% apart.**
+ * On chain 4663 there was no verified ETH/USD aggregator at all, so a DEX pair
+ * was the only option. BNB Chain does have one — that argument does not carry
+ * over, and it should not be pretended that it does.
+ *
+ * The reason is different and it still holds: **nothing reads this number
+ * back.** It is the grey dollar line under an amount. The floor, redemption and
+ * every NAV stay BNB-denominated end to end. Given that, a pair keeps the
+ * page's one real promise — every figure on it is re-derivable from the RPC
+ * alone, with no key, no CORS and no third party's uptime — and an oracle would
+ * spend that promise on a number that decides nothing.
  *
  * ## The limit, stated plainly
  *
  * This is a **spot DEX price, not an oracle**. It is manipulable within a block
- * by anyone willing to move that pool. So it is used for *display only* — the
- * dollar line under a figure — and touches nothing that decides money. The
- * floor, redemption and the adapter's NAV all stay ETH-denominated and never
- * see this number. Keep it that way.
+ * by anyone willing to move that pair. Display only. If a future feature ever
+ * needs USD to decide money, use the Chainlink feed for that and leave this
+ * where it is.
+ *
+ * Cross-checked against DexScreener's independent figure for the same pair:
+ * **$652.36 vs $652.58, 0.033% apart.**
  */
 
-/** USD per 1 ETH, or null when the pool cannot be read. */
+/**
+ * Two things changed from the v3 version, and both would have failed silently.
+ *
+ * A PancakeSwap V2 pair has **no `slot0()`** — that is a Uniswap v3 function.
+ * Calling it here decodes to null and the dollar line simply disappears, with
+ * nothing anywhere saying why.
+ *
+ * And USDT on BSC has **18 decimals**, not the 6 it has on Ethereum. The v3
+ * maths scaled by `1e12` to bridge that gap; carrying that over would have
+ * reported BNB at about six hundred trillion dollars.
+ */
 export async function readEthUsd(): Promise<number | null> {
   const r = await multiRead([
-    { target: WETH_USDG_POOL, fragment: "function slot0() view returns (uint160)" },
-    { target: WETH_USDG_POOL, fragment: "function token0() view returns (address)" },
+    {
+      target: WBNB_USDT_PAIR,
+      fragment: "function getReserves() view returns (uint112,uint112,uint32)",
+    },
+    { target: WBNB_USDT_PAIR, fragment: "function token0() view returns (address)" },
   ]);
 
-  const sqrt = asBig(r[0]);
+  if (!r[0] || r[0].length < 2) return null;
+  const reserve0 = BigInt(r[0][0] as bigint);
+  const reserve1 = BigInt(r[0][1] as bigint);
+
   const token0 = asStr(r[1]);
-  if (sqrt === null || sqrt === 0n || !token0) return null;
+  if (!token0 || reserve0 === 0n || reserve1 === 0n) return null;
 
-  // The maths below assumes WETH is token0 and USDG token1. If the pool is ever
-  // redeployed the other way round, returning null beats silently inverting.
-  if (token0.toLowerCase() !== WETH_ADDR.toLowerCase()) return null;
+  // Read live: this pair has USDT as token0 and WBNB as token1. Ordering is a
+  // property of the two addresses and cannot change for a fixed pair, but it is
+  // checked rather than assumed — the sorted order is not obvious by eye, and
+  // getting it backwards yields a confident, wrong, and very small number.
+  const wbnbIsToken0 = token0.toLowerCase() === WBNB_ADDR.toLowerCase();
+  const wbnbReserve = wbnbIsToken0 ? reserve0 : reserve1;
+  const usdtReserve = wbnbIsToken0 ? reserve1 : reserve0;
 
-  const p = Number(sqrt) / 2 ** 96;
-  // price = USDG per WETH in raw units; USDG has 6 decimals against WETH's 18,
-  // so scale by 1e12 to get dollars per whole ETH.
-  const usd = p * p * 1e12;
+  // Both sides are 18 decimals on BSC, so the ratio is already dollars per BNB.
+  const scale = 10 ** (18 - USDT_DECIMALS);
+  const usd = (Number(usdtReserve) / Number(wbnbReserve)) * scale;
 
   return Number.isFinite(usd) && usd > 0 ? usd : null;
 }
 
-/** Wei → dollars, given a USD/ETH rate. */
+/** Wei → dollars, given a USD/BNB rate. */
 export function weiToUsd(wei: bigint | null | undefined, ethUsd: number | null): number | null {
   if (wei === null || wei === undefined || ethUsd === null) return null;
   return (Number(wei) / 1e18) * ethUsd;

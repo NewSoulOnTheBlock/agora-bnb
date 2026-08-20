@@ -94,7 +94,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
 
       <div className="two">
         <Panel
-          label="Burn TORII for reserve"
+          label="Burn TORII for reserve 焚毀"
           id={`${haircutPct}% haircut`}
           right={
             <Pill warn={!deployed || rd?.requestsPaused === true}>
@@ -124,7 +124,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
             <div className="qrow">
               <span className="qk">Floor per TORII</span>
               <span className="qv">
-                {r?.floorPerTokenWad != null ? `${fmtSig(r.floorPerTokenWad)} ETH` : DASH}
+                {r?.floorPerTokenWad != null ? `${fmtSig(r.floorPerTokenWad)} BNB` : DASH}
               </span>
             </div>
             <div className="qrow">
@@ -133,7 +133,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
             </div>
             <div className="qrow">
               <span className="qk">You would receive</span>
-              <span className="qv">{quote != null ? `${fmtSig(quote)} ETH` : DASH}</span>
+              <span className="qv">{quote != null ? `${fmtSig(quote)} BNB` : DASH}</span>
             </div>
             <div className="qrow">
               <span className="qk">Claimable after</span>
@@ -167,7 +167,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
           <p className="sub">
             <b>The burn happens immediately and cannot be cancelled.</b> Your tokens are destroyed when
             you queue, not when you claim — which is what makes the supply drop, and the floor rise for
-            everyone else, right away. Re-minting is impossible: TORII's supply is fixed by the Pons
+            everyone else, right away. Re-minting is impossible: TORII's supply is fixed at launch
             factory.
           </p>
         </Panel>
@@ -177,12 +177,12 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
             <Stat
               k="Floor per TORII"
               value={r?.floorPerTokenWad != null ? fmtSig(r.floorPerTokenWad) : null}
-              unit="ETH"
+              unit="BNB"
             />
             <Stat
               k="Reserve"
               value={r?.navWad != null ? formatEther(r.navWad) : null}
-              unit="ETH"
+              unit="BNB"
               note="excludes income owed to stakers"
             />
           </div>
@@ -207,7 +207,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
                         disabled={!!busy}
                         onClick={() => run(`exec-${q.id}`, (sg) => executeRedeem(sg, q.id))}
                       >
-                        {busy === `exec-${q.id}` ? "claiming…" : `claim ${fmtSig(q.paid)} ETH`}
+                        {busy === `exec-${q.id}` ? "claiming…" : `claim ${fmtSig(q.paid)} BNB`}
                       </button>
                     ) : (
                       <span className="muted">{when(q.executableAt)}</span>
@@ -236,7 +236,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
                 {rd?.epochCapBps != null ? `${Number(rd.epochCapBps) / 100}% of reserve` : "unavailable"}
               </Row>
               <Row k="Capacity left this epoch" na={rd?.epochRemaining == null}>
-                {rd?.epochRemaining != null ? `${formatEther(rd.epochRemaining)} ETH` : "unavailable"}
+                {rd?.epochRemaining != null ? `${formatEther(rd.epochRemaining)} BNB` : "unavailable"}
               </Row>
               <Row k="Burned to date" na={rd?.totalBurned == null}>
                 {rd?.totalBurned != null ? `${fmtGrouped(rd.totalBurned, 0)} TORII` : "unavailable"}
@@ -260,14 +260,14 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
       </div>
 
       <div className="notice" style={{ marginTop: 18 }}>
-        <b>The floor is reported, not guaranteed.</b> The Treasury owner can withdraw corpus ETH to a
+        <b>The floor is reported, not guaranteed.</b> The Treasury owner can withdraw corpus BNB to a
         single operator wallet so it can be deployed into yield off-contract, which means{" "}
         <code>floorPerToken</code> describes what backs each token <em>right now</em> rather than a level
-        the contract can hold. Withdrawals cannot touch ETH already earmarked for stakers, they can only
+        the contract can hold. Withdrawals cannot touch BNB already earmarked for stakers, they can only
         reach that one operator address, and each one emits <code>Withdrawn</code> with the resulting NAV
         — so the corpus history is fully auditable on chain.
         {r?.cumulativeWithdrawn != null && (
-          <> Withdrawn to date: <b>{formatEther(r.cumulativeWithdrawn)} ETH</b>.</>
+          <> Withdrawn to date: <b>{formatEther(r.cumulativeWithdrawn)} BNB</b>.</>
         )}
       </div>
     </>

@@ -39,18 +39,18 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
     <Frame title="System Properties" icon="computer" onClose={onClose} width={460}>
       <div className="sysprops">
         <div className="sysprops-art">
-          <img src="/logo.png" width={64} height={64} alt="" />
-          <div className="kana">アゴラ</div>
+          <img src="/torii-192.png" width={64} height={64} alt="" />
+          <div className="hanzi">鳥居</div>
         </div>
         <div className="rows mini" style={{ flex: 1 }}>
           <SysRow k="System">TORII 98</SysRow>
-          <SysRow k="Version">4.663 (Robinhood Chain)</SysRow>
+          <SysRow k="Version">5.6 (BNB Smart Chain)</SysRow>
           <SysRow k="Registered to">whoever is holding</SysRow>
           <SysRow k="Chain ID">{CHAIN_ID}</SysRow>
-          <SysRow k="Processor">Pons v2 · V2MemeHook</SysRow>
+          <SysRow k="Processor">Flap · PancakeSwap V2</SysRow>
           <SysRow k="Levy">{TORII_TAX_BPS / 100}% on every buy and sell</SysRow>
           <SysRow k="Reserve">
-            {nav !== null ? `${formatEther(nav)} ETH` : "reading…"}
+            {nav !== null ? `${formatEther(nav)} BNB` : "reading…"}
           </SysRow>
           <SysRow k="Eligible supply">
             {supply !== null ? `${Number(formatEther(supply)).toLocaleString("en-US", { maximumFractionDigits: 0 })} TORII` : "reading…"}
@@ -175,7 +175,7 @@ export function WindowsUpdate({ onClose }: { onClose: () => void }) {
           <p className="sub">
             <b>Do not turn off your computer.</b> Adding an adapter is the one action the Treasury
             delays, because an adapter can hold the corpus. The two days exist so holders can read
-            the contract — and leave at the current floor — before any ETH goes into it.
+            the contract — and leave at the current floor — before any BNB goes into it.
           </p>
 
           <div className="rows mini">
@@ -262,7 +262,7 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
                 <span className="muted">{j.owner.slice(0, 10)}…</span>
               </span>
               <span className="rv">
-                {formatEther(j.paid)} ETH
+                {formatEther(j.paid)} BNB
                 <br />
                 {j.ready ? (
                   <b className="ok">ready to collect</b>
@@ -288,7 +288,7 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
       {nagged !== null && (
         <div className="notice" style={{ marginTop: 12 }}>
           <b>Cannot cancel job #{nagged}.</b> The TORII was destroyed the moment the request was
-          made, not when it is collected. Re-minting is impossible — the supply is fixed by the Pons
+          made, not when it is collected. Re-minting is impossible — the supply is fixed at launch
           factory and there is no mint function. Burning at request time is what makes every
           redemption raise the floor for the holders who stayed, immediately.
         </div>

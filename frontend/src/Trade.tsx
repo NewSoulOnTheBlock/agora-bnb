@@ -4,7 +4,7 @@ import { Panel, Row, Pill, Dot } from "./components";
 import Chart from "./Chart";
 import { fmtSig, fmtGrouped, bpsToPct, DASH } from "./format";
 import { useSnapshot } from "./useReads";
-import { TORII, PONS, explorerAddr, readProvider } from "./chain";
+import { TORII, PANCAKE, TORII_TAX_BPS, explorerAddr, readProvider } from "./chain";
 import type { Wallet } from "./eth";
 import {
   readCurveState, quoteBuy, quoteSell, applySlippage, curveBuy, curveSell,
@@ -123,23 +123,23 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
     } finally { setBusy(null); }
   }
 
-  const inDenom = side === "buy" ? "ETH" : "TORII";
-  const outDenom = side === "buy" ? "TORII" : "ETH";
+  const inDenom = side === "buy" ? "BNB" : "TORII";
+  const outDenom = side === "buy" ? "TORII" : "BNB";
 
   return (
     <>
       {graduated ? (
         <div className="notice">
           <b>TORII has graduated.</b> The bonding curve is closed and every trade now routes
-          through the Uniswap v4 pool, priced by <code>StateView.getSlot0</code> rather than by
-          the curve. The 4% creator tax still applies — it lives in the hook, not the curve, so
+          through the PancakeSwap V2 pair, priced from its own reserves rather than by
+          the curve. The 5% creator tax still applies — Flap takes it at the token level, so
           graduation did not change it.
         </div>
       ) : (
         <div className="notice">
           <b>Trading on the bonding curve.</b> TORII has not graduated
-          {curve && <> — <b>{curve.graduationPct.toFixed(2)}%</b> of the 4.2 ETH threshold</>}, so there is no
-          Uniswap v4 pool yet and all trades route through the Pons curve at{" "}
+          {curve && <> — <b>{curve.graduationPct.toFixed(2)}%</b> of the graduation threshold</>}, so there is no
+          PancakeSwap pair yet and all trades route through the Flap curve at{" "}
           <a className="link" href={explorerAddr(TORII.curve)} target="_blank" rel="noreferrer">
             {TORII.curve.slice(0, 10)}…
           </a>. The v4 path is built and validated; it activates automatically on graduation.
@@ -160,12 +160,12 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
       <div className="two">
         <Panel
           label={`${side === "buy" ? "Buy" : "Sell"} TORII`}
-          id={graduated ? "uniswap v4" : "pons v2 curve"}
+          id={graduated ? "pancakeswap v2" : "flap curve"}
           right={<Pill><Dot kind={graduated ? "ok" : "warn"} />{graduated ? "graduated" : "curve"}</Pill>}
         >
           <div className="swapdir">
-            <button className="mini" aria-selected={side === "buy"} onClick={() => { setSide("buy"); setAmount(""); }}>Buy</button>
-            <button className="mini" aria-selected={side === "sell"} onClick={() => { setSide("sell"); setAmount(""); }}>Sell</button>
+            <button className="mini" aria-selected={side === "buy"} onClick={() => { setSide("buy"); setAmount(""); }}>Buy<span className="gloss">買入</span></button>
+            <button className="mini" aria-selected={side === "sell"} onClick={() => { setSide("sell"); setAmount(""); }}>Sell<span className="gloss">賣出</span></button>
           </div>
 
           <div className="field">
@@ -195,7 +195,7 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
                 disabled={!!busy || (side === "buy" ? balances.eth === null : balances.token === null)}
                 onClick={() => {
                   if (side === "sell" && balances.token !== null) setAmount(formatEther(balances.token));
-                  // For ETH, leave headroom for gas rather than max-ing the balance.
+                  // For BNB, leave headroom for gas rather than max-ing the balance.
                   else if (balances.eth !== null && balances.eth > parseEther("0.0005"))
                     setAmount(formatEther(balances.eth - parseEther("0.0005")));
                 }}
@@ -239,7 +239,7 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
           ) : !wallet.account ? (
             <button className="btn" onClick={wallet.connect}>Connect wallet</button>
           ) : !wallet.onCorrectChain ? (
-            <button className="btn danger" onClick={wallet.switchChain}>Switch to Robinhood Chain</button>
+            <button className="btn danger" onClick={wallet.switchChain}>Switch to BNB Chain</button>
           ) : (
             <button
               className="btn"
@@ -289,53 +289,57 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
         <div>
           {graduated ? (
             /* Post-graduation the curve's reserves are drained by design, so a
-               "0 / 4.2 ETH, 0.000%" progress bar is technically accurate and
+               "0 / threshold, 0.000%" progress bar is technically accurate and
                completely meaningless. Once the token has graduated, the pool is
                the thing worth reading. */
-            <Panel label="Pool state" id="uniswap v4 · StateView">
+            <Panel label="Pool state" id="pancakeswap v2 · pair">
               <div className="rows">
                 <Row k="Spot price">
-                  {pool?.priceWad ? `${fmtSig(pool.priceWad, 6)} ETH` : DASH}
+                  {pool?.priceWad ? `${fmtSig(pool.priceWad, 6)} BNB` : DASH}
                 </Row>
-                <Row k="Active liquidity" na={pool?.liquidity == null}>
-                  {pool?.liquidity != null ? fmtGrouped(pool.liquidity, 4) : DASH}
+                <Row k="Pooled BNB" na={pool?.liquidity == null}>
+                  {pool?.liquidity != null ? `${fmtSig(pool.liquidity, 4)} BNB` : DASH}
                 </Row>
-                <Row k="Tick">{pool?.tick != null ? String(pool.tick) : DASH}</Row>
-                <Row k="Creator tax">{curve ? bpsToPct(curve.creatorTaxBps) : "4%"}</Row>
-                <Row k="Pool fee">0 — the hook prices every swap dynamically</Row>
-                <Row k="poolId">
-                  <span className="n">{pool ? `${pool.id.slice(0, 18)}…` : DASH}</span>
+                <Row k="Creator tax">{bpsToPct(TORII_TAX_BPS)} · charged by the token, not the pair</Row>
+                <Row k="Pool fee">{bpsToPct(PANCAKE.feeBps)} · constant product</Row>
+                <Row k="Pair">
+                  {pool ? (
+                    <a className="link" href={explorerAddr(pool.id)} target="_blank" rel="noreferrer">
+                      {pool.id.slice(0, 18)}…
+                    </a>
+                  ) : DASH}
                 </Row>
-                <Row k="Hook">
-                  <a className="link" href={explorerAddr(PONS.memeHook)} target="_blank" rel="noreferrer">
-                    V2MemeHook
+                <Row k="Router">
+                  <a className="link" href={explorerAddr(PANCAKE.router)} target="_blank" rel="noreferrer">
+                    PancakeRouter02
                   </a>
                 </Row>
                 <Row k="Curve">
-                  <span className="muted">closed — graduated at 4.2 ETH</span>
+                  <span className="muted">closed — graduated off Flap</span>
                 </Row>
               </div>
               <p className="sub">
-                The 4% creator tax did not move with graduation. It lives in the hook, applied in{" "}
-                <code>beforeSwap</code>, so it still reaches the FeeSink on every trade through this
-                pool.
+                The {bpsToPct(TORII_TAX_BPS)} tax does not live in the pair. Flap takes it at the
+                token level and <em>pushes</em> it into <code>ToriiVault</code>, so graduation
+                changes where TORII trades and nothing about where the tax goes — and no keeper we
+                do not control ever sits between a trade and the Treasury.
               </p>
             </Panel>
           ) : (
             <Panel label="Curve state" id="live">
               <div className="rows">
                 <Row k="Graduation progress">
-                  {curve ? `${fmtSig(curve.realQuoteReserve, 6)} / ${fmtSig(curve.graduationThreshold, 4)} ETH` : DASH}
+                  {curve ? `${fmtSig(curve.realQuoteReserve, 6)} / ${fmtSig(curve.graduationThreshold, 4)} BNB` : DASH}
                 </Row>
                 <Row k="Percent to graduation">{curve ? `${curve.graduationPct.toFixed(3)}%` : DASH}</Row>
-                <Row k="Spot price">{curve ? `${fmtSig(curve.priceWad, 6)} ETH` : DASH}</Row>
+                <Row k="Spot price">{curve ? `${fmtSig(curve.priceWad, 6)} BNB` : DASH}</Row>
                 <Row k="Token reserve">{curve ? fmtGrouped(curve.tokenReserve, 0) : DASH}</Row>
-                <Row k="Quote reserve (incl. phantom)">{curve ? `${fmtSig(curve.quoteReserve, 6)} ETH` : DASH}</Row>
-                <Row k="Phantom quote">{curve ? `${fmtSig(curve.phantomQuote, 4)} ETH` : DASH}</Row>
+                <Row k="Quote reserve (incl. phantom)">{curve ? `${fmtSig(curve.quoteReserve, 6)} BNB` : DASH}</Row>
+                <Row k="Phantom quote">{curve ? `${fmtSig(curve.phantomQuote, 4)} BNB` : DASH}</Row>
                 <Row k="Creator tax">{curve ? bpsToPct(curve.creatorTaxBps) : DASH}</Row>
                 <Row k="Curve fee">{curve ? bpsToPct(curve.feeBps) : DASH}</Row>
                 <Row k="Tax accrued on curve">
-                  {curve ? `${fmtSig(curve.creatorTaxBalance, 8)} ETH` : DASH}
+                  {curve ? `${fmtSig(curve.creatorTaxBalance, 8)} BNB` : DASH}
                 </Row>
                 <Row k="Snipe tax (first 3s)">
                   {curve ? `${bpsToPct(curve.snipeTaxStartBps)} — window closed` : DASH}
@@ -346,21 +350,29 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
 
           <div style={{ height: 14 }} />
 
-          <Panel label={graduated ? "Swap route" : "After graduation"} id={graduated ? "uniswap v4 · live" : "uniswap v4 · validated, dormant"}>
+          <Panel
+            label={graduated ? "Swap route" : "After graduation"}
+            id={graduated ? "pancakeswap v2 · live" : "pancakeswap v2 · dormant"}
+          >
             <div className="rows">
-              <Row k="Route">UniversalRouter → V4_SWAP</Row>
-              <Row k="Quotes">V4Quoter (staticCall only)</Row>
-              <Row k="Buys">native ETH — no approval, no Permit2</Row>
-              <Row k="Sells">Permit2 allowance required</Row>
-              <Row k="Hook">
-                <a className="rv" href={explorerAddr(PONS.memeHook)} target="_blank" rel="noreferrer">
-                  V2MemeHook
+              <Row k="Route">PancakeRouter02 → V2 pair</Row>
+              <Row k="Quotes">computed from reserves — the router runs the same maths</Row>
+              <Row k="Buys">native BNB — no approval needed</Row>
+              <Row k="Sells">one ERC-20 approval to the router</Row>
+              <Row k="Function">
+                <span className="n">swapExact*SupportingFeeOnTransferTokens</span>
+              </Row>
+              <Row k="Router">
+                <a className="rv" href={explorerAddr(PANCAKE.router)} target="_blank" rel="noreferrer">
+                  {PANCAKE.router.slice(0, 14)}…
                 </a>
               </Row>
             </div>
             <p className="sub">
-              Action encoding was dry-run against the live router via <code>eth_call</code> and accepted;
-              two plausible opcode variants reverted, so the sequence is confirmed for this chain.
+              The router was validated by behaviour rather than by having bytecode: it was asked
+              <code> WETH()</code> and answered WBNB, and <code>factory()</code> and answered the
+              PancakeFactory. On bscTestnet the mainnet router address holds an unrelated contract,
+              so "has code" would have passed on something that cannot swap at all.
             </p>
           </Panel>
         </div>

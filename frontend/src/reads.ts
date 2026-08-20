@@ -1,12 +1,12 @@
 import { Contract } from "ethers";
 import {
-  readProvider, V4, PONS, TORII, ZERO, activeToken, SUITS_NFT,
+  readProvider, PANCAKE, TORII, ZERO, activeToken, SUITS_NFT,
 } from "./chain";
 import {
   STAKED_SUITS_ABI, DISTRIBUTOR_ABI, SUITS_ABI,
 } from "./abis";
-import { ponsPoolKey, poolId, priceFromSqrtX96, type PoolKey } from "./poolkey";
-import { multiRead, asBig, asStr, asBool, type MCall } from "./multicall";
+import { pairFor, priceFromReserves, type Pair } from "./poolkey";
+import { multiRead, asBig, asStr, asBool } from "./multicall";
 
 /**
  * Every read returns `null` on failure rather than throwing.
@@ -33,40 +33,69 @@ function deployed(addr: string): boolean {
 // ---------------------------------------------------------------------------
 
 export type PoolState = {
-  key: PoolKey;
+  pair: Pair;
+  /** The pair address, kept under the old name so callers need no change. */
   id: string;
-  sqrtPriceX96: bigint | null;
-  tick: number | null;
+  reserve0: bigint | null;
+  reserve1: bigint | null;
+  /** Quote-side depth, in wei of BNB. The honest stand-in for v4 liquidity. */
   liquidity: bigint | null;
-  /** Price of the token in the quote currency (ETH), as WAD. */
+  /** Price of the token in the quote currency (BNB), as WAD. */
   priceWad: bigint | null;
-  /** False when the pool has never been initialised (still on the curve). */
+  /** False while the pair holds nothing — still on the Flap curve. */
   initialised: boolean;
 };
 
+/**
+ * The PancakeSwap V2 market for `token`, read straight off the pair.
+ *
+ * Two calls in one request. `getReserves` is the whole price; `factory.getPair`
+ * rides along to separate two states the reserves alone cannot:
+ *
+ *   pair == address(0)   Flap has not graduated the token; no market exists
+ *   pair != 0, empty     graduated, LP not yet in — a real, brief state
+ *
+ * On the v4 build these were indistinguishable, and reading the second as the
+ * first once sent this codebase hunting a decoy pool. Here the factory answers
+ * the question directly, so it is asked.
+ */
 export async function readPoolState(token: string): Promise<PoolState> {
-  const key = ponsPoolKey(token);
-  const id = poolId(key);
+  const pair = pairFor(token);
 
-  // One `eth_call` for both reads. Note that a freshly graduated pool answers
-  // zero here until its locked LP is seeded — that is a timing state, not a
-  // wrong PoolKey. See the note in `chain.ts`.
   const r = await multiRead([
-    { target: V4.stateView, fragment: "function getSlot0(bytes32) view returns (uint160,int24,uint24,uint24)", args: [id] },
-    { target: V4.stateView, fragment: "function getLiquidity(bytes32) view returns (uint128)", args: [id] },
+    {
+      target: pair.address,
+      fragment: "function getReserves() view returns (uint112,uint112,uint32)",
+    },
+    {
+      target: PANCAKE.factory,
+      fragment: "function getPair(address,address) view returns (address)",
+      args: [pair.token0, pair.token1],
+    },
   ]);
 
-  const sqrtPriceX96 = r[0] && r[0].length ? BigInt(r[0][0] as bigint) : null;
-  const tick = r[0] && r[0].length > 1 ? Number(r[0][1]) : null;
+  const reserve0 = r[0] && r[0].length ? BigInt(r[0][0] as bigint) : null;
+  const reserve1 = r[0] && r[0].length > 1 ? BigInt(r[0][1] as bigint) : null;
+
+  const registered = asStr(r[1]);
+  const exists = !!registered && registered !== ZERO;
+
+  const priceWad =
+    reserve0 !== null && reserve1 !== null
+      ? priceFromReserves(reserve0, reserve1, pair.tokenIsZero)
+      : null;
 
   return {
-    key,
-    id,
-    sqrtPriceX96,
-    tick,
-    liquidity: asBig(r[1]),
-    priceWad: sqrtPriceX96 && sqrtPriceX96 > 0n ? priceFromSqrtX96(sqrtPriceX96, key, token) : null,
-    initialised: !!sqrtPriceX96 && sqrtPriceX96 > 0n,
+    pair,
+    id: pair.address,
+    reserve0,
+    reserve1,
+    liquidity:
+      reserve0 !== null && reserve1 !== null
+        ? (pair.tokenIsZero ? reserve1 : reserve0)
+        : null,
+    priceWad,
+    initialised: exists && priceWad !== null,
   };
 }
 
@@ -107,45 +136,70 @@ export async function readTokenInfo(address: string, poolInitialised: boolean): 
 // ---------------------------------------------------------------------------
 
 export type FeePipeline = {
-  /** Accrued in the hook, NOT yet swept. Only Pons's operator can sweep. */
+  /**
+   * TORII sitting in the vault, taxed post-graduation and not yet sold.
+   * Named for the old shape so the shared UI compiles on both chains.
+   */
   pendingCreatorTaxEth: bigint | null;
+  /** BNB in the vault, recognised as revenue and awaiting `forwardQuote()`. */
   pendingFeesEth: bigint | null;
-  /** Swept into escrow, claimable by us. */
+  /** Everything the vault has ever pushed into the Treasury. */
   escrowBalanceEth: bigint | null;
   hookFeeBps: bigint | null;
   protocolFeeShareBps: bigint | null;
-  /** Confirms the sweep gatekeeper is still who we recorded. */
+  /** No gatekeeper on this chain — kept null so the UI can say so. */
   feeSweepOperator: string | null;
 };
 
-export async function readFeePipeline(pid: string, recipient: string): Promise<FeePipeline> {
-  const H = PONS.memeHook;
-  const calls: MCall[] = [
-    { target: H, fragment: "function pendingCreatorTax(bytes32,address) view returns (uint256)", args: [pid, ZERO] },
-    { target: H, fragment: "function pendingFees(bytes32,address) view returns (uint256)", args: [pid, ZERO] },
-    { target: H, fragment: "function hookFeeBps() view returns (uint256)" },
-    { target: H, fragment: "function protocolFeeShareBps() view returns (uint256)" },
-    { target: H, fragment: "function feeSweepOperator() view returns (address)" },
-  ];
-  // The escrow read only makes sense once there is a recipient to ask about,
-  // but it rides in the same request rather than costing a second round-trip.
-  if (deployed(recipient)) {
-    calls.push({
-      target: PONS.feeEscrow,
-      fragment: "function balanceOf(address) view returns (uint256)",
-      args: [recipient],
-    });
+/**
+ * The tax pipeline, which on BNB runs the opposite direction.
+ *
+ * On Pons the tax accrued inside a hook and had to be *pulled*: `sweepFees` was
+ * callable only by an operator Pons controlled, so the pipeline's interesting
+ * number was "how much is stuck behind someone else's keeper". v1 died there.
+ *
+ * Flap **pushes**. The tax arrives at `ToriiVault` as an ordinary transfer and
+ * the vault recognises it by balance delta, so nothing is ever gated on a third
+ * party. What is worth reading changed to match:
+ *
+ *   pendingQuote()      BNB recognised, waiting for `forwardQuote()`
+ *   pendingTaxToken()   TORII taken as tax after graduation, still unsold
+ *   cumulativeForwarded everything that has reached the Treasury
+ *
+ * `pendingTaxToken` is the one that needs explaining. Post-graduation the tax
+ * arrives denominated in TORII, and the Treasury marks TORII at **zero** — a
+ * token that backs itself would make the floor self-referentially inflatable.
+ * Forwarding that leg raw would therefore grow the balance sheet by nothing, so
+ * it has to be sold for BNB first, through `convertAndForward()`. A number
+ * sitting here is not lost; it is revenue that has not been converted yet.
+ *
+ * `pid` is the pair address rather than a v4 poolId, and is unused: the vault
+ * is per-token, not per-pool.
+ */
+export async function readFeePipeline(_pid: string, recipient: string): Promise<FeePipeline> {
+  if (!deployed(recipient)) {
+    return {
+      pendingCreatorTaxEth: null, pendingFeesEth: null, escrowBalanceEth: null,
+      hookFeeBps: null, protocolFeeShareBps: null, feeSweepOperator: null,
+    };
   }
 
-  const r = await multiRead(calls);
+  const V = recipient;
+  const r = await multiRead([
+    { target: V, fragment: "function pendingTaxToken() view returns (uint256)" },
+    { target: V, fragment: "function pendingQuote() view returns (uint256)" },
+    { target: V, fragment: "function cumulativeForwarded() view returns (uint256)" },
+  ]);
 
   return {
     pendingCreatorTaxEth: asBig(r[0]),
     pendingFeesEth: asBig(r[1]),
-    hookFeeBps: asBig(r[2]),
-    protocolFeeShareBps: asBig(r[3]),
-    feeSweepOperator: asStr(r[4]),
-    escrowBalanceEth: deployed(recipient) ? asBig(r[5]) : null,
+    escrowBalanceEth: asBig(r[2]),
+    // Flap's cut and the creator split are launch parameters fixed by
+    // `ToriiVaultFactory._validateBeforeLaunch`, not values the vault exposes.
+    hookFeeBps: null,
+    protocolFeeShareBps: null,
+    feeSweepOperator: null,
   };
 }
 

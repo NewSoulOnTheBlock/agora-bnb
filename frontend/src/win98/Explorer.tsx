@@ -44,7 +44,7 @@ function Pie({ used, capacity }: { used: bigint | null; capacity: bigint | null 
       {frac > 0.001 && (
         <path
           d={`M ${C} ${C} L ${C} ${C - R} A ${R} ${R} 0 ${large} 1 ${x} ${y} Z`}
-          fill="#ff2fb9"
+          fill="#c8102e"
           stroke="#0a0a0a"
           strokeWidth="1.2"
         />
@@ -103,9 +103,9 @@ export function MyComputer({ onClose }: { onClose: () => void }) {
           icon: "harddrive",
           used: nav,
           capacity: total,
-          note: `${liquid !== null ? formatEther(liquid) : "?"} ETH liquid · ${
+          note: `${liquid !== null ? formatEther(liquid) : "?"} BNB liquid · ${
             income !== null ? formatEther(income) : "?"
-          } ETH owed to stakers`,
+          } BNB owed to stakers`,
         },
         {
           letter: "D:",
@@ -147,7 +147,7 @@ export function MyComputer({ onClose }: { onClose: () => void }) {
                     <b>{d.letter}</b> {d.label}
                   </div>
                   <div className="drive-size">
-                    {d.used !== null ? `${formatEther(d.used)} ETH` : "unavailable"}
+                    {d.used !== null ? `${formatEther(d.used)} BNB` : "unavailable"}
                   </div>
                   <div className="drive-note">{d.note}</div>
                 </div>
@@ -158,12 +158,12 @@ export function MyComputer({ onClose }: { onClose: () => void }) {
           <div className="rows mini" style={{ marginTop: 12 }}>
             <div className="row">
               <span className="rk">Total capacity</span>
-              <span className="rv">{formatEther(total)} ETH</span>
+              <span className="rv">{formatEther(total)} BNB</span>
             </div>
             <div className="row">
               <span className="rk">Withdrawn, all time</span>
               <span className="rv">
-                {withdrawn !== null ? `${formatEther(withdrawn)} ETH` : "—"}
+                {withdrawn !== null ? `${formatEther(withdrawn)} BNB` : "—"}
               </span>
             </div>
           </div>
@@ -189,9 +189,9 @@ type Node = { name: string; addr: string; role: string };
 const NODES: Node[] = [
   { name: "TORII", addr: TORII.token, role: "the token · fixed supply, burn-only" },
   { name: "TREASURY", addr: TORII.treasury, role: "the corpus · NAV and the floor" },
-  { name: "FEESINK", addr: TORII.feeSink, role: "collects the 4% from Pons" },
+  { name: "FEESINK", addr: TORII.feeSink, role: "collects the 5% pushed by Flap" },
   { name: "REDEEMER", addr: TORII.redeemer, role: "burn TORII, join the queue" },
-  { name: "STTORII", addr: TORII.stakedAgora, role: "ERC-4626 vault · ETH rewards" },
+  { name: "STTORII", addr: TORII.stakedAgora, role: "ERC-4626 vault · BNB rewards" },
   { name: "DISTRIBUTOR", addr: TORII.distributor, role: "splits income 90 / 10" },
   { name: "STAKEDSUITS", addr: TORII.stakedSuits, role: "NFT staking · blocked by the collection" },
   { name: "ADAPTER", addr: "0x0B57a02cd732A4942DefD1c67F83097a24DBDbEe", role: "Beefy sleeve · queued, not active" },
@@ -247,7 +247,7 @@ export function NetworkNeighborhood({ onClose }: { onClose: () => void }) {
         })}
       </div>
       <p className="sub">
-        Every machine on this network is a contract on chain 4663. A green light means the address
+        Every machine on this network is a contract on chain 56. A green light means the address
         holds code — nothing more. Click through to{" "}
         <a className="link" href={EXPLORER} target="_blank" rel="noreferrer">the explorer</a> to read
         any of them.
@@ -266,7 +266,7 @@ const README = `TORII — readme.txt
 WHAT THIS IS
 
   Every buy and every sell of TORII pays a ${TORII_TAX_BPS / 100}% fee.
-  The fee is set in the Pons pool and paid in ETH, so the
+  The fee is set at launch on Flap and paid in BNB, so the
   token itself carries no tax code at all — it is a plain
   ERC-20 with no hooks, no owner, no blacklist, no mint.
 
@@ -283,7 +283,7 @@ WHAT THIS IS
 WHAT IT IS NOT
 
   It is not a guaranteed floor. The operator can withdraw
-  corpus ETH to deploy it into yield, so the reported figure
+  corpus BNB to deploy it into yield, so the reported figure
   describes what backs each token right now, not a level the
   contract can hold. Every withdrawal is logged on-chain.
 
@@ -295,7 +295,7 @@ THINGS THAT ARE TRUE AND EASY TO MISS
   - Burning happens when you ASK, not when you collect.
     There is no cancel. Re-minting is impossible.
 
-  - Staking rewards are ETH and stay outside the vault's
+  - Staking rewards are BNB and stay outside the vault's
     totalAssets(), so the share price never moves.
 
   - Suits staking is unavailable: the collection only
@@ -306,7 +306,7 @@ THINGS THAT ARE TRUE AND EASY TO MISS
     not count an asset it does not custody.
 
 
-  chain 4663 · robinhood
+  chain 56 · bnb smart chain
   ${EXPLORER}
 
 ==================================================

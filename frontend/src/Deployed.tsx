@@ -11,15 +11,15 @@ import { pricedCoverage } from "./beefy";
  * This page exists because of a specific, fair complaint about the dashboard:
  * it reported `cumulativeWithdrawn` as a bare number with no counterpart, so a
  * treasury with most of its capital at work looked like one that had been
- * emptied. At the time of writing NAV reads 0.02 ETH against 1.37 ETH
+ * emptied. At the time of writing NAV reads 0.02 BNB against 1.37 BNB
  * withdrawn — a reading that is alarming and, on its own, misleading.
  *
- * Until `BeefyCLMAdapter` is queued and activated, moving ETH out to the
+ * Until `BeefyCLMAdapter` is queued and activated, moving BNB out to the
  * operator **is** the deployment mechanism. It is not a leak, and the position
  * is fully readable on-chain, so it belongs on the page as an asset rather than
  * as an absence.
  *
- * The disclosure does not go away — deployed ETH genuinely sits outside `nav()`
+ * The disclosure does not go away — deployed BNB genuinely sits outside `nav()`
  * and therefore outside the floor, and that is stated plainly at the bottom.
  * What changes is that the reader can now see where it went and what it is
  * worth.
@@ -43,7 +43,7 @@ export default function Deployed() {
    *
    * `beefy.total` is null both when the operator holds nothing and when it
    * holds positions that could not be priced, and those must not render the
-   * same. Printing "0 ETH" over a visible list of open vaults asserts they are
+   * same. Printing "0 BNB" over a visible list of open vaults asserts they are
    * worthless — the same shape of mistake as reporting a failed sweep as "no
    * positions", which this page already had to fix once.
    */
@@ -76,14 +76,14 @@ export default function Deployed() {
           <Stat
             k="Withdrawn, all time"
             value={withdrawn != null ? fmtSig(withdrawn) : null}
-            unit="ETH"
+            unit="BNB"
             usd={usdOf(withdrawn, ethUsd)}
             note="cumulative total, not a current balance"
           />
           <Stat
             k="Worth now"
             value={deployedValue}
-            unit="ETH"
+            unit="BNB"
             usd={usdOf(worth, ethUsd)}
             note={
               partial
@@ -94,7 +94,7 @@ export default function Deployed() {
           <Stat
             k="Still in the Treasury"
             value={s?.reserve.navWad != null ? fmtSig(s.reserve.navWad) : null}
-            unit="ETH"
+            unit="BNB"
             usd={usdOf(s?.reserve.navWad, ethUsd)}
             note="NAV — the only part the floor counts"
           />
@@ -102,14 +102,14 @@ export default function Deployed() {
 
         <div style={{ height: 14 }} />
 
-        {/* Beefy is only one of the places withdrawn ETH can sit. Reconciling
+        {/* Beefy is only one of the places withdrawn BNB can sit. Reconciling
             against it alone leaves a hole that looks like a loss and usually is
             not — most of it is plainly visible in the wallet. */}
         <div className="grid c4">
           <Stat
             k="In Beefy vaults"
             value={deployedValue}
-            unit="ETH"
+            unit="BNB"
             note={
               cover.total > 0
                 ? `${cover.total} open cowcentrated position${cover.total === 1 ? "" : "s"}`
@@ -117,9 +117,9 @@ export default function Deployed() {
             }
           />
           <Stat
-            k="Operator ETH"
+            k="Operator BNB"
             value={held?.eth != null ? fmtSig(held.eth) : null}
-            unit="ETH"
+            unit="BNB"
             usd={usdOf(held?.eth, ethUsd)}
             note="idle in the wallet, not yet deployed"
           />
@@ -129,7 +129,7 @@ export default function Deployed() {
             unit="TORII"
             note={
               held?.toriiWei != null
-                ? `≈ ${fmtSig(held.toriiWei)} ETH at the pool price`
+                ? `≈ ${fmtSig(held.toriiWei)} BNB at the pool price`
                 : "bought back, or never sold"
             }
           />
@@ -139,7 +139,7 @@ export default function Deployed() {
             unit="stTORII"
             note={
               held?.stToriiWei != null
-                ? `staked in the protocol's own vault · ≈ ${fmtSig(held.stToriiWei)} ETH`
+                ? `staked in the protocol's own vault · ≈ ${fmtSig(held.stToriiWei)} BNB`
                 : "staked in the protocol's own vault"
             }
           />
@@ -157,7 +157,7 @@ export default function Deployed() {
             )} The remainder is not necessarily missing — it may have been returned to the
             Treasury with <code>fund()</code>, spent on gas, or moved into a venue this page does
             not scan. What this page can prove is only what it can read, and it reads three places:
-            Beefy, the wallet's ETH, and the wallet's TORII.
+            Beefy, the wallet's BNB, and the wallet's TORII.
           </p>
         )}
       </div>
@@ -215,7 +215,7 @@ export default function Deployed() {
           >
             <div className="rows">
               <Row k="Value now" na={p.valueWei === null}>
-                {p.valueWei != null ? `${fmtSig(p.valueWei)} ETH` : "could not be priced"}
+                {p.valueWei != null ? `${fmtSig(p.valueWei)} BNB` : "could not be priced"}
               </Row>
               <Row k="Composition">
                 {p.amount0 != null && p.decimals0 != null
@@ -226,7 +226,7 @@ export default function Deployed() {
                   : DASH}
               </Row>
               <Row k="Whole vault holds">
-                {p.vaultValueWei != null ? `${fmtSig(p.vaultValueWei)} ETH` : DASH}
+                {p.vaultValueWei != null ? `${fmtSig(p.vaultValueWei)} BNB` : DASH}
               </Row>
               <Row k="Vault contract">
                 <a className="link" href={explorerAddr(p.clm)} target="_blank" rel="noreferrer">
@@ -256,7 +256,7 @@ export default function Deployed() {
         <p className="label">Why this sits outside the floor</p>
         <Panel>
           <p className="sub" style={{ marginTop: 0 }}>
-            Deployed ETH is held by the operator wallet, not by the Treasury, so{" "}
+            Deployed BNB is held by the operator wallet, not by the Treasury, so{" "}
             <code>nav()</code> cannot see it and the floor is computed only from what remains
             on-contract. That is the honest accounting — a contract should not count an asset it
             does not custody.

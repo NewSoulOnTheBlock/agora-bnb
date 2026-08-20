@@ -14,6 +14,18 @@ import { approveSuitsForStaking, stakeSuits, unstakeSuits } from "../vault";
 import type { Wallet } from "../eth";
 
 /**
+ * PARKED — nothing renders this on BNB Chain.
+ *
+ * The desktop icon is an inert "soon" marker instead. This file is kept whole
+ * rather than deleted because the reason it is off is external: there is no
+ * TORII NFT collection on chain 56 yet. The moment there is, the only change
+ * needed is an address in `chain.ts` and re-wiring the icon.
+ *
+ * It works. It was built and verified against a live 1111-token collection on
+ * chain 4663: 29 tokens listed in 2.3s on first open and 116ms on reopen.
+ *
+ * ---------------------------------------------------------------------------
+ *
  * My Suits — the wallet's NFTs, as a Windows 98 folder.
  *
  * ## Why a folder is the right metaphor and not just a joke
@@ -451,7 +463,7 @@ function SuitProperties({ id, onClose }: { id: number; onClose: () => void }) {
           <p style={{ margin: 0 }}>Metadata is unreachable right now.</p>
           <p className="sub">
             The art and traits live on IPFS behind public gateways. The token itself is on chain
-            4663 and unaffected — this is a gateway being slow, not a missing NFT.
+            56 and unaffected — this is a gateway being slow, not a missing NFT.
           </p>
         </>
       ) : (

@@ -185,11 +185,11 @@ export default function Dino() {
       }
 
       // horizon
-      ctx.fillStyle = "#01cdfe";
+      ctx.fillStyle = "#e8b530";
       ctx.fillRect(0, GROUND + 3, W, 1);
 
       // cacti
-      ctx.fillStyle = "#05ffa1";
+      ctx.fillStyle = "#12836b";
       for (const c of s.cacti) {
         ctx.fillRect(c.x, GROUND - c.h, c.w, c.h);
         ctx.fillRect(c.x - 4, GROUND - c.h + 8, 4, 3);
@@ -201,7 +201,7 @@ export default function Dino() {
       ctx.fillStyle = dead ? "#8b8677" : "#ffffff";
       ctx.fillRect(42 + 10, dy - 24, 12, 10);        // head
       ctx.fillRect(42 + 20, dy - 21, 3, 2);          // snout
-      ctx.fillStyle = dead ? "#8b8677" : "#ff2fb9";
+      ctx.fillStyle = dead ? "#8b8677" : "#c8102e";
       ctx.fillRect(42 + 15, dy - 22, 2, 2);          // eye
       ctx.fillStyle = dead ? "#8b8677" : "#ffffff";
       ctx.fillRect(42 + 4, dy - 16, 16, 12);         // body
@@ -221,7 +221,7 @@ export default function Dino() {
   return (
     <div className="dino">
       <div className="dino-hud">
-        <span className="kana">ノーインターネット</span>
+        <span className="hanzi">無網際網路</span>
         <span className="dino-score">
           HI {String(hi).padStart(5, "0")} &nbsp; {String(score).padStart(5, "0")}
         </span>

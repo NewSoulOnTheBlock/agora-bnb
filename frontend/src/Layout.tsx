@@ -4,14 +4,17 @@ import { shortAddr } from "./format";
 import type { Wallet } from "./eth";
 import { PixelIcon, type IconName } from "./win98/pixel";
 import Dino from "./win98/Dino";
-import Screensaver from "./win98/Screensaver";
 import { useDrag, withDrag } from "./win98/useDrag";
 import TaxWatch from "./win98/TaxWatch";
 import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
 import { MyComputer, NetworkNeighborhood, Notepad } from "./win98/Explorer";
-import { NftFolder } from "./win98/NftFolder";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
-import { TORII, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
+import { TORII, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL, RPC_URL } from "./chain";
+
+/** The endpoint, as a hostname. Derived so the status bar cannot go stale. */
+const RPC_HOST = (() => {
+  try { return new URL(RPC_URL).host; } catch { return RPC_URL; }
+})();
 
 export type Tab = "about" | "floor" | "deployed" | "trade" | "stake" | "suits" | "redeem";
 
@@ -20,18 +23,18 @@ export type Tab = "about" | "floor" | "deployed" | "trade" | "stake" | "suits" |
  * same "explain before you dashboard" reasoning. Only an icon was added.
  */
 export const TABS: {
-  id: Tab; label: string; icon: IconName; kana: string;
+  id: Tab; label: string; icon: IconName; hanzi: string;
   disabled?: boolean; why?: string;
   /** Kept out of the UI entirely, rather than shown greyed. */
   hidden?: boolean;
 }[] = [
-  { id: "about", label: "What is this?", icon: "help", kana: "ガイド" },
-  { id: "floor", label: "Reserve", icon: "coins", kana: "リザーブ" },
-  { id: "deployed", label: "Deployed", icon: "harddrive", kana: "デプロイ" },
-  { id: "trade", label: "Trade", icon: "chart", kana: "トレード" },
-  { id: "stake", label: "Stake", icon: "lock", kana: "ステーク" },
+  { id: "about", label: "What is this?", icon: "help", hanzi: "指南" },
+  { id: "floor", label: "Reserve", icon: "coins", hanzi: "儲備" },
+  { id: "deployed", label: "Deployed", icon: "harddrive", hanzi: "部署" },
+  { id: "trade", label: "Trade", icon: "chart", hanzi: "交易" },
+  { id: "stake", label: "Stake", icon: "lock", hanzi: "質押" },
   {
-    id: "suits", label: "Suits", icon: "tie", kana: "スーツ",
+    id: "suits", label: "Suits", icon: "tie", hanzi: "西裝",
     disabled: !SUITS_STAKING_ENABLED,
     // Hidden rather than greyed while the collection's operator allowlist
     // blocks the vault. A permanently dead tab is worse than no tab — it
@@ -40,7 +43,7 @@ export const TABS: {
     hidden: !SUITS_STAKING_ENABLED,
     why: "Suits staking is unavailable: the collection only permits allowlisted operators to move tokens, and this vault is not on that list.",
   },
-  { id: "redeem", label: "Redeem", icon: "flame", kana: "リディーム" },
+  { id: "redeem", label: "Redeem", icon: "flame", hanzi: "贖回" },
 ];
 
 /** Routes a user must not reach, because the underlying action cannot succeed. */
@@ -59,15 +62,15 @@ const VISIBLE_TABS = TABS.filter((t) => !t.hidden);
  * the ones worth reading; the rest is set dressing.
  */
 const TICKER = [
-  "ＷＥＬＣＯＭＥ ＴＯ ＴＨＥ ＡＧＯＲＡ",
-  "the tax never sleeps · 4% on every buy and every sell",
-  "アゴラ · 準備金 · 償還",
+  "ＷＥＬＣＯＭＥ ＴＯ ＴＨＥ ＴＯＲＩＩ",
+  "the tax never sleeps · 5% on every buy and every sell",
+  "神社 · 儲備金 · 贖回",
   "burn it and the floor rises for everyone who stayed",
-  "we are not a bank · we are a marble pot with a queue",
+  "we are not a bank · we are a lacquer pot with a queue",
   "no keeper moves the corpus · every allocation is a signature",
   "SO LONG AND GOODNIGHT, MERCENARY LIQUIDITY",
-  "chain 4663 · robinhood · verified on-chain",
-  "the columns were always on brand",
+  "chain 56 · bnb chain · verified on-chain",
+  "the gate was always on brand · 神社",
 ];
 
 const TITLES: Record<Tab, string> = {
@@ -89,16 +92,18 @@ const TITLES: Record<Tab, string> = {
 function Boot() {
   return (
     <div className="boot" aria-hidden="true">
-      <div className="boot-art chrome">ＡＧＯＲＡ</div>
-      <div className="boot-kana kana">アゴラ・準備金・システム起動</div>
+      <div className="boot-art chrome">ＴＯＲＩＩ</div>
+      <div className="boot-hanzi hanzi">神社・儲備・系統啟動</div>
       <div className="boot-rule meander" />
-      <div className="bright">TORII BIOS v4.663</div>
+      <div className="bright">TORII BIOS v5.6</div>
       <div>Copyright (C) 2026, Torii Collective</div>
       <br />
-      <div>Chain . . . . . . . . 4663 Robinhood (Arbitrum Orbit)</div>
-      <div>Numeraire . . . . . . ETH, no oracle</div>
-      <div>Reserve . . . . . . . Treasury 0x7A3B…6C5c <b className="okc">OK</b></div>
-      <div>Redemption. . . . . . Redeemer 0x6315…84C0 <b className="okc">OK</b></div>
+      <div>Chain . . . . . . . . 56 BNB Smart Chain</div>
+      <div>Numeraire . . . . . . BNB, no oracle</div>
+      <div>Launchpad . . . . . . Flap <b className="okc">OK</b></div>
+      <div>Reserve . . . . . . . Treasury 0x2384…BE1a <b className="okc">OK</b></div>
+      <div>Redemption. . . . . . Redeemer 0xcF48…3fb1 <b className="okc">OK</b></div>
+      <div>Tax vault . . . . . . ToriiVault 0x0938…c9A4 <b className="okc">OK</b></div>
       <div>Yield sleeve. . . . . 0 bps, no adapters</div>
       <div>Marble. . . . . . . . loaded</div>
       <br />
@@ -241,7 +246,7 @@ export default function Layout({
   const [tip, setTip] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
   const [win, setWin] = useState<
-    null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad" | "suitsfolder"
+    null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad"
   >(null);
   const [crt, setCrt] = useState(() => {
     try { return localStorage.getItem("torii98:crt") === "on"; } catch { return false; }
@@ -310,7 +315,7 @@ export default function Layout({
    *  so the list is useful somewhere other than this page. */
   const copyAddresses = () => {
     const lines = [
-      "TORII — chain 4663 (Robinhood)",
+      "TORII — chain 56 (BNB Smart Chain)",
       `explorer     ${EXPLORER}`,
       `token        ${TORII.token}`,
       `curve        ${TORII.curve}`,
@@ -345,28 +350,41 @@ export default function Layout({
     >
       {booting && <Boot />}
 
-      {/* ---- the scene: sun, grid, horizon, frieze, columns ----
-           Decorative only, so it is aria-hidden and takes no pointer events. */}
+      {/* ---- the scene: moon, mountains, the 牌坊, lanterns ----
+           Decorative only, so it is aria-hidden and takes no pointer events.
+
+           The gate is a paifang rather than a torii on purpose. TORII names the
+           Japanese gate, but the Japanese gate descends from this one, and the
+           brief for this chain is Chinese — drawing the ancestor keeps the name
+           true and puts the page in the right country at the same time.
+
+           The plaque reads 神社・鳥居 — the token's own name and its symbol.
+           `name()` on chain 56 returns 神社 (shénshè, "shrine") literally, so
+           the plaque is quoting the contract rather than decorating around it.
+           Set as text rather than baked into the SVG so it can be read,
+           selected and translated. */}
       <div className="scene" aria-hidden="true">
-        <div className="vw-sun" />
-        <div className="vw-grid" />
-        <div className="vw-horizon" />
-        <div className="frieze-band">
-          <picture>
-            <source media="(max-width: 900px)" srcSet="/frieze-sm.jpg" />
-            <img src="/frieze.jpg" alt="" loading="eager" decoding="async" />
-          </picture>
+        <div className="cn-clouds" />
+        <div className="cn-moon" />
+        <div className="cn-hills" />
+        <div className="cn-gate">
+          <div className="roof" />
+          <div className="plaque">神社・鳥居</div>
+          <div className="pillar left">
+            <span className="cn-lion left" />
+          </div>
+          <div className="pillar right">
+            <span className="cn-lion right" />
+          </div>
+          {/* 对联 — a matched couplet, right line read first, seven characters
+              each. Both halves are literally true of the contracts: every trade
+              is taxed into the pot, and every burn lifts the floor for whoever
+              did not burn. */}
+          <div className="cn-couplet right">每筆交易皆納稅</div>
+          <div className="cn-couplet left">每次焚毀價更高</div>
         </div>
-        <div className="column left">
-          <div className="cap" />
-          <div className="shaft" />
-          <div className="base" />
-        </div>
-        <div className="column right">
-          <div className="cap" />
-          <div className="shaft" />
-          <div className="base" />
-        </div>
+        <div className="cn-lantern l1" />
+        <div className="cn-lantern l2" />
       </div>
 
       {/* ---- desktop icons ---- */}
@@ -383,7 +401,7 @@ export default function Layout({
             <PixelIcon name={t.icon} size={32} />
             <span>
               {t.label}
-              <span className="kana">{t.kana}</span>
+              <span className="hanzi">{t.hanzi}</span>
             </span>
           </button>
         ))}
@@ -398,7 +416,7 @@ export default function Layout({
           <PixelIcon name="computer" size={32} />
           <span>
             My Computer
-            <span className="kana">マイコンピュータ</span>
+            <span className="hanzi">我的電腦</span>
           </span>
         </button>
 
@@ -410,7 +428,7 @@ export default function Layout({
           <PixelIcon name="network" size={32} />
           <span>
             Network
-            <span className="kana">ネットワーク</span>
+            <span className="hanzi">網路芳鄰</span>
           </span>
         </button>
 
@@ -422,22 +440,28 @@ export default function Layout({
           <PixelIcon name="help" size={32} />
           <span>
             readme.txt
-            <span className="kana">リードミー</span>
+            <span className="hanzi">說明文件</span>
           </span>
         </button>
 
-        {/* The wallet's Suits, as a folder. Right-click a file to stake it —
-            the collection is not enumerable, so the folder has to read all 1111
-            owners to know which files belong in it. */}
+        {/* The NFT folder is built and works — it lists a wallet's tokens by
+            sweeping every owner, because the collection is not enumerable — but
+            there is no collection on BNB Chain to point it at. So the icon
+            stays as a marker and does nothing when clicked, rather than opening
+            a folder that can only ever be empty.
+
+            `disabled` rather than hidden: an inert icon that says "soon" is a
+            statement about the roadmap; a missing one is just an absence. */}
         <button
-          className="desk-icon"
-          onClick={() => { play("open"); setWin("suitsfolder"); }}
-          title="My Suits — your NFTs"
+          className="desk-icon soon"
+          disabled
+          aria-disabled="true"
+          title="NFTs — not on BNB Chain yet"
         >
           <PixelIcon name="folder" size={32} />
           <span>
-            My Suits
-            <span className="kana">スーツ</span>
+            NFTs <span className="soon-tag">soon</span>
+            <span className="hanzi">即將推出</span>
           </span>
         </button>
 
@@ -454,7 +478,7 @@ export default function Layout({
           <PixelIcon name="rocket" size={32} />
           <span>
             Launchpad
-            <span className="kana">ローンチパッド</span>
+            <span className="hanzi">發射台</span>
           </span>
         </button>
 
@@ -466,7 +490,7 @@ export default function Layout({
           <PixelIcon name="dino" size={32} />
           <span>
             No Internet
-            <span className="kana">ランナー</span>
+            <span className="hanzi">恐龍跑酷</span>
           </span>
         </button>
 
@@ -482,7 +506,7 @@ export default function Layout({
             <PixelIcon name="dolphin" size={32} />
             <span>
               dolphin.exe
-              <span className="kana">イルカ</span>
+              <span className="hanzi">海豚</span>
             </span>
           </button>
           {tip && <span className="tip">{tip}</span>}
@@ -501,7 +525,7 @@ export default function Layout({
           <img src="/GMGN_logo.svg" width={32} height={32} alt="" />
           <span>
             TORII chart
-            <span className="kana">ジーエムジーエヌ</span>
+            <span className="hanzi">行情圖</span>
           </span>
         </a>
       </div>
@@ -532,8 +556,8 @@ export default function Layout({
           >
             <PixelIcon name="computer" size={16} />
             <span className="t-text">
-              <span className="chrome">ＡＧＯＲＡ ９８</span>
-              <span className="kana" style={{ margin: "0 6px", opacity: 0.8 }}>アゴラ</span>
+              <span className="chrome">ＴＯＲＩＩ ９８</span>
+              <span className="hanzi" style={{ margin: "0 6px", opacity: 0.8 }}>神社</span>
               — {TITLES[tab]}
             </span>
             <span className="t-btns">
@@ -591,7 +615,7 @@ export default function Layout({
                 },
                 {
                   kind: "item",
-                  label: "Switch to chain 4663",
+                  label: "Switch to chain 56",
                   disabled: !wallet.account || wallet.onCorrectChain,
                   onClick: wallet.switchChain,
                 },
@@ -602,7 +626,6 @@ export default function Layout({
               open={openMenu === "help"} setOpen={(v) => setOpenMenu(v ? "help" : null)}
               entries={[
                 { kind: "item", label: "What is this?", onClick: () => go("about") },
-                { kind: "item", label: "My Suits…", onClick: () => setWin("suitsfolder") },
                 { kind: "item", label: "Windows Update…", onClick: () => setWin("update") },
                 { kind: "item", label: "Redemption Queue…", onClick: () => setWin("queue") },
                 { kind: "item", label: "System Properties…", onClick: () => setWin("sysprops") },
@@ -626,7 +649,7 @@ export default function Layout({
               >
                 <PixelIcon name={t.icon} size={16} />
                 {t.label}
-                <span className="kana">{t.kana}</span>
+                <span className="hanzi">{t.hanzi}</span>
               </button>
             ))}
           </div>
@@ -658,7 +681,10 @@ export default function Layout({
             </div>
             <div className="status-pane mono">
               <PixelIcon name="globe" size={16} />
-              rpc.mainnet.chain.robinhood.com
+              {RPC_HOST}
+            </div>
+            <div className="status-pane" title="鏈上核驗 — verified on chain 56">
+              <span className="seal">鏈上<br />核驗</span>
             </div>
           </div>
         </div>
@@ -680,14 +706,14 @@ export default function Layout({
         <Dialog title="About TORII 98" icon="info" onClose={() => setDialog(null)}>
           <p style={{ margin: 0 }}>
             <b>TORII 98</b><br />
-            A 4% trade tax funding a reserve on Robinhood Chain.
+            A 5% trade tax funding a reserve on BNB Chain.
           </p>
           <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
-            Every buy and sell pays 4%. Part of it pays people who stake; the rest sits in the
+            Every buy and sell pays 5%. Part of it pays people who stake; the rest sits in the
             reserve, and any holder may burn TORII for a share of it.
           </p>
           <p style={{ margin: "8px 0 0", color: "#505050" }}>
-            The interface is a tribute. The contracts are real — addresses verified on chain 4663.
+            The interface is a tribute. The contracts are real — addresses verified on chain 56.
           </p>
         </Dialog>
       )}
@@ -699,7 +725,7 @@ export default function Layout({
           </p>
           <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
             Redeeming TORII burns it at the moment you ask, not when you collect. The supply is
-            fixed by the Pons factory and there is no mint function, so nothing that goes in here
+            fixed at launch and there is no mint function, so nothing that goes in here
             ever comes back.
           </p>
           <p style={{ margin: "8px 0 0", color: "#4a5a50" }}>
@@ -725,7 +751,7 @@ export default function Layout({
         >
           <div className="titlebar" {...gameDrag.handleProps} onDoubleClick={gameDrag.reset}>
             <PixelIcon name="dino" size={16} />
-            <span className="t-text">No Internet — ランナー</span>
+            <span className="t-text">No Internet — 恐龍跑酷</span>
             <span className="t-btns">
               <button
                 className="tbtn close"
@@ -747,7 +773,7 @@ export default function Layout({
         >
           <div className="titlebar" {...padDrag.handleProps} onDoubleClick={padDrag.reset}>
             <PixelIcon name="rocket" size={16} />
-            <span className="t-text">Launchpad — ローンチパッド</span>
+            <span className="t-text">Launchpad — 發射台</span>
             <span className="t-btns">
               <button
                 className="tbtn close"
@@ -761,15 +787,15 @@ export default function Layout({
               <PixelIcon name="rocket" size={32} />
               <div>
                 <p style={{ margin: 0 }}>
-                  <b>There are already a hundred launchpads on Robinhood Chain.</b>
+                  <b>There are already a hundred launchpads on BNB Chain.</b>
                 </p>
                 <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
-                  So we did not build another one. TORII launched on Pons like everything else, and
+                  So we did not build another one. TORII launched on Flap like everything else, and
                   the interesting part was never the launch — it was what happens to the tax
                   afterwards.
                 </p>
                 <p style={{ margin: "8px 0 0", color: "#4a3a5e", lineHeight: 1.5 }}>
-                  Every buy and sell still pays 4%. That is the whole product. A launchpad would
+                  Every buy and sell still pays 5%. That is the whole product. A launchpad would
                   have been a hundred-and-first way to start; the reserve is a way to keep going.
                 </p>
               </div>
@@ -827,9 +853,6 @@ export default function Layout({
       {win === "mycomputer" && <MyComputer onClose={() => { play("close"); setWin(null); }} />}
       {win === "network" && <NetworkNeighborhood onClose={() => { play("close"); setWin(null); }} />}
       {win === "notepad" && <Notepad onClose={() => { play("close"); setWin(null); }} />}
-      {win === "suitsfolder" && (
-        <NftFolder wallet={wallet} onClose={() => { play("close"); setWin(null); }} />
-      )}
 
       {/* ---- start menu ---- */}
       {startOpen && (
@@ -863,9 +886,9 @@ export default function Layout({
               <PixelIcon name="network" size={24} />
               Network Neighborhood
             </button>
-            <button role="menuitem" onClick={() => { play("open"); setWin("suitsfolder"); setStartOpen(false); }}>
+            <button role="menuitem" disabled aria-disabled="true">
               <PixelIcon name="folder" size={24} />
-              My Suits
+              NFTs <span className="soon-tag">soon</span>
             </button>
             <button role="menuitem" onClick={() => { play("open"); setWin("notepad"); setStartOpen(false); }}>
               <PixelIcon name="help" size={24} />
@@ -909,7 +932,6 @@ export default function Layout({
       {/* Announcements from the chain, and the idle takeover. Both sit above
           the desktop and outside every window. */}
       <TaxWatch enabled={!booting} />
-      <Screensaver />
 
       {/* ---- taskbar ---- */}
       <div className="taskbar">
@@ -920,7 +942,7 @@ export default function Layout({
           onClick={() => { play("click"); setStartOpen(!startOpen); setOpenMenu(null); }}
         >
           <PixelIcon name="computer" size={18} />
-          Start
+          Start<span className="gloss">開始</span>
         </button>
         <div className="task-sep" />
 

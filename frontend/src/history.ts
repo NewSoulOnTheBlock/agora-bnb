@@ -1,19 +1,47 @@
 import { Contract, id as topicId, Interface, type Log } from "ethers";
-import { readProvider, MAX_LOG_SPAN, PONS, TORII, ZERO } from "./chain";
-import { MEME_HOOK_ABI, TREASURY_ABI } from "./abis";
+import { logProvider, MAX_LOG_SPAN, MAX_LOG_DEPTH, HAS_ARCHIVE, TORII, ZERO } from "./chain";
+import { TREASURY_ABI } from "./abis";
 
 /**
- * Chunked backwards log scanner.
+ * Chunked backwards log scanner, and the wall it runs into on BSC.
  *
- * The public Robinhood RPC accepts ~500k-block eth_getLogs spans (1M fails), and
- * the chain produces blocks fast enough that 500k is well under two days. So a
- * "last N days" view means several sequential requests — hence the chunking and
- * the hard `maxChunks` ceiling, which keeps a curious user from accidentally
- * firing hundreds of requests at a public endpoint.
+ * On Robinhood Chain this walked ~500k blocks per request across several
+ * chunks, covering days. BNB Chain gives far less, and the numbers were
+ * measured rather than assumed (2026-08-20, eight public endpoints):
  *
- * The Alchemy endpoint cannot do this at all: its free tier caps getLogs at a
- * 10-block range.
+ *   - Most public BSC RPCs refuse `eth_getLogs` outright. `bsc-dataseed.*`,
+ *     `1rpc.io`, `blastapi`, `blockrazor` all decline; `meowrpc` answers
+ *     "method not supported".
+ *   - The one that serves it, `bsc-rpc.publicnode.com`, is **not an archive
+ *     node**: past roughly **9,960 blocks** it answers "Archive requests
+ *     require a personal token".
+ *   - Its other limit is by *result count*, not block span — "query exceeds
+ *     max results 20000" — which only bites on very busy contracts.
+ *
+ * BSC blocks are 0.45 seconds, so ~9,960 blocks is about **75 minutes**. Every
+ * log-backed view on this chain sees a little over an hour of history and no
+ * more, until `VITE_BSC_LOG_RPC_URL` points at an archive endpoint.
+ *
+ * `reachedWall` reports that rather than hiding it. A caller must be able to
+ * tell "no trades happened" from "the node would not say", because rendering
+ * the second as the first is how an empty chart starts looking like a fact.
  */
+let lastScanRefused = 0;
+let lastScanChunks = 0;
+let lastScanClamped = false;
+
+/**
+ * Whether the last scan hit the archive wall.
+ *
+ * Deliberately a module-level reading rather than part of the return value:
+ * every caller already destructures a `Log[]`, and threading a second field
+ * through all of them to answer one question would be worse than one honest
+ * global read immediately after the call.
+ */
+export function lastScanReachedWall(): boolean {
+  return lastScanChunks > 0 && (lastScanRefused > 0 || lastScanClamped);
+}
+
 export async function scanLogsBackwards(opts: {
   address: string;
   topics: (string | null)[];
@@ -32,7 +60,7 @@ export async function scanLogsBackwards(opts: {
 
   if (!address || address === ZERO) return [];
 
-  const head = await readProvider.getBlockNumber();
+  const head = await logProvider.getBlockNumber();
 
   // The ranges are a pure function of `head`, so they do not need to be walked
   // one at a time. The previous version awaited each chunk before computing the
@@ -40,24 +68,37 @@ export async function scanLogsBackwards(opts: {
   // a 450k-block getLogs — and the page fires two of these scans at once, so
   // the wait was up to ten heavy queries end to end. Issuing them together
   // collapses that to a single wave.
+  // Never request a range the endpoint has already said it will not serve.
+  // See `MAX_LOG_DEPTH`: without this, most chunks came back 403 every load.
+  const floor = Math.max(0, head - MAX_LOG_DEPTH);
+
   const ranges: { from: number; to: number }[] = [];
   let to = head;
-  for (let i = 0; i < maxChunks && to >= 0; i++) {
-    const from = Math.max(0, to - spanPerChunk + 1);
+  for (let i = 0; i < maxChunks && to >= floor; i++) {
+    const from = Math.max(floor, to - spanPerChunk + 1);
     ranges.push({ from, to });
-    if (from === 0) break;
+    if (from === floor) break;
     to = from - 1;
   }
 
   // A rejected chunk (rate limit, span too wide) contributes nothing rather
   // than discarding the chunks that did succeed.
+  let refused = 0;
   const settled = await Promise.all(
     ranges.map(({ from, to: hi }) =>
-      readProvider
+      logProvider
         .getLogs({ address, topics, fromBlock: from, toBlock: hi })
-        .catch(() => [] as Log[])
+        .catch(() => {
+          refused++;
+          return [] as Log[];
+        })
     )
   );
+  lastScanRefused = refused;
+  lastScanChunks = ranges.length;
+  // Truncated on purpose is still truncated: a caller charting this needs to
+  // know the window was capped even when every request succeeded.
+  lastScanClamped = !HAS_ARCHIVE && floor > 0;
 
   // Ranges were built newest-first, so reverse to get overall ascending order.
   const out: Log[] = [];
@@ -85,79 +126,106 @@ export type TaxEvent = {
   cumulativeTax: bigint;
 };
 
-const HOOK_IFACE = new Interface(MEME_HOOK_ABI);
-const T_HOOK_FEE = topicId("HookFeeCollected(bytes32,address,uint256,uint256)");
+/**
+ * `ToriiVault` recognises tax by balance delta and says so.
+ *
+ *   RevenueRecognized(uint256 amount, uint256 baseline)
+ *
+ * Non-indexed, both words in `data`. `baseline` is the vault balance the delta
+ * was measured against; it is read here only to keep the decode honest about
+ * the event's real shape.
+ */
+const T_REVENUE = topicId("RevenueRecognized(uint256,uint256)");
+
+/** `Converted(uint256 tokensIn, uint256 quoteOut)` — the TORII leg being sold. */
+const T_CONVERTED = topicId("Converted(uint256,uint256)");
 
 /**
- * Tax history for one pool, in ONE currency.
+ * Tax history, read from the vault rather than from a pool hook.
  *
- * The `currency` filter is not optional in spirit: the hook emits
- * HookFeeCollected for BOTH legs of a swap — native ETH on one side and the
- * memecoin on the other. Measured over 100k blocks on chain 4663, the same hook
- * produced 1,397 native-ETH events alongside hundreds of token-denominated ones.
- * Summing across currencies adds ether to token units and yields a meaningless
- * number (it read as ~8.8M "ETH" before this filter existed).
+ * ## Why the currency filter is gone
  *
- * Pons's sweepPoolFees() later converts the memecoin leg to quote before
- * crediting the creator, so the ETH series is the one that maps to corpus inflow.
+ * On Pons this function existed mostly to *filter*: the hook emitted
+ * `HookFeeCollected` for both legs of every swap, and summing across them added
+ * ether to token units — a bug that once printed ~8.8M "ETH". Flap's vault has
+ * no such ambiguity. `RevenueRecognized` is BNB, always, because the vault's
+ * quote token is native BNB.
+ *
+ * The TORII leg is a separate event, `Converted`, and it is genuinely separate:
+ * post-graduation tax arrives as TORII, which the Treasury marks at zero, so it
+ * is not revenue until it has been sold. Keeping the two apart is the same
+ * lesson the currency filter taught, expressed in the contract instead of in
+ * the reader.
+ *
+ * `_pid` is ignored — the vault is per-token, not per-pool — and kept only so
+ * `useReads` calls the same shape on both chains.
  */
 export async function readTaxHistory(
-  pid: string,
-  currency: string = ZERO,
+  _pid: string,
+  _currency: string = ZERO,
   maxChunks = 4
 ): Promise<TaxEvent[]> {
+  if (!deployed(TORII.feeSink)) return [];
+
   const logs = await scanLogsBackwards({
-    address: PONS.memeHook,
-    topics: [T_HOOK_FEE, pid],
+    address: TORII.feeSink,
+    topics: [T_REVENUE],
     maxChunks,
   });
 
-  const want = currency.toLowerCase();
   let running = 0n;
   const out: TaxEvent[] = [];
   for (const l of logs) {
     try {
-      const p = HOOK_IFACE.parseLog({ topics: [...l.topics], data: l.data });
-      if (!p) continue;
-      const cur = String(p.args.currency);
-      if (cur.toLowerCase() !== want) continue;
-      const taxAmount = BigInt(p.args.taxAmount);
-      running += taxAmount;
+      // Two uint256 words: amount, then baseline.
+      const amount = BigInt("0x" + l.data.slice(2, 66));
+      running += amount;
       out.push({
         block: l.blockNumber,
-        currency: cur,
-        feeAmount: BigInt(p.args.feeAmount),
-        taxAmount,
+        currency: ZERO,
+        feeAmount: amount,
+        taxAmount: amount,
         cumulativeTax: running,
       });
     } catch {
-      // Skip any log we can't decode rather than failing the whole series.
+      // One malformed entry must not void the series.
     }
   }
   return out;
 }
 
-/** Per-currency totals, for the Proof page — makes the two legs explicit. */
+/**
+ * The two legs, separated: BNB recognised directly, and TORII sold into BNB.
+ *
+ * Keyed by the asset the tax *arrived* as, which is the distinction that
+ * matters — `Converted` output is already counted in `RevenueRecognized`, so
+ * these are reported side by side rather than summed.
+ */
 export async function readTaxByCurrency(
-  pid: string,
+  _pid: string,
   maxChunks = 4
 ): Promise<Map<string, { count: number; total: bigint }>> {
-  const logs = await scanLogsBackwards({
-    address: PONS.memeHook,
-    topics: [T_HOOK_FEE, pid],
-    maxChunks,
-  });
   const m = new Map<string, { count: number; total: bigint }>();
-  for (const l of logs) {
-    try {
-      const p = HOOK_IFACE.parseLog({ topics: [...l.topics], data: l.data });
-      if (!p) continue;
-      const cur = String(p.args.currency);
-      const e = m.get(cur) ?? { count: 0, total: 0n };
-      e.count += 1;
-      e.total += BigInt(p.args.taxAmount);
-      m.set(cur, e);
-    } catch { /* ignore */ }
+  if (!deployed(TORII.feeSink)) return m;
+
+  const [revenue, converted] = await Promise.all([
+    scanLogsBackwards({ address: TORII.feeSink, topics: [T_REVENUE], maxChunks }),
+    scanLogsBackwards({ address: TORII.feeSink, topics: [T_CONVERTED], maxChunks }),
+  ]);
+
+  const add = (key: string, v: bigint) => {
+    const e = m.get(key) ?? { count: 0, total: 0n };
+    e.count += 1;
+    e.total += v;
+    m.set(key, e);
+  };
+
+  for (const l of revenue) {
+    try { add(ZERO, BigInt("0x" + l.data.slice(2, 66))); } catch { /* skip */ }
+  }
+  for (const l of converted) {
+    // tokensIn is the first word — the TORII actually sold.
+    try { add(TORII.token, BigInt("0x" + l.data.slice(2, 66))); } catch { /* skip */ }
   }
   return m;
 }
@@ -224,9 +292,18 @@ export function findFloorRegressions(points: FloorPoint[]): FloorPoint[] {
   return bad;
 }
 
-/** Unused-but-exported guard so the hook ABI stays wired for the sweep event. */
-export const HOOK_CONTRACT = () =>
-  new Contract(PONS.memeHook, MEME_HOOK_ABI, readProvider);
+/** The tax vault, for anyone who wants to read it directly. */
+export const VAULT_CONTRACT = () =>
+  new Contract(
+    TORII.feeSink,
+    [
+      "function pendingQuote() view returns (uint256)",
+      "function pendingTaxToken() view returns (uint256)",
+      "function cumulativeForwarded() view returns (uint256)",
+      "function cumulativeConverted() view returns (uint256)",
+    ],
+    logProvider
+  );
 
 // ---------------------------------------------------------------------------
 // Income history — what stakers have actually been paid, and over what window
@@ -275,8 +352,8 @@ export async function readIncomeHistory(maxChunks = 5): Promise<IncomeHistory | 
   let windowSec = 0;
   if (sorted.length > 1) {
     const [a, b] = await Promise.all([
-      readProvider.getBlock(sorted[0].blockNumber).catch(() => null),
-      readProvider.getBlock(sorted[sorted.length - 1].blockNumber).catch(() => null),
+      logProvider.getBlock(sorted[0].blockNumber).catch(() => null),
+      logProvider.getBlock(sorted[sorted.length - 1].blockNumber).catch(() => null),
     ]);
     if (a && b) windowSec = Math.max(0, b.timestamp - a.timestamp);
   }
