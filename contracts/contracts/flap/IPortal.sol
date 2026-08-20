@@ -2,12 +2,12 @@
 
 pragma solidity ^0.8.13;
 
-// VENDORING NOTE (AGORA) — this is the only edit made to Flap's source.
+// VENDORING NOTE (TORII) — this is the only edit made to Flap's source.
 //
 // Upstream imports `IAccessControlUpgradeable` from a Foundry remapping
 // (`@openzeppelin-contracts-upgradeable/...`) that Hardhat cannot resolve and
 // that no npm package provides under that name. The symbol is used exactly once,
-// at the bottom of this file, as a base of `IPortal` — an interface AGORA never
+// at the bottom of this file, as a base of `IPortal` — an interface TORII never
 // references; we consume only `IPortalTypes`. Declaring it locally keeps every
 // other line of Flap's file byte-identical and avoids pulling an entire
 // upgradeable-contracts dependency in for one unused inherited interface.

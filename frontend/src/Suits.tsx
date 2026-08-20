@@ -4,7 +4,7 @@ import { Panel, Row, Stat, Pill, Dot } from "./components";
 import { AwaitingDeployment } from "./Layout";
 import { fmtSig, DASH } from "./format";
 import {
-  AGORA, ZERO, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_VALIDATOR, SUITS_SHARE_BPS,
+  TORII, ZERO, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_VALIDATOR, SUITS_SHARE_BPS,
   SUITS_MARKET,
 } from "./chain";
 import {
@@ -14,7 +14,7 @@ import {
 import { useSnapshot } from "./useReads";
 import type { Wallet } from "./eth";
 
-const deployed = AGORA.stakedSuits !== ZERO;
+const deployed = TORII.stakedSuits !== ZERO;
 
 /** Accepts "1, 2, 7" and "1-4" — holders think in ranges. */
 function parseIds(input: string): bigint[] {
@@ -282,7 +282,7 @@ export default function Suits({ wallet }: { wallet: Wallet }) {
                   ? `${formatEther(suitsInfo.cumulativeClaimed)} ETH`
                   : "unavailable"}
               </Row>
-              <Row k="If none staked">Rerouted to stAGORA — never stranded</Row>
+              <Row k="If none staked">Rerouted to stTORII — never stranded</Row>
             </div>
           </Panel>
         </div>

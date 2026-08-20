@@ -1,6 +1,6 @@
 import { Contract } from "ethers";
 import {
-  readProvider, V4, PONS, AGORA, ZERO, activeToken, SUITS_NFT,
+  readProvider, V4, PONS, TORII, ZERO, activeToken, SUITS_NFT,
 } from "./chain";
 import {
   STAKED_SUITS_ABI, DISTRIBUTOR_ABI, SUITS_ABI,
@@ -184,12 +184,12 @@ const NO_RESERVE: Reserve = {
 };
 
 export async function readReserve(): Promise<Reserve> {
-  if (!deployed(AGORA.treasury)) return NO_RESERVE;
+  if (!deployed(TORII.treasury)) return NO_RESERVE;
 
   // One `eth_call`, not sixteen. Issued individually these were two sequential
   // waves of parallel reads, and the public endpoint rate-limits a JSON-RPC
   // batch as a batch — the Reserve page was paying for that on every poll.
-  const T = AGORA.treasury;
+  const T = TORII.treasury;
   const f = (sig: string) => ({ target: T, fragment: `function ${sig} view returns (uint256)` });
 
   const r = await multiRead([
@@ -225,17 +225,17 @@ export async function readReserve(): Promise<Reserve> {
 export type Staking = {
   deployed: boolean;
   totalAssets: bigint | null;
-  /** Raw stAGORA supply — 21 decimals, not 18. See `ST_AGORA_DECIMALS`. */
+  /** Raw stTORII supply — 21 decimals, not 18. See `ST_TORII_DECIMALS`. */
   totalShares: bigint | null;
   cumulativeRewards: bigint | null;
   cumulativeClaimed: bigint | null;
 };
 
 export async function readStaking(): Promise<Staking> {
-  if (!deployed(AGORA.stakedAgora)) {
+  if (!deployed(TORII.stakedAgora)) {
     return { deployed: false, totalAssets: null, totalShares: null, cumulativeRewards: null, cumulativeClaimed: null };
   }
-  const A = AGORA.stakedAgora;
+  const A = TORII.stakedAgora;
   const f = (sig: string) => ({ target: A, fragment: `function ${sig} view returns (uint256)` });
   const r = await multiRead([
     f("totalAssets()"), f("totalSupply()"), f("cumulativeRewards()"), f("cumulativeClaimed()"),
@@ -262,14 +262,14 @@ export type RedeemInfo = {
 };
 
 export async function readRedeemer(): Promise<RedeemInfo> {
-  if (!deployed(AGORA.redeemer)) {
+  if (!deployed(TORII.redeemer)) {
     return {
       deployed: false, haircutBps: null, redeemDelay: null, totalBurned: null,
       totalPaidOut: null, queueLength: null, epochCapBps: null, epochRemaining: null,
       requestsPaused: null,
     };
   }
-  const R = AGORA.redeemer;
+  const R = TORII.redeemer;
   const f = (sig: string) => ({ target: R, fragment: `function ${sig} view returns (uint256)` });
   const r = await multiRead([
     f("haircutBps()"), f("redeemDelay()"), f("totalBurned()"), f("totalPaidOut()"),
@@ -317,23 +317,23 @@ export async function readSuits(): Promise<SuitsInfo> {
   ]);
   const collection = { name, totalSupply, transferValidator };
 
-  if (!deployed(AGORA.stakedSuits)) {
+  if (!deployed(TORII.stakedSuits)) {
     return {
       collection, vaultDeployed: false, totalStaked: null,
       cumulativeRewards: null, cumulativeClaimed: null, shareBps: null,
     };
   }
 
-  const v = new Contract(AGORA.stakedSuits, STAKED_SUITS_ABI, readProvider);
+  const v = new Contract(TORII.stakedSuits, STAKED_SUITS_ABI, readProvider);
   const [totalStaked, cumulativeRewards, cumulativeClaimed] = await Promise.all([
     safe(async () => BigInt(await v.totalStaked())),
     safe(async () => BigInt(await v.cumulativeRewards())),
     safe(async () => BigInt(await v.cumulativeClaimed())),
   ]);
 
-  const shareBps = deployed(AGORA.distributor)
+  const shareBps = deployed(TORII.distributor)
     ? await safe(async () =>
-        BigInt(await new Contract(AGORA.distributor, DISTRIBUTOR_ABI, readProvider).suitsBps())
+        BigInt(await new Contract(TORII.distributor, DISTRIBUTOR_ABI, readProvider).suitsBps())
       )
     : null;
 
@@ -365,7 +365,7 @@ export async function readSnapshot(): Promise<Snapshot> {
   const pool = await readPoolState(address);
   const [token, fees, reserve, staking, redeem, suits] = await Promise.all([
     readTokenInfo(address, pool.initialised),
-    readFeePipeline(pool.id, AGORA.feeSink),
+    readFeePipeline(pool.id, TORII.feeSink),
     readReserve(),
     readStaking(),
     readRedeemer(),

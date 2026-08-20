@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Contract, formatEther } from "ethers";
-import { readProvider, AGORA, EXPLORER, explorerAddr, AGORA_TAX_BPS, CHAIN_ID } from "../chain";
+import { readProvider, TORII, EXPLORER, explorerAddr, TORII_TAX_BPS, CHAIN_ID } from "../chain";
 import { Frame } from "./Frame";
 
 /**
@@ -20,7 +20,7 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const t = new Contract(
-      AGORA.treasury,
+      TORII.treasury,
       [
         "function nav() view returns (uint256)",
         "function eligibleSupply() view returns (uint256)",
@@ -43,26 +43,26 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
           <div className="kana">アゴラ</div>
         </div>
         <div className="rows mini" style={{ flex: 1 }}>
-          <SysRow k="System">AGORA 98</SysRow>
+          <SysRow k="System">TORII 98</SysRow>
           <SysRow k="Version">4.663 (Robinhood Chain)</SysRow>
           <SysRow k="Registered to">whoever is holding</SysRow>
           <SysRow k="Chain ID">{CHAIN_ID}</SysRow>
           <SysRow k="Processor">Pons v2 · V2MemeHook</SysRow>
-          <SysRow k="Levy">{AGORA_TAX_BPS / 100}% on every buy and sell</SysRow>
+          <SysRow k="Levy">{TORII_TAX_BPS / 100}% on every buy and sell</SysRow>
           <SysRow k="Reserve">
             {nav !== null ? `${formatEther(nav)} ETH` : "reading…"}
           </SysRow>
           <SysRow k="Eligible supply">
-            {supply !== null ? `${Number(formatEther(supply)).toLocaleString("en-US", { maximumFractionDigits: 0 })} AGORA` : "reading…"}
+            {supply !== null ? `${Number(formatEther(supply)).toLocaleString("en-US", { maximumFractionDigits: 0 })} TORII` : "reading…"}
           </SysRow>
           <SysRow k="Token">
-            <a className="link" href={explorerAddr(AGORA.token)} target="_blank" rel="noreferrer">
-              {AGORA.token.slice(0, 12)}…
+            <a className="link" href={explorerAddr(TORII.token)} target="_blank" rel="noreferrer">
+              {TORII.token.slice(0, 12)}…
             </a>
           </SysRow>
           <SysRow k="Treasury">
-            <a className="link" href={explorerAddr(AGORA.treasury)} target="_blank" rel="noreferrer">
-              {AGORA.treasury.slice(0, 12)}…
+            <a className="link" href={explorerAddr(TORII.treasury)} target="_blank" rel="noreferrer">
+              {TORII.treasury.slice(0, 12)}…
             </a>
           </SysRow>
         </div>
@@ -98,7 +98,7 @@ export function WindowsUpdate({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const t = new Contract(
-      AGORA.treasury,
+      TORII.treasury,
       [
         "function adapterQueuedAt(address) view returns (uint256)",
         "function ADAPTER_TIMELOCK() view returns (uint256)",
@@ -209,7 +209,7 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const r = new Contract(
-      AGORA.redeemer,
+      TORII.redeemer,
       [
         "function queueLength() view returns (uint256)",
         "function requests(uint256) view returns (tuple(address owner,uint128 amount,uint128 snapshotFloor,uint64 requestedAt,bool executed))",
@@ -257,7 +257,7 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
           return (
             <div className="row" key={j.id}>
               <span className="rk">
-                #{j.id} · {Number(formatEther(j.amount)).toLocaleString("en-US", { maximumFractionDigits: 0 })} AGORA
+                #{j.id} · {Number(formatEther(j.amount)).toLocaleString("en-US", { maximumFractionDigits: 0 })} TORII
                 <br />
                 <span className="muted">{j.owner.slice(0, 10)}…</span>
               </span>
@@ -287,7 +287,7 @@ export function PrintQueue({ onClose }: { onClose: () => void }) {
 
       {nagged !== null && (
         <div className="notice" style={{ marginTop: 12 }}>
-          <b>Cannot cancel job #{nagged}.</b> The AGORA was destroyed the moment the request was
+          <b>Cannot cancel job #{nagged}.</b> The TORII was destroyed the moment the request was
           made, not when it is collected. Re-minting is impossible — the supply is fixed by the Pons
           factory and there is no mint function. Burning at request time is what makes every
           redemption raise the floor for the holders who stayed, immediately.

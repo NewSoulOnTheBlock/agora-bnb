@@ -11,7 +11,7 @@ import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
 import { MyComputer, NetworkNeighborhood, Notepad } from "./win98/Explorer";
 import { NftFolder } from "./win98/NftFolder";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
-import { AGORA, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
+import { TORII, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL } from "./chain";
 
 export type Tab = "about" | "floor" | "deployed" | "trade" | "stake" | "suits" | "redeem";
 
@@ -92,8 +92,8 @@ function Boot() {
       <div className="boot-art chrome">ＡＧＯＲＡ</div>
       <div className="boot-kana kana">アゴラ・準備金・システム起動</div>
       <div className="boot-rule meander" />
-      <div className="bright">AGORA BIOS v4.663</div>
-      <div>Copyright (C) 2026, Agora Collective</div>
+      <div className="bright">TORII BIOS v4.663</div>
+      <div>Copyright (C) 2026, Torii Collective</div>
       <br />
       <div>Chain . . . . . . . . 4663 Robinhood (Arbitrum Orbit)</div>
       <div>Numeraire . . . . . . ETH, no oracle</div>
@@ -102,7 +102,7 @@ function Boot() {
       <div>Yield sleeve. . . . . 0 bps, no adapters</div>
       <div>Marble. . . . . . . . loaded</div>
       <br />
-      <div>Starting AGORA 98<span className="cur">_</span></div>
+      <div>Starting TORII 98<span className="cur">_</span></div>
     </div>
   );
 }
@@ -225,7 +225,7 @@ export default function Layout({
   children: ReactNode;
 }) {
   const [booting, setBooting] = useState(() => {
-    try { return sessionStorage.getItem("agora98:booted") !== "1"; } catch { return true; }
+    try { return sessionStorage.getItem("torii98:booted") !== "1"; } catch { return true; }
   });
   const [minimised, setMinimised] = useState(false);
   const [maximised, setMaximised] = useState(false);
@@ -244,13 +244,13 @@ export default function Layout({
     null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad" | "suitsfolder"
   >(null);
   const [crt, setCrt] = useState(() => {
-    try { return localStorage.getItem("agora98:crt") === "on"; } catch { return false; }
+    try { return localStorage.getItem("torii98:crt") === "on"; } catch { return false; }
   });
 
   const toggleCrt = () => {
     setCrt((on) => {
       const next = !on;
-      try { localStorage.setItem("agora98:crt", next ? "on" : "off"); } catch { /* private mode */ }
+      try { localStorage.setItem("torii98:crt", next ? "on" : "off"); } catch { /* private mode */ }
       play("click");
       return next;
     });
@@ -261,7 +261,7 @@ export default function Layout({
 
   useEffect(() => {
     if (!booting) return;
-    try { sessionStorage.setItem("agora98:booted", "1"); } catch { /* private mode */ }
+    try { sessionStorage.setItem("torii98:booted", "1"); } catch { /* private mode */ }
     const t = setTimeout(() => setBooting(false), 2100);
     return () => clearTimeout(t);
   }, [booting]);
@@ -310,16 +310,16 @@ export default function Layout({
    *  so the list is useful somewhere other than this page. */
   const copyAddresses = () => {
     const lines = [
-      "AGORA — chain 4663 (Robinhood)",
+      "TORII — chain 4663 (Robinhood)",
       `explorer     ${EXPLORER}`,
-      `token        ${AGORA.token}`,
-      `curve        ${AGORA.curve}`,
-      `feeSink      ${AGORA.feeSink}`,
-      `treasury     ${AGORA.treasury}`,
-      `stakedAgora  ${AGORA.stakedAgora}`,
-      `redeemer     ${AGORA.redeemer}`,
-      `stakedSuits  ${AGORA.stakedSuits}`,
-      `distributor  ${AGORA.distributor}`,
+      `token        ${TORII.token}`,
+      `curve        ${TORII.curve}`,
+      `feeSink      ${TORII.feeSink}`,
+      `treasury     ${TORII.treasury}`,
+      `stakedAgora  ${TORII.stakedAgora}`,
+      `redeemer     ${TORII.redeemer}`,
+      `stakedSuits  ${TORII.stakedSuits}`,
+      `distributor  ${TORII.distributor}`,
     ].join("\n");
 
     navigator.clipboard?.writeText(lines).then(
@@ -389,7 +389,7 @@ export default function Layout({
         ))}
 
         {/* The one desktop icon that is not a tab. Burned supply really is a
-            recycle bin here: redemption destroys AGORA permanently. */}
+            recycle bin here: redemption destroys TORII permanently. */}
         <button
           className="desk-icon"
           onClick={() => { play("open"); setWin("mycomputer"); }}
@@ -489,18 +489,18 @@ export default function Layout({
         </span>
 
         {/* A shortcut off the desktop, the way a browser bookmark sat on one.
-            GMGN is where the chart actually lives now that AGORA has graduated. */}
+            GMGN is where the chart actually lives now that TORII has graduated. */}
         <a
           className="desk-icon"
           href={GMGN_URL}
           target="_blank"
           rel="noreferrer"
-          title="AGORA on GMGN"
+          title="TORII on GMGN"
           onClick={() => play("click")}
         >
           <img src="/GMGN_logo.svg" width={32} height={32} alt="" />
           <span>
-            AGORA chart
+            TORII chart
             <span className="kana">ジーエムジーエヌ</span>
           </span>
         </a>
@@ -607,7 +607,7 @@ export default function Layout({
                 { kind: "item", label: "Redemption Queue…", onClick: () => setWin("queue") },
                 { kind: "item", label: "System Properties…", onClick: () => setWin("sysprops") },
                 { kind: "sep" },
-                { kind: "item", label: "About AGORA 98…", onClick: () => setDialog("about") },
+                { kind: "item", label: "About TORII 98…", onClick: () => setDialog("about") },
               ]}
             />
           </div>
@@ -666,7 +666,7 @@ export default function Layout({
 
       {/* ---- dialogs ---- */}
       {dialog === "close" && (
-        <Dialog title="AGORA 98" icon="error" onClose={() => setDialog(null)}>
+        <Dialog title="TORII 98" icon="error" onClose={() => setDialog(null)}>
           <p style={{ margin: 0 }}>
             This program cannot be closed. It is a web page.
           </p>
@@ -677,14 +677,14 @@ export default function Layout({
       )}
 
       {dialog === "about" && (
-        <Dialog title="About AGORA 98" icon="info" onClose={() => setDialog(null)}>
+        <Dialog title="About TORII 98" icon="info" onClose={() => setDialog(null)}>
           <p style={{ margin: 0 }}>
-            <b>AGORA 98</b><br />
+            <b>TORII 98</b><br />
             A 4% trade tax funding a reserve on Robinhood Chain.
           </p>
           <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
             Every buy and sell pays 4%. Part of it pays people who stake; the rest sits in the
-            reserve, and any holder may burn AGORA for a share of it.
+            reserve, and any holder may burn TORII for a share of it.
           </p>
           <p style={{ margin: "8px 0 0", color: "#505050" }}>
             The interface is a tribute. The contracts are real — addresses verified on chain 4663.
@@ -698,7 +698,7 @@ export default function Layout({
             <b>Empty — and it cannot be restored.</b>
           </p>
           <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
-            Redeeming AGORA burns it at the moment you ask, not when you collect. The supply is
+            Redeeming TORII burns it at the moment you ask, not when you collect. The supply is
             fixed by the Pons factory and there is no mint function, so nothing that goes in here
             ever comes back.
           </p>
@@ -764,7 +764,7 @@ export default function Layout({
                   <b>There are already a hundred launchpads on Robinhood Chain.</b>
                 </p>
                 <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
-                  So we did not build another one. AGORA launched on Pons like everything else, and
+                  So we did not build another one. TORII launched on Pons like everything else, and
                   the interesting part was never the launch — it was what happens to the tax
                   afterwards.
                 </p>
@@ -835,7 +835,7 @@ export default function Layout({
       {startOpen && (
         <div className="start-menu" role="menu">
           <div className="start-banner">
-            AGORA<b>98</b>
+            TORII<b>98</b>
           </div>
           <div className="start-items">
             {VISIBLE_TABS.map((t) => (
@@ -895,12 +895,12 @@ export default function Layout({
               onClick={() => { play("click"); setStartOpen(false); }}
             >
               <img src="/GMGN_logo.svg" width={24} height={24} alt="" />
-              AGORA chart on GMGN
+              TORII chart on GMGN
             </a>
             <div className="sep" />
             <button role="menuitem" onClick={() => { play("click"); setDialog("about"); setStartOpen(false); }}>
               <PixelIcon name="info" size={24} />
-              About AGORA 98…
+              About TORII 98…
             </button>
           </div>
         </div>
@@ -931,7 +931,7 @@ export default function Layout({
             onClick={() => { play("click"); setMinimised(minimised ? false : true); }}
           >
             <PixelIcon name="computer" size={16} />
-            AGORA 98 — {TITLES[tab]}
+            TORII 98 — {TITLES[tab]}
           </button>
         </div>
 

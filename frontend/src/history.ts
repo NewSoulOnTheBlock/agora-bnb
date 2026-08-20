@@ -1,5 +1,5 @@
 import { Contract, id as topicId, Interface, type Log } from "ethers";
-import { readProvider, MAX_LOG_SPAN, PONS, AGORA, ZERO } from "./chain";
+import { readProvider, MAX_LOG_SPAN, PONS, TORII, ZERO } from "./chain";
 import { MEME_HOOK_ABI, TREASURY_ABI } from "./abis";
 
 /**
@@ -183,9 +183,9 @@ const T_FLOOR = topicId("FloorUpdated(uint256,uint256,uint256)");
 const WAD = 10n ** 18n;
 
 export async function readFloorHistory(maxChunks = 6): Promise<FloorPoint[]> {
-  if (!AGORA.treasury || AGORA.treasury === ZERO) return [];
+  if (!TORII.treasury || TORII.treasury === ZERO) return [];
   const logs = await scanLogsBackwards({
-    address: AGORA.treasury,
+    address: TORII.treasury,
     topics: [T_FLOOR],
     maxChunks,
   });
@@ -253,10 +253,10 @@ export type IncomeHistory = {
  * the fiction that rule exists to prevent.
  */
 export async function readIncomeHistory(maxChunks = 5): Promise<IncomeHistory | null> {
-  if (!deployed(AGORA.treasury)) return null;
+  if (!deployed(TORII.treasury)) return null;
 
   const logs = await scanLogsBackwards({
-    address: AGORA.treasury,
+    address: TORII.treasury,
     topics: [topicId("IncomeDistributed(uint256)")],
     maxChunks,
   });

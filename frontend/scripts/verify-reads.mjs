@@ -183,16 +183,30 @@ try {
 } catch (e) { no("tax history scan failed", String(e.shortMessage ?? e.message).slice(0, 80)); }
 
 // ---------------------------------------------------------------------------
-// 8. AGORA bonding curve — the live trading venue until graduation
+// 8. TORII bonding curve — the live trading venue until graduation
 // ---------------------------------------------------------------------------
-console.log("\n=== 8. AGORA curve (live trade path) ===");
+console.log("\n=== 8. TORII curve (live trade path) ===");
 {
-  // Set these from bind.ts output after the relaunch. They are NOT defaulted to
-  // the v1 addresses: that token's fee recipient was misdirected to a contract
-  // that cannot sweep, the change is irreversible, and checking it here would
-  // report a dead launch as a healthy trade path.
-  const CURVE = process.env.AGORA_CURVE ?? "";
-  const AGORA_T = process.env.AGORA_TOKEN ?? "";
+  // Defaulted to the live v2 relaunch on Robinhood Chain (chain 4663).
+  //
+  // These were previously left empty on purpose: defaulting to the **v1**
+  // addresses would have reported a dead launch as a healthy trade path, since
+  // that token's creator-fee recipient was misdirected to a contract incapable
+  // of sweeping and the change was irreversible. v2 fixed it by ordering, so
+  // defaulting is now correct — but the original hazard has not gone away, so
+  // the dead v1 token is refused outright below rather than merely undefaulted.
+  //
+  // NOTE these stay AGORA-era addresses after the TORII rename: they are the
+  // live chain-4663 deployment, which is not rebranded and not redeployed. The
+  // TORII launch is a separate BNB deployment with its own addresses.
+  const V1_DEAD_TOKEN = "0x6853618673D952Fe602616F6f896cC7be8e25fCc";
+  const CURVE = process.env.TORII_CURVE ?? "0x05CDABCA3e464e00a91B81021dc881e2e8238fEE";
+  const TORII_T = process.env.TORII_TOKEN ?? "0x286b4b456Bd10FD1745A7b7B33f25a804DDf5F04";
+
+  if (TORII_T.toLowerCase() === V1_DEAD_TOKEN.toLowerCase()) {
+    no("token is the dead v1 launch — its fee stream is unrecoverable");
+    console.log("        v1 must never be wired back in. Use the v2 token.");
+  }
   const RICH = "0x8366a39CC670B4001A1121B8F6A443A643e40951";
   const abi = [
     "function buy(uint256,uint256,address) payable returns (uint256)",
@@ -205,14 +219,14 @@ console.log("\n=== 8. AGORA curve (live trade path) ===");
     "function token() view returns (address)",
     "function isNativeQuote() view returns (bool)",
   ];
-  if (!CURVE || !AGORA_T) {
-    console.log("  \x1b[33mSKIP\x1b[0m  relaunch pending — set AGORA_CURVE and AGORA_TOKEN to run");
-    console.log("        e.g. AGORA_TOKEN=0x… AGORA_CURVE=0x… npm run verify");
+  if (!CURVE || !TORII_T) {
+    console.log("  \x1b[33mSKIP\x1b[0m  relaunch pending — set TORII_CURVE and TORII_TOKEN to run");
+    console.log("        e.g. TORII_TOKEN=0x… TORII_CURVE=0x… npm run verify");
   } else {
   const c = new Contract(CURVE, abi, p);
   try {
-    getAddress(await c.token()) === getAddress(AGORA_T)
-      ? ok("curve.token() == AGORA")
+    getAddress(await c.token()) === getAddress(TORII_T)
+      ? ok("curve.token() == TORII")
       : no("curve points at a different token");
     const tax = await c.creatorTaxBps();
     Number(tax) === 400 ? ok("creatorTaxBps == 400 (4%, as designed)") : no(`creatorTaxBps is ${tax}, design assumes 400`);
@@ -222,12 +236,21 @@ console.log("\n=== 8. AGORA curve (live trade path) ===");
     ok("graduation", `${formatEther(rq)} / ${formatEther(gt)} ETH = ${(Number(rq * 10000n / gt) / 100).toFixed(3)}%`);
     ok("graduated", String(await c.graduated()));
     ok("creatorTaxBalance", `${formatEther(await c.creatorTaxBalance())} ETH already accrued`);
-    // buy(quoteIn, minOut, to) — parameter order pinned by simulation
-    const amt = 10n ** 15n;
-    const out = await c.buy.staticCall(amt, 0n, RICH, { value: amt, from: RICH });
-    BigInt(out) > 0n
-      ? ok("buy(quoteIn,minOut,to) simulates", `0.001 ETH -> ${formatEther(out)} AGORA`)
-      : no("buy simulation returned 0");
+    // buy(quoteIn, minOut, to) — parameter order pinned by simulation.
+    //
+    // Only meaningful BEFORE graduation. Once the token graduates the curve is
+    // closed and buy() reverts by design, so simulating it reports a healthy,
+    // expected state as a failure. Trading then routes through the v4 pool,
+    // which sections 4 and 5 already price end to end.
+    if (await c.graduated()) {
+      ok("buy simulation skipped", "curve closed — graduated, trades route via v4");
+    } else {
+      const amt = 10n ** 15n;
+      const out = await c.buy.staticCall(amt, 0n, RICH, { value: amt, from: RICH });
+      BigInt(out) > 0n
+        ? ok("buy(quoteIn,minOut,to) simulates", `0.001 ETH -> ${formatEther(out)} TORII`)
+        : no("buy simulation returned 0");
+    }
   } catch (e) {
     no("curve checks failed", String(e.shortMessage ?? e.message).slice(0, 90));
   }

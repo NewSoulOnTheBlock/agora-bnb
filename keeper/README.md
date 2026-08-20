@@ -1,4 +1,4 @@
-# AGORA keeper
+# TORII keeper
 
 Cranks the protocol's **permissionless** maintenance calls. Holds no privileged key.
 
@@ -20,7 +20,7 @@ Three jobs, in this order, every `KEEPER_INTERVAL` seconds:
 | Job | Call | Moves |
 |---|---|---|
 | `collect tax` | `FeeSink.collect()` | Pons escrow + bonding curve → Treasury |
-| `distribute` | `Treasury.distributeIncome()` | earmarked income → 90% stAGORA / 10% staked Suits |
+| `distribute` | `Treasury.distributeIncome()` | earmarked income → 90% stTORII / 10% staked Suits |
 | `realize surplus` | `Treasury.realizeSurplus(adapter)` | sleeve yield → earmarked income |
 
 The order is deliberate: collecting can create income to distribute in the same

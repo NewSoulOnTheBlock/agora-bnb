@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 /**
  * The screensaver.
  *
- * Idle for `idleMs` and the desktop hands over to a starfield with the AGORA
+ * Idle for `idleMs` and the desktop hands over to a starfield with the TORII
  * medallion tumbling through it — the flying-logo screensaver every machine of
  * the era shipped, on the vapourwave grid.
  *

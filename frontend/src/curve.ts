@@ -1,5 +1,5 @@
 import { Contract, MaxUint256, type JsonRpcSigner } from "ethers";
-import { readProvider, AGORA, ZERO } from "./chain";
+import { readProvider, TORII, ZERO } from "./chain";
 
 /**
  * Pons v2 bonding curve.
@@ -78,8 +78,8 @@ export type CurveState = {
 };
 
 export async function readCurveState(): Promise<CurveState | null> {
-  if (!AGORA.curve || AGORA.curve === ZERO) return null;
-  const c = new Contract(AGORA.curve, CURVE_ABI, readProvider);
+  if (!TORII.curve || TORII.curve === ZERO) return null;
+  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
   try {
     const [
       quoteReserve, tokenReserve, realQuoteReserve, phantomQuote,
@@ -134,7 +134,7 @@ export type CurveQuote = {
  */
 export async function quoteBuy(ethIn: bigint, from?: string | null): Promise<CurveQuote | null> {
   if (ethIn <= 0n) return null;
-  const c = new Contract(AGORA.curve, CURVE_ABI, readProvider);
+  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
   try {
     const out = await c.buy.staticCall(ethIn, 0n, from ?? QUOTE_FROM, {
       value: ethIn,
@@ -154,7 +154,7 @@ export async function quoteBuy(ethIn: bigint, from?: string | null): Promise<Cur
 
 export async function quoteSell(tokensIn: bigint, from?: string | null): Promise<CurveQuote | null> {
   if (tokensIn <= 0n) return null;
-  const c = new Contract(AGORA.curve, CURVE_ABI, readProvider);
+  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
   if (from) {
     try {
       const out = await c.sell.staticCall(tokensIn, 0n, from, { from });
@@ -184,30 +184,30 @@ export function applySlippage(amountOut: bigint, slippageBps: number): bigint {
 export async function curveBuy(
   signer: JsonRpcSigner, ethIn: bigint, minTokensOut: bigint, recipient: string
 ) {
-  const c = new Contract(AGORA.curve, CURVE_ABI, signer);
+  const c = new Contract(TORII.curve, CURVE_ABI, signer);
   return c.buy(ethIn, minTokensOut, recipient, { value: ethIn });
 }
 
 export async function curveSell(
   signer: JsonRpcSigner, tokensIn: bigint, minEthOut: bigint, recipient: string
 ) {
-  const c = new Contract(AGORA.curve, CURVE_ABI, signer);
+  const c = new Contract(TORII.curve, CURVE_ABI, signer);
   return c.sell(tokensIn, minEthOut, recipient);
 }
 
 /** Selling on the curve needs an ERC-20 allowance; buying does not. */
 export async function readCurveAllowance(owner: string): Promise<bigint> {
-  const t = new Contract(AGORA.token, ERC20_ABI, readProvider);
-  return BigInt(await t.allowance(owner, AGORA.curve));
+  const t = new Contract(TORII.token, ERC20_ABI, readProvider);
+  return BigInt(await t.allowance(owner, TORII.curve));
 }
 
 export async function approveCurve(signer: JsonRpcSigner) {
-  const t = new Contract(AGORA.token, ERC20_ABI, signer);
-  return t.approve(AGORA.curve, MaxUint256);
+  const t = new Contract(TORII.token, ERC20_ABI, signer);
+  return t.approve(TORII.curve, MaxUint256);
 }
 
 export async function readTokenBalance(owner: string): Promise<bigint> {
-  const t = new Contract(AGORA.token, ERC20_ABI, readProvider);
+  const t = new Contract(TORII.token, ERC20_ABI, readProvider);
   return BigInt(await t.balanceOf(owner));
 }
 
@@ -218,7 +218,7 @@ export async function dryRunCurve(
   amountIn: bigint,
   minOut: bigint
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const c = new Contract(AGORA.curve, CURVE_ABI, readProvider);
+  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
   try {
     if (kind === "buy") {
       await c.buy.staticCall(amountIn, minOut, from, { value: amountIn, from });

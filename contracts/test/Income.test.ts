@@ -9,11 +9,11 @@ const RICH = 10_000_000n * WAD;
 
 describe("Income route: Treasury → Distributor → stakers", () => {
   let owner: HardhatEthersSigner;
-  let alice: HardhatEthersSigner; // AGORA staker
+  let alice: HardhatEthersSigner; // TORII staker
   let bob: HardhatEthersSigner; // Suits staker
   let carol: HardhatEthersSigner; // funder / cranker
 
-  let agora: any, suits: any, escrow: any;
+  let torii: any, suits: any, escrow: any;
   let treasury: any, feeSink: any, staking: any, suitsVault: any, distributor: any, redeemer: any;
 
   beforeEach(async () => {
@@ -27,13 +27,13 @@ describe("Income route: Treasury → Distributor → stakers", () => {
     ).deploy(await treasury.getAddress(), await escrow.getAddress(), owner.address);
     await treasury.setFeeSink(await feeSink.getAddress());
 
-    agora = await (await ethers.getContractFactory("MockAgora")).deploy(SUPPLY);
+    torii = await (await ethers.getContractFactory("MockTorii")).deploy(SUPPLY);
     suits = await (await ethers.getContractFactory("MockSuits")).deploy();
-    await treasury.setAgora(await agora.getAddress());
+    await treasury.setAgora(await torii.getAddress());
 
     staking = await (
-      await ethers.getContractFactory("StakedAgora")
-    ).deploy(await agora.getAddress(), owner.address);
+      await ethers.getContractFactory("StakedTorii")
+    ).deploy(await torii.getAddress(), owner.address);
     suitsVault = await (
       await ethers.getContractFactory("StakedSuits")
     ).deploy(await suits.getAddress(), owner.address);
@@ -42,14 +42,14 @@ describe("Income route: Treasury → Distributor → stakers", () => {
     ).deploy(await staking.getAddress(), await suitsVault.getAddress(), owner.address);
     redeemer = await (
       await ethers.getContractFactory("Redeemer")
-    ).deploy(await agora.getAddress(), await treasury.getAddress(), owner.address);
+    ).deploy(await torii.getAddress(), await treasury.getAddress(), owner.address);
 
     await treasury.setDistributor(await distributor.getAddress());
     await treasury.setRedeemer(await redeemer.getAddress());
 
     // Stakers on both sides.
-    await agora.transfer(alice.address, 1000n * WAD);
-    await agora.connect(alice).approve(await staking.getAddress(), 1000n * WAD);
+    await torii.transfer(alice.address, 1000n * WAD);
+    await torii.connect(alice).approve(await staking.getAddress(), 1000n * WAD);
     await staking.connect(alice).deposit(1000n * WAD, alice.address);
 
     await suits.mintMany(bob.address, 1, 2);
@@ -232,7 +232,7 @@ describe("Income route: Treasury → Distributor → stakers", () => {
       await treasury.realizeSurplus(await adapter.getAddress());
       await treasury.connect(carol).distributeIncome();
 
-      // 10% Suits (2 NFTs) / 90% AGORA
+      // 10% Suits (2 NFTs) / 90% TORII
       expect(await suitsVault.pendingYield(bob.address)).to.equal(ethers.parseEther("1"));
       expect(await staking.pendingYield(alice.address)).to.equal(ethers.parseEther("9"));
     });

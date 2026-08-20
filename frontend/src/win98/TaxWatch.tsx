@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatEther, id as topicId, AbiCoder } from "ethers";
-import { readProvider, PONS, ZERO, AGORA } from "../chain";
+import { readProvider, PONS, ZERO, TORII } from "../chain";
 import { ponsPoolKey, poolId } from "../poolkey";
 import { play } from "./sound";
 
@@ -34,9 +34,9 @@ export default function TaxWatch({ enabled = true }: { enabled?: boolean }) {
   const seq = useRef(0);
 
   useEffect(() => {
-    if (!enabled || AGORA.token === ZERO) return;
+    if (!enabled || TORII.token === ZERO) return;
     let alive = true;
-    const pid = poolId(ponsPoolKey(AGORA.token));
+    const pid = poolId(ponsPoolKey(TORII.token));
     const abi = AbiCoder.defaultAbiCoder();
 
     const poll = async () => {

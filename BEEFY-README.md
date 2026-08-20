@@ -564,7 +564,7 @@ callback `uniswapV3SwapCallback(int256,int256,bytes)`.
 | `tendies-weth` | `0xAAa8C1e4F75Ec7DF802607D827Ea0efE8dCDDbDD` | `0xcD68b5A8850E5A10531bDE1BC657329575E40E2C` |
 | `msft-usdg` *(unsupported)* | `0xE36274737D99273d353d8d9F0a51c1AeA7426C31` | `0xd9993b44E8d014F4ad979cb7706673386cd31520` |
 
-### AGORA
+### TORII
 
 | Contract | Address |
 |---|---|

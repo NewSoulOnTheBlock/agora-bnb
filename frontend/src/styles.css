@@ -1,7 +1,7 @@
 /* ==========================================================================
-   AGORA 98
+   TORII 98
    --------------------------------------------------------------------------
-   A Windows 98 interface for the AGORA reserve.
+   A Windows 98 interface for the TORII reserve.
 
    The rule that shaped this file: **the data layer was not touched.** Every
    class the pages already used (`panel`, `stat`, `row`, `grid`, `notice`,
@@ -36,7 +36,7 @@
      of the look, not something being replaced by it.
 
      It also happens to be the right costume for this particular product: the
-     token is called AGORA. The columns were always on-brand. */
+     token is called TORII. The columns were always on-brand. */
   --vw-pink: #ff71ce;
   --vw-magenta: #ff2fb9;
   --vw-cyan: #01cdfe;

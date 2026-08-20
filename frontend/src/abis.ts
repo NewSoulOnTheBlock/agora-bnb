@@ -39,7 +39,7 @@ export const PONS_TOKEN_ABI = [
 // is written against, so wiring them up later is a one-line address change.
 // ---------------------------------------------------------------------------
 export const TREASURY_ABI = [
-  // NAV excludes AGORA (marked at zero, spec §6) AND pendingIncome, which is
+  // NAV excludes TORII (marked at zero, spec §6) AND pendingIncome, which is
   // owed to stakers and therefore never backs the floor.
   "function nav() view returns (uint256)",
   "function eligibleSupply() view returns (uint256)",
@@ -82,7 +82,7 @@ export const FEE_SINK_ABI = [
   "function treasury() view returns (address)",
 ];
 
-export const STAKED_AGORA_ABI = [
+export const STAKED_TORII_ABI = [
   "function totalAssets() view returns (uint256)",
   "function totalSupply() view returns (uint256)",
   "function convertToAssets(uint256 shares) view returns (uint256)",
@@ -132,7 +132,7 @@ export const DISTRIBUTOR_ABI = [
   "function suitsBps() view returns (uint16)",
   "function cumulativeToSuits() view returns (uint256)",
   "function cumulativeToAgora() view returns (uint256)",
-  "function preview(uint256 amount) view returns (uint256 toSuits, uint256 toAgora)",
+  "function preview(uint256 amount) view returns (uint256 toSuits, uint256 toTorii)",
   "function distribute() payable",
 ];
 

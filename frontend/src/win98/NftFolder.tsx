@@ -7,7 +7,7 @@ import {
   type Suit, type SuitMeta,
 } from "../nft";
 import {
-  AGORA, ZERO, SUITS_NFT, SUITS_SUPPLY, SUITS_MARKET, SUITS_STAKING_ENABLED,
+  TORII, ZERO, SUITS_NFT, SUITS_SUPPLY, SUITS_MARKET, SUITS_STAKING_ENABLED,
   explorerAddr, EXPLORER,
 } from "../chain";
 import { approveSuitsForStaking, stakeSuits, unstakeSuits } from "../vault";
@@ -56,7 +56,7 @@ export function NftFolder({ wallet, onClose }: { wallet: Wallet; onClose: () => 
 
 
   const account = wallet.account;
-  const vaultLive = AGORA.stakedSuits !== ZERO;
+  const vaultLive = TORII.stakedSuits !== ZERO;
   /** How many thumbnails have finished, so the status bar can say so. */
   const [done, setDone] = useState(0);
   useEffect(() => { setDone(0); }, [view, account]);

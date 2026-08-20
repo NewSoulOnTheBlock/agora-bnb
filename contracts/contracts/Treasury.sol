@@ -12,7 +12,7 @@ interface IDistributor {
 
 /**
  * @title Treasury
- * @notice The collective balance sheet behind AGORA's redemption floor.
+ * @notice The collective balance sheet behind TORII's redemption floor.
  *         **ETH-denominated corpus** (spec §4.1, option 1).
  *
  * ## What ETH-denomination buys, and what it costs
@@ -31,7 +31,7 @@ interface IDistributor {
  * adapters, there is no oracle to gate, and `nav()` cannot go stale.
  *
  * The cost is honest and should not be papered over: **the floor is denominated
- * in ETH, so its dollar value moves with ETH.** A floor of 0.000001 ETH/AGORA is
+ * in ETH, so its dollar value moves with ETH.** A floor of 0.000001 ETH/TORII is
  * a hard floor in ether and a soft one in dollars. Spec §4.1 recommended USDG
  * for exactly this reason. That trade was made deliberately.
  *
@@ -41,7 +41,7 @@ interface IDistributor {
  *   - tax inflow raises it,
  *   - redemption pays out at a 5% haircut that *stays* in the corpus, so each
  *     redemption is accretive to everyone who did not redeem (spec §7),
- *   - AGORA's supply is fixed and burn-only, so `eligibleSupply` only shrinks.
+ *   - TORII's supply is fixed and burn-only, so `eligibleSupply` only shrinks.
  * Floor is therefore monotonically non-decreasing in v1. `floorHighWaterMark`
  * records that, and `FloorRegression` fires if it is ever violated — which can
  * only happen once a yield sleeve exists and takes impermanent loss.
@@ -50,14 +50,14 @@ interface IDistributor {
  * floor would brick redemption at precisely the moment holders most want out,
  * converting an accounting problem into a trapped-funds problem.
  *
- * ## AGORA is never corpus
+ * ## TORII is never corpus
  *
- * AGORA held by this contract is marked at **zero** in `nav()`, and the same
+ * TORII held by this contract is marked at **zero** in `nav()`, and the same
  * balance is removed from `eligibleSupply()` so numerator and denominator agree
  * (spec §6.1). A token that backs itself makes the floor self-referentially
  * inflatable.
  *
- * Consequence worth understanding: donating AGORA to this contract shrinks the
+ * Consequence worth understanding: donating TORII to this contract shrinks the
  * denominator and therefore *raises* reported `floorPerToken` without adding any
  * value. It is not profitable to do (you give up more redemption value than you
  * gain), but it does mean `floorPerToken()` is not manipulation-proof against a
@@ -88,7 +88,7 @@ interface IDistributor {
  *   destination, so funds can only reach `operator` — a compromised owner key
  *   bounds where corpus ETH lands, though not whether it leaves.
  * - **Staker income is untouchable.** Withdrawal is limited to `liquidEth()`,
- *   which excludes `pendingIncome`. ETH already earmarked for stAGORA and staked
+ *   which excludes `pendingIncome`. ETH already earmarked for stTORII and staked
  *   Suits is owed to third parties, not corpus, and the owner cannot reach it.
  * - **Redemption still settles honestly.** `Redeemer` pays
  *   `min(snapshotFloor, currentFloor)`, so a withdrawal between request and
@@ -119,7 +119,7 @@ contract Treasury is Ownable, ReentrancyGuard {
     // -----------------------------------------------------------------------
 
     /**
-     * @notice The AGORA token. Marked at zero in NAV, always.
+     * @notice The TORII token. Marked at zero in NAV, always.
      * @dev Set **once**, after launch, via `setAgora()` — not in the constructor.
      *
      *      This is what lets the entire contract set be deployed BEFORE the
@@ -144,7 +144,7 @@ contract Treasury is Ownable, ReentrancyGuard {
     /// @notice The only address permitted to move ETH out of this contract.
     address public redeemer;
 
-    /// @notice Splits income between stAGORA stakers and staked Suits.
+    /// @notice Splits income between stTORII stakers and staked Suits.
     address public distributor;
 
     /**
@@ -208,14 +208,14 @@ contract Treasury is Ownable, ReentrancyGuard {
     /// @notice Wei paid out through `payout`, cumulatively.
     uint256 public cumulativePaidOut;
 
-    /// @notice Highest `floorPerToken()` ever observed, in wei per whole AGORA.
+    /// @notice Highest `floorPerToken()` ever observed, in wei per whole TORII.
     uint256 public floorHighWaterMark;
 
     address[] private _adapters;
     mapping(address => bool) public isAdapter;
     mapping(address => uint256) public adapterQueuedAt;
 
-    /// @dev Holders whose AGORA is excluded from `eligibleSupply()`. DEAD is
+    /// @dev Holders whose TORII is excluded from `eligibleSupply()`. DEAD is
     ///      always excluded and is NOT stored here.
     address[] private _excluded;
     mapping(address => bool) public isExcluded;
@@ -294,7 +294,7 @@ contract Treasury is Ownable, ReentrancyGuard {
         operator = owner_;
         emit OperatorSet(address(0), owner_);
 
-        // The Treasury's own AGORA is never corpus, so exclude it from day one.
+        // The Treasury's own TORII is never corpus, so exclude it from day one.
         _excluded.push(address(this));
         isExcluded[address(this)] = true;
         emit ExclusionSet(address(this), true);
@@ -450,7 +450,7 @@ contract Treasury is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Net asset value in wei. AGORA is marked at zero, always.
+     * @notice Net asset value in wei. TORII is marked at zero, always.
      * @dev No oracle is involved: both terms are natively ETH-denominated.
      */
     function nav() public view returns (uint256) {
@@ -459,10 +459,10 @@ contract Treasury is Ownable, ReentrancyGuard {
 
     /**
      * @notice Supply the floor is spread across: total minus burned minus
-     *         protocol-owned AGORA (spec §6).
+     *         protocol-owned TORII (spec §6).
      * @dev Do NOT add the staking vault to the exclusion list. It *custodies*
-     *      user AGORA rather than owning it, and stakers must keep their floor
-     *      backing. Exclude only AGORA the protocol itself owns.
+     *      user TORII rather than owning it, and stakers must keep their floor
+     *      backing. Exclude only TORII the protocol itself owns.
      */
     function eligibleSupply() public view returns (uint256) {
         // Before `setAgora`, there is no supply to spread the floor across.
@@ -481,7 +481,7 @@ contract Treasury is Ownable, ReentrancyGuard {
         return supply > excluded ? supply - excluded : 0;
     }
 
-    /// @notice Wei of NAV backing each whole AGORA. Zero when supply is zero.
+    /// @notice Wei of NAV backing each whole TORII. Zero when supply is zero.
     function floorPerToken() public view returns (uint256) {
         uint256 supply = eligibleSupply();
         if (supply == 0) return 0;
@@ -538,7 +538,7 @@ contract Treasury is Ownable, ReentrancyGuard {
 
     /**
      * @notice Forward all earmarked income to the Distributor. Permissionless.
-     * @dev The Distributor splits it (10% staked Suits / 90% stAGORA by default)
+     * @dev The Distributor splits it (10% staked Suits / 90% stTORII by default)
      *      and reverts if neither side has stakers — in which case this reverts
      *      too and the income simply stays earmarked here until someone stakes.
      *      It is never silently reclassified as corpus, because it was already
@@ -697,7 +697,7 @@ contract Treasury is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Exclude or re-include an account's AGORA in `eligibleSupply()`.
+     * @notice Exclude or re-include an account's TORII in `eligibleSupply()`.
      * @dev DEAD is unconditionally excluded and cannot be listed here — listing
      *      it would double-count and understate eligible supply, overstating the
      *      floor.

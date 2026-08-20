@@ -1,7 +1,7 @@
 [package]
 name = "tithe"
 version = "0.1.0"
-description = "AGORA on Solana — SOL corpus, redemption floor, pump.fun creator-fee income"
+description = "TORII on Solana — SOL corpus, redemption floor, pump.fun creator-fee income"
 edition = "2021"
 
 [lib]

@@ -5,7 +5,7 @@
  *
  * ## Why this exists
  *
- * `bind.ts` deploys StakedAgora / Redeemer / StakedSuits / Distributor
+ * `bind.ts` deploys StakedTorii / Redeemer / StakedSuits / Distributor
  * unconditionally and then calls setRedeemer + setDistributor. Running it twice
  * therefore deploys a SECOND, empty set and repoints the Treasury at it, while
  * the frontend keeps sending users to the first set. Income would then be paid
@@ -55,17 +55,17 @@ async function main() {
 
   // --- refuse unless the target actually has stake behind it ---------------
   const dist = await ethers.getContractAt("Distributor", TARGET.distributor, ethers.provider);
-  const [tAgora, tSuits] = [await dist.stakedAgora(), await dist.stakedSuits()];
-  const agoraVault = await ethers.getContractAt("StakedAgora", tAgora, ethers.provider);
+  const [tTorii, tSuits] = [await dist.stakedAgora(), await dist.stakedSuits()];
+  const toriiVault = await ethers.getContractAt("StakedTorii", tTorii, ethers.provider);
   const suitsVault = await ethers.getContractAt("StakedSuits", tSuits, ethers.provider);
   const [shares, assets, staked] = await Promise.all([
-    agoraVault.totalSupply(), agoraVault.totalAssets(), suitsVault.totalStaked(),
+    toriiVault.totalSupply(), toriiVault.totalAssets(), suitsVault.totalStaked(),
   ]);
 
   line();
   console.log("TARGET SET — what is actually in it");
-  console.log(`  stAGORA  ${tAgora}`);
-  console.log(`     ${eth(shares)} shares · ${eth(assets)} AGORA staked`);
+  console.log(`  stTORII  ${tTorii}`);
+  console.log(`     ${eth(shares)} shares · ${eth(assets)} TORII staked`);
   console.log(`  StakedSuits  ${tSuits}`);
   console.log(`     ${staked} Suits staked`);
 
@@ -79,8 +79,8 @@ async function main() {
   // --- also confirm the CURRENT set is the empty one, so we are not -------
   // --- abandoning real stakers by switching away from it -------------------
   const curD = await ethers.getContractAt("Distributor", curDist, ethers.provider);
-  const curAgora = await ethers.getContractAt("StakedAgora", await curD.stakedAgora(), ethers.provider);
-  const curShares = await curAgora.totalSupply();
+  const curTorii = await ethers.getContractAt("StakedTorii", await curD.stakedAgora(), ethers.provider);
+  const curShares = await curTorii.totalSupply();
   console.log(`\n  current set holds ${eth(curShares)} shares`);
   if (curShares > 0n) {
     throw new Error(

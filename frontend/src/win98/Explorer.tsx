@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Contract, formatEther } from "ethers";
-import { readProvider, AGORA, explorerAddr, AGORA_TAX_BPS, EXPLORER } from "../chain";
+import { readProvider, TORII, explorerAddr, TORII_TAX_BPS, EXPLORER } from "../chain";
 import { readBeefyPositions, totalDeployedWei } from "../beefy";
 import { multiRead, asBig } from "../multicall";
 import { PixelIcon, type IconName } from "./pixel";
@@ -62,14 +62,14 @@ export function MyComputer({ onClose }: { onClose: () => void }) {
     let alive = true;
 
     (async () => {
-      const T = AGORA.treasury;
+      const T = TORII.treasury;
       const f = (sig: string) => ({ target: T, fragment: `function ${sig} view returns (uint256)` });
 
       const [reads, positions, collectable] = await Promise.all([
         multiRead([f("nav()"), f("liquidEth()"), f("pendingIncome()"), f("cumulativeWithdrawn()")]),
-        readBeefyPositions(AGORA.deployer).catch(() => []),
+        readBeefyPositions(TORII.deployer).catch(() => []),
         new Contract(
-          AGORA.feeSink,
+          TORII.feeSink,
           ["function collectable() view returns (uint256,uint256,uint256)"],
           readProvider
         )
@@ -187,15 +187,15 @@ export function MyComputer({ onClose }: { onClose: () => void }) {
 type Node = { name: string; addr: string; role: string };
 
 const NODES: Node[] = [
-  { name: "AGORA", addr: AGORA.token, role: "the token · fixed supply, burn-only" },
-  { name: "TREASURY", addr: AGORA.treasury, role: "the corpus · NAV and the floor" },
-  { name: "FEESINK", addr: AGORA.feeSink, role: "collects the 4% from Pons" },
-  { name: "REDEEMER", addr: AGORA.redeemer, role: "burn AGORA, join the queue" },
-  { name: "STAGORA", addr: AGORA.stakedAgora, role: "ERC-4626 vault · ETH rewards" },
-  { name: "DISTRIBUTOR", addr: AGORA.distributor, role: "splits income 90 / 10" },
-  { name: "STAKEDSUITS", addr: AGORA.stakedSuits, role: "NFT staking · blocked by the collection" },
+  { name: "TORII", addr: TORII.token, role: "the token · fixed supply, burn-only" },
+  { name: "TREASURY", addr: TORII.treasury, role: "the corpus · NAV and the floor" },
+  { name: "FEESINK", addr: TORII.feeSink, role: "collects the 4% from Pons" },
+  { name: "REDEEMER", addr: TORII.redeemer, role: "burn TORII, join the queue" },
+  { name: "STTORII", addr: TORII.stakedAgora, role: "ERC-4626 vault · ETH rewards" },
+  { name: "DISTRIBUTOR", addr: TORII.distributor, role: "splits income 90 / 10" },
+  { name: "STAKEDSUITS", addr: TORII.stakedSuits, role: "NFT staking · blocked by the collection" },
   { name: "ADAPTER", addr: "0x0B57a02cd732A4942DefD1c67F83097a24DBDbEe", role: "Beefy sleeve · queued, not active" },
-  { name: "CURVE", addr: AGORA.curve, role: "the bonding curve · closed" },
+  { name: "CURVE", addr: TORII.curve, role: "the bonding curve · closed" },
 ];
 
 export function NetworkNeighborhood({ onClose }: { onClose: () => void }) {
@@ -260,12 +260,12 @@ export function NetworkNeighborhood({ onClose }: { onClose: () => void }) {
    Notepad — readme.txt
    ========================================================================== */
 
-const README = `AGORA — readme.txt
+const README = `TORII — readme.txt
 ==================================================
 
 WHAT THIS IS
 
-  Every buy and every sell of AGORA pays a ${AGORA_TAX_BPS / 100}% fee.
+  Every buy and every sell of TORII pays a ${TORII_TAX_BPS / 100}% fee.
   The fee is set in the Pons pool and paid in ETH, so the
   token itself carries no tax code at all — it is a plain
   ERC-20 with no hooks, no owner, no blacklist, no mint.
@@ -274,7 +274,7 @@ WHAT THIS IS
   who stake; the rest stays in the pot and makes every token
   worth a little more than it was.
 
-  Any holder may burn AGORA and take a pro-rata share of the
+  Any holder may burn TORII and take a pro-rata share of the
   pot, minus a 5% haircut. The haircut stays behind, so every
   redemption makes the remaining position stronger. A run
   makes the survivors richer. That is the whole design.

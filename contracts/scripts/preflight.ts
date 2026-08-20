@@ -60,7 +60,7 @@ async function main() {
       : "                ⚠ signer is NOT the owner — bind will print calldata for governance"
   );
   const bound = await t.agora();
-  console.log(`Treasury.agora  ${bound}  ${bound === ethers.ZeroAddress ? "(unbound — bind will set it)" : "(ALREADY BOUND — bind will skip)"}`);
+  console.log(`Treasury.torii  ${bound}  ${bound === ethers.ZeroAddress ? "(unbound — bind will set it)" : "(ALREADY BOUND — bind will skip)"}`);
   line();
 }
 

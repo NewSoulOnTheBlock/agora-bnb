@@ -13,27 +13,27 @@ interface IGate {
 }
 
 /**
- * @title StakedAgora (stAGORA)
- * @notice ERC-4626 vault over AGORA. Stakers receive the protocol's income
+ * @title StakedTorii (stTORII)
+ * @notice ERC-4626 vault over TORII. Stakers receive the protocol's income
  *         stream; passive holders keep the redemption floor (spec §9).
  *
  * ## Why staking rather than per-holder reflection
  *
  * Eligible supply for income is simply `totalSupply()` of this vault. That is
  * the entire reason the design stakes instead of reflecting: no transfer-hook
- * checkpoints on AGORA (which has no hooks at all and cannot gain any), no
+ * checkpoints on TORII (which has no hooks at all and cannot gain any), no
  * exclusion set to get wrong, no rebasing, and nothing downstream broken by a
  * balance that changes without a Transfer event.
  *
- * ## Rewards are ETH, not more AGORA
+ * ## Rewards are ETH, not more TORII
  *
  * The corpus is ETH-denominated, so income arrives as ETH. That means share
- * price does **not** grow: `totalAssets()` is just the AGORA held here, so
+ * price does **not** grow: `totalAssets()` is just the TORII held here, so
  * shares stay ~1:1 with deposits. Yield is tracked separately in a MasterChef-
  * style accumulator and claimed pull-wise.
  *
  * Keeping rewards out of `totalAssets()` is deliberate. If ETH income inflated
- * the share price, `convertToAssets` would report AGORA that the vault does not
+ * the share price, `convertToAssets` would report TORII that the vault does not
  * hold, and every 4626 integrator downstream would be misled.
  *
  * ## Why the Distributor was folded in
@@ -46,11 +46,11 @@ interface IGate {
  *
  * ## Share transfers settle rewards first
  *
- * stAGORA is itself an ERC-20. `_update` settles both parties' accrued rewards
+ * stTORII is itself an ERC-20. `_update` settles both parties' accrued rewards
  * before any balance moves, so buying shares never buys someone else's unclaimed
  * yield, and selling them never forfeits your own.
  */
-contract StakedAgora is ERC4626, Ownable, ReentrancyGuard {
+contract StakedTorii is ERC4626, Ownable, ReentrancyGuard {
     /// @dev High precision: share supply can reach ~1e27 while a reward may be
     ///      a fraction of an ETH, and a smaller scalar would truncate to zero.
     uint256 private constant ACC_PRECISION = 1e30;
@@ -70,7 +70,7 @@ contract StakedAgora is ERC4626, Ownable, ReentrancyGuard {
     /**
      * @notice Optional eligibility gate. Zero address = open to everyone.
      * @dev Spec §11 puts any allowlist or geofence HERE and on the Redeemer —
-     *      never on AGORA itself, which has no transfer hooks and must stay a
+     *      never on TORII itself, which has no transfer hooks and must stay a
      *      plain composable ERC-20. Pluggable so no policy is baked in now.
      */
     IGate public gate;

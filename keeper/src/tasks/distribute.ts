@@ -36,10 +36,10 @@ export const distributeIncome: Job = {
     if (pending === 0n) return { act: false, reason: "no income earmarked" };
 
     // Both sinks empty → the Distributor reverts by design. Say so plainly.
-    const stAgora = new Contract(ADDR.stakedAgora, SINK_ABI, provider);
+    const stTorii = new Contract(ADDR.stakedAgora, SINK_ABI, provider);
     const suits = new Contract(ADDR.stakedSuits, SINK_ABI, provider);
     const [shares, staked] = await Promise.all([
-      stAgora.totalSupply().catch(() => 0n),
+      stTorii.totalSupply().catch(() => 0n),
       suits.totalStaked().catch(() => 0n),
     ]);
     if (shares === 0n && staked === 0n) {

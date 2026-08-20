@@ -1,7 +1,7 @@
 import { Contract, MaxUint256, type JsonRpcSigner } from "ethers";
-import { readProvider, AGORA, SUITS_NFT, ZERO } from "./chain";
+import { readProvider, TORII, SUITS_NFT, ZERO } from "./chain";
 import {
-  STAKED_AGORA_ABI, REDEEMER_ABI, STAKED_SUITS_ABI, SUITS_ABI, TREASURY_ABI,
+  STAKED_TORII_ABI, REDEEMER_ABI, STAKED_SUITS_ABI, SUITS_ABI, TREASURY_ABI,
   FEE_SINK_ABI,
 } from "./abis";
 import { PONS_TOKEN_ABI } from "./abis";
@@ -22,7 +22,7 @@ function ro(address: string, abi: string[]) {
 // ---------------------------------------------------------------------------
 
 export type StakePosition = {
-  agoraBalance: bigint | null;
+  toriiBalance: bigint | null;
   shares: bigint | null;
   sharesAsAssets: bigint | null;
   pendingYield: bigint | null;
@@ -31,24 +31,24 @@ export type StakePosition = {
 
 export async function readStakePosition(account: string): Promise<StakePosition> {
   const empty: StakePosition = {
-    agoraBalance: null, shares: null, sharesAsAssets: null, pendingYield: null, allowance: null,
+    toriiBalance: null, shares: null, sharesAsAssets: null, pendingYield: null, allowance: null,
   };
-  if (AGORA.token === ZERO) return empty;
+  if (TORII.token === ZERO) return empty;
 
-  const token = ro(AGORA.token, ERC20_ABI);
-  const agoraBalance = await token.balanceOf(account).then(BigInt).catch(() => null);
-  if (AGORA.stakedAgora === ZERO) return { ...empty, agoraBalance };
+  const token = ro(TORII.token, ERC20_ABI);
+  const toriiBalance = await token.balanceOf(account).then(BigInt).catch(() => null);
+  if (TORII.stakedAgora === ZERO) return { ...empty, toriiBalance };
 
-  const v = ro(AGORA.stakedAgora, STAKED_AGORA_ABI);
+  const v = ro(TORII.stakedAgora, STAKED_TORII_ABI);
   const [shares, pendingYield, allowance] = await Promise.all([
     v.balanceOf(account).then(BigInt).catch(() => null),
     v.pendingYield(account).then(BigInt).catch(() => null),
-    token.allowance(account, AGORA.stakedAgora).then(BigInt).catch(() => null),
+    token.allowance(account, TORII.stakedAgora).then(BigInt).catch(() => null),
   ]);
   const sharesAsAssets =
     shares === null ? null : await v.convertToAssets(shares).then(BigInt).catch(() => null);
 
-  return { agoraBalance, shares, sharesAsAssets, pendingYield, allowance };
+  return { toriiBalance, shares, sharesAsAssets, pendingYield, allowance };
 }
 
 export type SuitsPosition = {
@@ -62,14 +62,14 @@ export async function readSuitsPosition(account: string): Promise<SuitsPosition>
   const nft = ro(SUITS_NFT, SUITS_ABI);
   const owned = await nft.balanceOf(account).then(BigInt).catch(() => null);
 
-  if (AGORA.stakedSuits === ZERO) {
+  if (TORII.stakedSuits === ZERO) {
     return { owned, staked: null, pendingYield: null, approvedForAll: null };
   }
-  const v = ro(AGORA.stakedSuits, STAKED_SUITS_ABI);
+  const v = ro(TORII.stakedSuits, STAKED_SUITS_ABI);
   const [staked, pendingYield, approvedForAll] = await Promise.all([
     v.stakedCount(account).then(BigInt).catch(() => null),
     v.pendingYield(account).then(BigInt).catch(() => null),
-    nft.isApprovedForAll(account, AGORA.stakedSuits).then((b: boolean) => b).catch(() => null),
+    nft.isApprovedForAll(account, TORII.stakedSuits).then((b: boolean) => b).catch(() => null),
   ]);
   return { owned, staked, pendingYield, approvedForAll };
 }
@@ -91,7 +91,7 @@ export type TokenStatus = {
 
 export async function classifyTokens(ids: bigint[], account: string): Promise<TokenStatus[]> {
   const nft = ro(SUITS_NFT, SUITS_ABI);
-  const vault = AGORA.stakedSuits !== ZERO ? ro(AGORA.stakedSuits, STAKED_SUITS_ABI) : null;
+  const vault = TORII.stakedSuits !== ZERO ? ro(TORII.stakedSuits, STAKED_SUITS_ABI) : null;
   const me = account.toLowerCase();
 
   return Promise.all(
@@ -127,8 +127,8 @@ export type RedeemRequest = {
 
 /** Newest-first queue entries belonging to `account`. */
 export async function readMyRequests(account: string, max = 25): Promise<RedeemRequest[]> {
-  if (AGORA.redeemer === ZERO) return [];
-  const r = ro(AGORA.redeemer, REDEEMER_ABI);
+  if (TORII.redeemer === ZERO) return [];
+  const r = ro(TORII.redeemer, REDEEMER_ABI);
   const len = Number(await r.queueLength().catch(() => 0n));
   const me = account.toLowerCase();
   const out: RedeemRequest[] = [];
@@ -157,14 +157,14 @@ export async function readMyRequests(account: string, max = 25): Promise<RedeemR
 }
 
 export async function quoteRedeem(amount: bigint): Promise<bigint | null> {
-  if (AGORA.redeemer === ZERO) return null;
-  return ro(AGORA.redeemer, REDEEMER_ABI).quote(amount).then(BigInt).catch(() => null);
+  if (TORII.redeemer === ZERO) return null;
+  return ro(TORII.redeemer, REDEEMER_ABI).quote(amount).then(BigInt).catch(() => null);
 }
 
 export async function readCollectable(): Promise<{ inEscrow: bigint; onCurve: bigint; held: bigint } | null> {
-  if (AGORA.feeSink === ZERO) return null;
+  if (TORII.feeSink === ZERO) return null;
   try {
-    const [inEscrow, onCurve, held] = await ro(AGORA.feeSink, FEE_SINK_ABI).collectable();
+    const [inEscrow, onCurve, held] = await ro(TORII.feeSink, FEE_SINK_ABI).collectable();
     return { inEscrow: BigInt(inEscrow), onCurve: BigInt(onCurve), held: BigInt(held) };
   } catch {
     return null;
@@ -182,50 +182,50 @@ async function send(signer: JsonRpcSigner, address: string, abi: string[], fn: s
   return tx.hash as string;
 }
 
-export const approveAgoraForStaking = (s: JsonRpcSigner) =>
-  send(s, AGORA.token, ERC20_ABI, "approve", [AGORA.stakedAgora, MaxUint256]);
+export const approveToriiForStaking = (s: JsonRpcSigner) =>
+  send(s, TORII.token, ERC20_ABI, "approve", [TORII.stakedAgora, MaxUint256]);
 
-export const stakeAgora = (s: JsonRpcSigner, assets: bigint, to: string) =>
-  send(s, AGORA.stakedAgora, STAKED_AGORA_ABI, "deposit", [assets, to]);
+export const stakeTorii = (s: JsonRpcSigner, assets: bigint, to: string) =>
+  send(s, TORII.stakedAgora, STAKED_TORII_ABI, "deposit", [assets, to]);
 
-export const unstakeAgora = (s: JsonRpcSigner, shares: bigint, to: string) =>
-  send(s, AGORA.stakedAgora, STAKED_AGORA_ABI, "redeem", [shares, to, to]);
+export const unstakeTorii = (s: JsonRpcSigner, shares: bigint, to: string) =>
+  send(s, TORII.stakedAgora, STAKED_TORII_ABI, "redeem", [shares, to, to]);
 
-export const claimAgoraYield = (s: JsonRpcSigner) =>
-  send(s, AGORA.stakedAgora, STAKED_AGORA_ABI, "claim", []);
+export const claimToriiYield = (s: JsonRpcSigner) =>
+  send(s, TORII.stakedAgora, STAKED_TORII_ABI, "claim", []);
 
 export const approveSuitsForStaking = (s: JsonRpcSigner) =>
-  send(s, SUITS_NFT, SUITS_ABI, "setApprovalForAll", [AGORA.stakedSuits, true]);
+  send(s, SUITS_NFT, SUITS_ABI, "setApprovalForAll", [TORII.stakedSuits, true]);
 
 export const stakeSuits = (s: JsonRpcSigner, ids: bigint[]) =>
-  send(s, AGORA.stakedSuits, STAKED_SUITS_ABI, "stake", [ids]);
+  send(s, TORII.stakedSuits, STAKED_SUITS_ABI, "stake", [ids]);
 
 export const unstakeSuits = (s: JsonRpcSigner, ids: bigint[]) =>
-  send(s, AGORA.stakedSuits, STAKED_SUITS_ABI, "unstake", [ids]);
+  send(s, TORII.stakedSuits, STAKED_SUITS_ABI, "unstake", [ids]);
 
 export const claimSuitsYield = (s: JsonRpcSigner) =>
-  send(s, AGORA.stakedSuits, STAKED_SUITS_ABI, "claim", []);
+  send(s, TORII.stakedSuits, STAKED_SUITS_ABI, "claim", []);
 
-export const approveAgoraForRedeemer = (s: JsonRpcSigner) =>
-  send(s, AGORA.token, ERC20_ABI, "approve", [AGORA.redeemer, MaxUint256]);
+export const approveToriiForRedeemer = (s: JsonRpcSigner) =>
+  send(s, TORII.token, ERC20_ABI, "approve", [TORII.redeemer, MaxUint256]);
 
 export const requestRedeem = (s: JsonRpcSigner, amount: bigint) =>
-  send(s, AGORA.redeemer, REDEEMER_ABI, "requestRedeem", [amount]);
+  send(s, TORII.redeemer, REDEEMER_ABI, "requestRedeem", [amount]);
 
 export const executeRedeem = (s: JsonRpcSigner, id: number) =>
-  send(s, AGORA.redeemer, REDEEMER_ABI, "execute", [id]);
+  send(s, TORII.redeemer, REDEEMER_ABI, "execute", [id]);
 
 /** Permissionless keeper actions — anyone may crank these. */
 export const collectFees = (s: JsonRpcSigner) =>
-  send(s, AGORA.feeSink, FEE_SINK_ABI, "collect", []);
+  send(s, TORII.feeSink, FEE_SINK_ABI, "collect", []);
 
 export const distributeIncome = (s: JsonRpcSigner) =>
-  send(s, AGORA.treasury, TREASURY_ABI, "distributeIncome", []);
+  send(s, TORII.treasury, TREASURY_ABI, "distributeIncome", []);
 
 export async function readRedeemerAllowance(account: string): Promise<bigint | null> {
-  if (AGORA.token === ZERO || AGORA.redeemer === ZERO) return null;
-  return ro(AGORA.token, ERC20_ABI)
-    .allowance(account, AGORA.redeemer)
+  if (TORII.token === ZERO || TORII.redeemer === ZERO) return null;
+  return ro(TORII.token, ERC20_ABI)
+    .allowance(account, TORII.redeemer)
     .then(BigInt)
     .catch(() => null);
 }

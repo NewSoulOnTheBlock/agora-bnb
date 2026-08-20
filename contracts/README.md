@@ -1,6 +1,6 @@
-# AGORA contracts — Treasury + FeeSink
+# TORII contracts — Treasury + FeeSink
 
-The collective balance sheet behind AGORA's redemption floor. **ETH-denominated corpus**
+The collective balance sheet behind TORII's redemption floor. **ETH-denominated corpus**
 (spec [§4.1](../docs/design.md), option 1).
 
 ```bash
@@ -24,7 +24,7 @@ staleness and Arbitrum sequencer uptime — with an ETH corpus and no adapters, 
 oracle to gate and `nav()` cannot go stale.
 
 **The cost, stated plainly:** the floor is denominated in ETH, so its dollar value moves
-with ETH. A floor of 0.000001 ETH/AGORA is hard in ether and soft in dollars. Spec §4.1
+with ETH. A floor of 0.000001 ETH/TORII is hard in ether and soft in dollars. Spec §4.1
 recommended USDG for exactly this reason; ETH was chosen deliberately over that advice.
 
 ## The owner CAN withdraw corpus ETH — read this before trusting the floor
@@ -37,7 +37,7 @@ and it has a direct consequence:
 > now*. It is not a level the contract can hold, because corpus ETH can leave without a
 > redemption.
 
-Do not describe AGORA as having a *guaranteed* or *hard* floor. The honest description is a
+Do not describe TORII as having a *guaranteed* or *hard* floor. The honest description is a
 **reported floor** that ratchets up with tax and redemptions and falls when the operator
 withdraws. Every withdrawal emits `Withdrawn(to, amount, navAfter)` and fires
 `FloorRegression`, so the entire history is auditable from events with no indexer.
@@ -49,7 +49,7 @@ withdraws. Every withdrawal emits `Withdrawn(to, amount, navAfter)` and fires
   compromised owner key bounds where corpus ETH lands, though not whether it leaves. A test
   asserts the function signature has exactly one `uint256` parameter.
 - **Staker income is untouchable.** Withdrawal is capped at `liquidEth()`, which excludes
-  `pendingIncome`. ETH earmarked for stAGORA and staked Suits is owed to third parties, not
+  `pendingIncome`. ETH earmarked for stTORII and staked Suits is owed to third parties, not
   corpus, and the owner cannot reach it.
 - **Redemption settles honestly through a withdrawal.** `Redeemer` pays
   `min(snapshotFloor, currentFloor)`, so a withdrawal between request and execution *reduces*
@@ -91,14 +91,14 @@ that burns all forwarded gas can still make `nav()` unusable. Calling untrusted 
 be made fully safe — the allowlist and timelock are the real mitigations, which is why
 adding an adapter is the one action delayed by 2 days while removal is immediate.
 
-**AGORA is never corpus.** It is marked at zero in `nav()` and the same balance is removed
-from `eligibleSupply()` so the two agree (spec §6.1). Consequence: donating AGORA to the
+**TORII is never corpus.** It is marked at zero in `nav()` and the same balance is removed
+from `eligibleSupply()` so the two agree (spec §6.1). Consequence: donating TORII to the
 Treasury shrinks the denominator and *raises* reported `floorPerToken` without adding value.
 It is not profitable to do, but `floorPerToken()` is therefore not manipulation-proof
 against a donor — the Redeemer must price against a **lagged** NAV per spec §6.3.
 
-**Do not add the staking vault to the exclusion list.** It *custodies* user AGORA rather
-than owning it; stakers must keep their floor backing. Exclude only AGORA the protocol owns.
+**Do not add the staking vault to the exclusion list.** It *custodies* user TORII rather
+than owning it; stakers must keep their floor backing. Exclude only TORII the protocol owns.
 
 ## Deploying — contracts BEFORE the token
 
@@ -140,8 +140,8 @@ To rehearse the whole flow against a local node first:
 
 ```bash
 npx hardhat node
-npx hardhat run scripts/seed-local.ts --network localhost      # prints a mock AGORA
-AGORA_TOKEN=<printed> npx hardhat run scripts/deploy.ts --network localhost
+npx hardhat run scripts/seed-local.ts --network localhost      # prints a mock TORII
+TORII_TOKEN=<printed> npx hardhat run scripts/deploy.ts --network localhost
 ```
 
 ## After deployment
@@ -153,9 +153,9 @@ AGORA_TOKEN=<printed> npx hardhat run scripts/deploy.ts --network localhost
    ```
    The read layer is already written against this exact ABI, so no other change is needed.
 
-2. **Point AGORA's creator fees at the FeeSink**, from the Pons launch deployer:
+2. **Point TORII's creator fees at the FeeSink**, from the Pons launch deployer:
    ```
-   PonsV2LaunchFactory.transferCreatorFeeRecipient(AGORA, feeSink)
+   PonsV2LaunchFactory.transferCreatorFeeRecipient(TORII, feeSink)
    ```
    **3-day timelock + 3-day execution window.** A contract is an accepted recipient
    (probed and confirmed). Only `transferCreatorFeeRecipient` works — `setCreatorFeeRecipient`,
@@ -169,16 +169,16 @@ AGORA_TOKEN=<printed> npx hardhat run scripts/deploy.ts --network localhost
 4. **Test with a small amount first.** The `sweepFees` destination has never been verified:
    the public RPC exposes no trace API, so where the ETH lands is inferred, not proven.
 
-## StakedAgora — the income side
+## StakedTorii — the income side
 
-ERC-4626 vault over AGORA. Eligible supply for income is just `totalSupply()` of the vault,
+ERC-4626 vault over TORII. Eligible supply for income is just `totalSupply()` of the vault,
 which is the whole reason the design stakes rather than reflects: no transfer-hook checkpoints
-on AGORA (which has none and can never gain any), no exclusion set to get wrong, no rebasing.
+on TORII (which has none and can never gain any), no exclusion set to get wrong, no rebasing.
 
 **Rewards are ETH and deliberately stay OUT of `totalAssets()`.** Share price therefore never
 moves — shares are ~1:1 with deposits — and yield is tracked in a MasterChef-style accumulator
 claimed pull-wise via `claim()`. If ETH income inflated the share price, `convertToAssets`
-would report AGORA the vault does not hold and mislead every 4626 integrator downstream.
+would report TORII the vault does not hold and mislead every 4626 integrator downstream.
 
 `_update` settles both parties before any share transfer, so buying shares never buys
 someone else's unclaimed yield and selling never forfeits your own.
@@ -215,7 +215,7 @@ protect remaining holders; with none remaining there is nobody to protect. **A t
 this — the first implementation confiscated the last redemption.**
 
 **No cancel.** Tokens are destroyed at request time, which makes the benefit to holders
-immediate and abandoning the queue non-free. Re-minting is impossible: AGORA's supply is fixed
+immediate and abandoning the queue non-free. Re-minting is impossible: TORII's supply is fixed
 by the Pons factory.
 
 Bounded governance: haircut ≤ 20%, delay ≤ 30 days, and `setRequestsPaused` blocks **new**
@@ -224,7 +224,7 @@ their claim, or an emergency stop becomes confiscation.
 
 ## StakedSuits + Distributor — the 10% NFT slice
 
-**10% of yield goes to staked Suits NFTs**, 90% to stAGORA stakers.
+**10% of yield goes to staked Suits NFTs**, 90% to stTORII stakers.
 
 Suits (`0x3ac7beb099c560f5a09bd822621327d8768f0625`, chain 4663) is a SeaDrop ERC-721 clone,
 fully minted at **1111/1111**, with **no staking functions of its own** — so `StakedSuits`
@@ -247,7 +247,7 @@ uses plain `transferFrom` rather than `safeTransferFrom` so it does not addition
 the receiver hook, and rewards are tracked independently of custody so accrued ETH stays
 claimable even if an NFT were stuck. Anyone staking is trusting the Suits owner on this point.
 
-**The Distributor comes back.** It was folded into `StakedAgora` when there was a single sink;
+**The Distributor comes back.** It was folded into `StakedTorii` when there was a single sink;
 with two sinks a split has to live somewhere both sides can be reasoned about. `distribute()`
 is permissionless, both destinations are `immutable`, there is no withdrawal function, and the
 NFT slice is capped at **30%** so governance cannot redirect the income stream.
@@ -262,7 +262,7 @@ a claim nobody could exercise in a contract with no exit.
 ```
 tax ──► FeeSink ──► Treasury ──┬──► corpus  (raises the floor)
                                └──► pendingIncome ──► Distributor ──┬──► 10% StakedSuits
-sleeve yield ──► realizeSurplus ──► pendingIncome ──────────────────┴──► 90% stAGORA
+sleeve yield ──► realizeSurplus ──► pendingIncome ──────────────────┴──► 90% stTORII
 ```
 
 `pendingIncome` is **excluded from `nav()`**, and that single decision is what keeps the floor
@@ -395,11 +395,11 @@ does not know about it. Three owner actions, one behind the 2-day
 
 ## Not written yet
 
-`StakedAgora` and `Redeemer` are deployed by **step 3** (`bind.ts`), not step 1, because both
+`StakedTorii` and `Redeemer` are deployed by **step 3** (`bind.ts`), not step 1, because both
 take the token address as a constructor argument. Until `Redeemer` is set via `setRedeemer()`,
 **no ETH can leave the Treasury at all** — `payout()` reverts with `NotRedeemer`.
 
-**Do not add StakedAgora to the Treasury's exclusion list.** It custodies user AGORA rather
+**Do not add StakedTorii to the Treasury's exclusion list.** It custodies user TORII rather
 than owning it, so stakers must keep their floor backing.
 
 ## Layout
@@ -408,10 +408,10 @@ than owning it, so stakers must keep their floor backing.
 contracts/
   Treasury.sol              ETH corpus, NAV, floor, capped sleeve, timelocked adapters
   FeeSink.sol               logic-free 2300-gas-safe ETH receiver
-  Redeemer.sol              burn AGORA → queued pro-rata claim at a haircut
-  StakedAgora.sol           ERC-4626 stAGORA; ETH rewards via an accumulator
+  Redeemer.sol              burn TORII → queued pro-rata claim at a haircut
+  StakedTorii.sol           ERC-4626 stTORII; ETH rewards via an accumulator
   StakedSuits.sol           custodial ERC-721 staking, one Suit one share
-  Distributor.sol           10/90 split between staked Suits and stAGORA
+  Distributor.sol           10/90 split between staked Suits and stTORII
   adapters/BeefyCLMAdapter.sol   ETH ⇄ Beefy cowcentrated vault, TWAP-guarded
   interfaces/IYieldAdapter.sol   the only external integration surface
   interfaces/IBeefyCLM.sol  Beefy + Uniswap v3 ABIs, read from verified sources
@@ -421,7 +421,7 @@ scripts/
   deploy.ts                 Treasury → FeeSink → wire; prints multisig calldata if needed
   deploy-beefy-adapter.ts   adapter + the governance sequence that activates it
   rehearse-beefy.ts         full adapter lifecycle against a FORK of the live vault
-  seed-local.ts             local-only mock AGORA for rehearsing deploy.ts
+  seed-local.ts             local-only mock TORII for rehearsing deploy.ts
 test/
   Treasury.test.ts          82 tests
   BeefyAdapter.test.ts      23 guard tests (mocked; economics proven on a fork)

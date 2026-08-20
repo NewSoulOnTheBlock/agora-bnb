@@ -1,4 +1,4 @@
-# AGORA — launch runbook
+# TORII — launch runbook
 
 Ordered, with a verification gate after every step. **Do not skip the gates** — the
 first launch died because a step's effect was assumed rather than checked.
@@ -38,8 +38,8 @@ DEPLOYER_PRIVATE_KEY=
 # SHOULD be a multisig. If blank, the deployer EOA owns the treasury.
 TREASURY_OWNER=
 
-TOKEN_NAME=Agora
-TOKEN_SYMBOL=AGORA
+TOKEN_NAME=Torii
+TOKEN_SYMBOL=TORII
 CREATOR_TAX_BPS=400
 ```
 
@@ -128,7 +128,7 @@ This verifies Gate 2, then:
 
 - `Treasury.setAgora(token)` — write-once
 - `FeeSink.setCurve(curve)` — write-once, **and renounces the FeeSink's owner in the same call**
-- deploys `StakedAgora`, `Redeemer`, `StakedSuits`, `Distributor`
+- deploys `StakedTorii`, `Redeemer`, `StakedSuits`, `Distributor`
 - `Treasury.setRedeemer(...)` and `Treasury.setDistributor(...)`
 
 If `TREASURY_OWNER` is a multisig, the two `set*` calls print calldata for governance to execute
@@ -163,7 +163,7 @@ distributor: "0x…",
 
 ```bash
 cd ../frontend
-AGORA_TOKEN=0x… AGORA_CURVE=0x… npm run verify   # 31 checks incl. the trade path
+TORII_TOKEN=0x… TORII_CURVE=0x… npm run verify   # 31 checks incl. the trade path
 npx vite build
 npx vercel deploy --prod --yes
 ```
@@ -213,7 +213,7 @@ Two consequences to hold in mind:
   Do not market a guaranteed or hard floor. Every withdrawal emits `Withdrawn` with the
   resulting NAV and fires `FloorRegression`, so the record is public either way.
 - **You cannot withdraw staker income.** Withdrawal is capped at `liquidEth()`, which excludes
-  `pendingIncome`. That ETH is owed to stAGORA and staked Suits holders.
+  `pendingIncome`. That ETH is owed to stTORII and staked Suits holders.
 
 **There is now an on-chain alternative to that manual route.** `BeefyCLMAdapter` deploys corpus
 ETH into a WETH-paired Beefy cowcentrated vault **without the ETH leaving `nav()`**, so the

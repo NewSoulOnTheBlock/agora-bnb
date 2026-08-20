@@ -1,9 +1,9 @@
 /**
- * AGORA on BNB Chain — step 3 of 3: deploy the staking side and wire everything.
+ * TORII on BNB Chain — step 3 of 3: deploy the staking side and wire everything.
  *
  *   npx hardhat run scripts/bind-bnb.ts --network bsc
  *
- * Requires in .env: TREASURY, AGORA_TOKEN, AGORA_VAULT.
+ * Requires in .env: TREASURY, TORII_TOKEN, TORII_VAULT.
  *
  * VAULT_FACTORY is NOT read here. The vault is validated directly instead — it
  * must pay this Treasury and be bound to this token — which is the property
@@ -19,7 +19,7 @@
  *
  * Tax is split — 70% corpus, 30% earmarked for stakers. Anything else is
  * treated as a donation and lands entirely in the corpus. So if `setFeeSink` is
- * never pointed at the AgoraVault, everything still *works*: the vault collects,
+ * never pointed at the ToriiVault, everything still *works*: the vault collects,
  * the Treasury's balance grows, the floor rises. Stakers simply never get paid,
  * and nothing anywhere reverts to say so.
  *
@@ -42,22 +42,22 @@ async function main() {
   const net = await ethers.provider.getNetwork();
 
   const TREASURY = req("TREASURY");
-  const AGORA_TOKEN = req("AGORA_TOKEN");
-  const AGORA_VAULT = req("AGORA_VAULT");
+  const TORII_TOKEN = req("TORII_TOKEN");
+  const TORII_VAULT = req("TORII_VAULT");
 
   line();
-  console.log("AGORA on BNB — step 3/3: staking side + wiring");
+  console.log("TORII on BNB — step 3/3: staking side + wiring");
   line();
   console.log(`network   ${network.name}  (chainId ${net.chainId})`);
   console.log(`deployer  ${deployer.address}`);
   console.log(`treasury  ${TREASURY}`);
-  console.log(`token     ${AGORA_TOKEN}`);
-  console.log(`vault     ${AGORA_VAULT}`);
+  console.log(`token     ${TORII_TOKEN}`);
+  console.log(`vault     ${TORII_VAULT}`);
 
   for (const [label, addr] of [
     ["TREASURY", TREASURY],
-    ["AGORA_TOKEN", AGORA_TOKEN],
-    ["AGORA_VAULT", AGORA_VAULT],
+    ["TORII_TOKEN", TORII_TOKEN],
+    ["TORII_VAULT", TORII_VAULT],
   ] as const) {
     if ((await ethers.provider.getCode(addr)) === "0x") {
       throw new Error(`No contract at ${label} ${addr} on chain ${net.chainId}.`);
@@ -65,7 +65,7 @@ async function main() {
   }
 
   const treasury = await ethers.getContractAt("Treasury", TREASURY, deployer);
-  const vault = await ethers.getContractAt("AgoraVault", AGORA_VAULT, deployer);
+  const vault = await ethers.getContractAt("ToriiVault", TORII_VAULT, deployer);
 
   // The vault Flap built must be the one that pays THIS treasury, and must be
   // bound to THIS token. A vault from someone else's factory would satisfy the
@@ -75,41 +75,41 @@ async function main() {
   if (vaultTreasury.toLowerCase() !== TREASURY.toLowerCase()) {
     throw new Error(`Vault pays ${vaultTreasury}, not the Treasury ${TREASURY}. Wrong vault.`);
   }
-  if (vaultToken.toLowerCase() !== AGORA_TOKEN.toLowerCase()) {
-    throw new Error(`Vault is bound to ${vaultToken}, not AGORA ${AGORA_TOKEN}. Wrong vault.`);
+  if (vaultToken.toLowerCase() !== TORII_TOKEN.toLowerCase()) {
+    throw new Error(`Vault is bound to ${vaultToken}, not TORII ${TORII_TOKEN}. Wrong vault.`);
   }
   console.log("  ↳ vault checks out: pays this Treasury, bound to this token");
 
   const owner = await treasury.owner();
   const ownerIsDeployer = owner.toLowerCase() === deployer.address.toLowerCase();
 
-  console.log("\ndeploying StakedAgora…");
+  console.log("\ndeploying StakedTorii…");
   const staking = await (
-    await ethers.getContractFactory("StakedAgora")
-  ).deploy(AGORA_TOKEN, owner);
+    await ethers.getContractFactory("StakedTorii")
+  ).deploy(TORII_TOKEN, owner);
   await staking.waitForDeployment();
   const stakingAddr = await staking.getAddress();
-  console.log(`  StakedAgora        ${stakingAddr}`);
+  console.log(`  StakedTorii        ${stakingAddr}`);
 
-  console.log("deploying AgoraDistributor…");
+  console.log("deploying ToriiDistributor…");
   const distributor = await (
-    await ethers.getContractFactory("AgoraDistributor")
+    await ethers.getContractFactory("ToriiDistributor")
   ).deploy(stakingAddr);
   await distributor.waitForDeployment();
   const distributorAddr = await distributor.getAddress();
-  console.log(`  AgoraDistributor   ${distributorAddr}   (no Suits, no owner)`);
+  console.log(`  ToriiDistributor   ${distributorAddr}   (no Suits, no owner)`);
 
   console.log("deploying Redeemer…");
   const redeemer = await (
     await ethers.getContractFactory("Redeemer")
-  ).deploy(AGORA_TOKEN, TREASURY, owner);
+  ).deploy(TORII_TOKEN, TREASURY, owner);
   await redeemer.waitForDeployment();
   const redeemerAddr = await redeemer.getAddress();
   console.log(`  Redeemer           ${redeemerAddr}`);
 
   const wiring: [string, string][] = [
-    ["setAgora", AGORA_TOKEN],
-    ["setFeeSink", AGORA_VAULT],
+    ["setAgora", TORII_TOKEN],
+    ["setFeeSink", TORII_VAULT],
     ["setDistributor", distributorAddr],
     ["setRedeemer", redeemerAddr],
   ];
@@ -137,14 +137,14 @@ async function main() {
   line();
 
   const checks: [string, string, string][] = [
-    ["Treasury.agora()", await treasury.agora(), AGORA_TOKEN],
-    ["Treasury.feeSink()", await treasury.feeSink(), AGORA_VAULT],
+    ["Treasury.agora()", await treasury.agora(), TORII_TOKEN],
+    ["Treasury.feeSink()", await treasury.feeSink(), TORII_VAULT],
     ["Treasury.distributor()", await treasury.distributor(), distributorAddr],
     ["Treasury.redeemer()", await treasury.redeemer(), redeemerAddr],
     ["Redeemer.treasury()", await redeemer.treasury(), TREASURY],
     ["Distributor.stakedAgora()", await distributor.stakedAgora(), stakingAddr],
     ["Vault.treasury()", await vault.treasury(), TREASURY],
-    ["Vault.taxToken()", await vault.taxToken(), AGORA_TOKEN],
+    ["Vault.taxToken()", await vault.taxToken(), TORII_TOKEN],
     ["Vault.vaultQuoteToken()", await vault.vaultQuoteToken(), ethers.ZeroAddress],
   ];
 
@@ -177,7 +177,7 @@ async function main() {
   console.log("and no revert anywhere to tell you.");
   console.log("");
   console.log("Record in .env:");
-  console.log(`  STAKED_AGORA=${stakingAddr}`);
+  console.log(`  STAKED_TORII=${stakingAddr}`);
   console.log(`  DISTRIBUTOR=${distributorAddr}`);
   console.log(`  REDEEMER=${redeemerAddr}`);
   line();

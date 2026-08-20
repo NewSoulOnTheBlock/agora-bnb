@@ -1,4 +1,4 @@
-import { AGORA, SUITS_NFT, SUITS_SUPPLY, ZERO } from "./chain";
+import { TORII, SUITS_NFT, SUITS_SUPPLY, ZERO } from "./chain";
 import { multiRead, asStr, type MCall } from "./multicall";
 
 /**
@@ -92,7 +92,7 @@ export async function readSuitsInventory(
   const hit = inventoryCache.get(me);
   if (hit && !opts?.fresh) return hit;
 
-  const vault = AGORA.stakedSuits;
+  const vault = TORII.stakedSuits;
   const hasVault = vault !== ZERO;
 
   const owners = await readAll(

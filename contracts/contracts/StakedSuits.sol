@@ -57,7 +57,7 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
  * tighten transfer policy. That is a property of the collection, not a bug here.
  */
 contract StakedSuits is Ownable, ReentrancyGuard, IERC721Receiver {
-    /// @dev Matches StakedAgora. Staked counts are tiny (≤1111) and rewards are
+    /// @dev Matches StakedTorii. Staked counts are tiny (≤1111) and rewards are
     ///      wei, so a smaller scalar would truncate small distributions to zero.
     uint256 private constant ACC_PRECISION = 1e30;
 
@@ -156,7 +156,7 @@ contract StakedSuits is Ownable, ReentrancyGuard, IERC721Receiver {
     /**
      * @notice Deliver ETH to staked Suits. Permissionless.
      * @dev Reverts when nothing is staked rather than swallowing the ETH — the
-     *      Distributor relies on that revert to reroute the slice to AGORA
+     *      Distributor relies on that revert to reroute the slice to TORII
      *      stakers instead of stranding it here.
      */
     function notifyReward() external payable {

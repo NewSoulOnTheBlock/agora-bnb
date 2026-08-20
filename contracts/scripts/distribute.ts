@@ -19,27 +19,27 @@ async function main() {
   const [signer] = await ethers.getSigners();
   const t = await ethers.getContractAt("Treasury", process.env.TREASURY!, signer);
   const dist = await ethers.getContractAt("Distributor", await t.distributor(), ethers.provider);
-  const stAgora = await ethers.getContractAt("StakedAgora", await dist.stakedAgora(), ethers.provider);
+  const stTorii = await ethers.getContractAt("StakedTorii", await dist.stakedAgora(), ethers.provider);
   const stSuits = await ethers.getContractAt("StakedSuits", await dist.stakedSuits(), ethers.provider);
 
   const [income, nav, floor, shares, suits] = await Promise.all([
     t.pendingIncome(), t.nav(), t.floorPerToken(),
-    stAgora.totalSupply(), stSuits.totalStaked(),
+    stTorii.totalSupply(), stSuits.totalStaked(),
   ]);
 
   line();
   console.log("DISTRIBUTE INCOME");
   line();
   console.log(`  earmarked income  ${eth(income)} ETH`);
-  console.log(`  stAGORA staked    ${eth(shares)} shares`);
+  console.log(`  stTORII staked    ${eth(shares)} shares`);
   console.log(`  Suits staked      ${suits} / 1111`);
   console.log(`  nav (untouched)   ${eth(nav)} ETH`);
 
   if (income === 0n) { console.log("\nNothing earmarked."); return; }
 
-  const [toSuits, toAgora] = await dist.preview(income);
+  const [toSuits, toTorii] = await dist.preview(income);
   console.log(`\n  → staked Suits    ${eth(toSuits)} ETH${suits === 0n ? "   (rerouted — none staked)" : ""}`);
-  console.log(`  → stAGORA         ${eth(toAgora)} ETH`);
+  console.log(`  → stTORII         ${eth(toTorii)} ETH`);
 
   console.log("\nsimulating…");
   await t.distributeIncome.staticCall();
@@ -51,17 +51,17 @@ async function main() {
 
   line();
   console.log("AFTER");
-  const [income2, nav2, floor2, agoraRewards, suitsRewards] = await Promise.all([
+  const [income2, nav2, floor2, toriiRewards, suitsRewards] = await Promise.all([
     t.pendingIncome(), t.nav(), t.floorPerToken(),
-    stAgora.cumulativeRewards(), stSuits.cumulativeRewards(),
+    stTorii.cumulativeRewards(), stSuits.cumulativeRewards(),
   ]);
   console.log(`  earmarked income  ${eth(income2)} ETH`);
-  console.log(`  paid to stAGORA   ${eth(agoraRewards)} ETH (cumulative)`);
+  console.log(`  paid to stTORII   ${eth(toriiRewards)} ETH (cumulative)`);
   console.log(`  paid to Suits     ${eth(suitsRewards)} ETH (cumulative)`);
   console.log(`  nav               ${eth(nav2)} ETH   ${nav2 === nav ? "← unchanged, as designed" : "← CHANGED, investigate"}`);
   console.log(`  floorPerToken     ${eth(floor2)} ETH ${floor2 === floor ? "← unchanged" : ""}`);
 
-  const you = await stAgora.pendingYield(signer.address);
+  const you = await stTorii.pendingYield(signer.address);
   if (you > 0n) console.log(`\n  claimable by ${signer.address.slice(0, 10)}…  ${eth(you)} ETH`);
   line();
 }

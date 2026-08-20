@@ -1,9 +1,9 @@
 {
-  "name": "agora-keeper",
+  "name": "torii-keeper",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Cranks AGORA's permissionless maintenance calls. Holds no privileged key.",
+  "description": "Cranks TORII's permissionless maintenance calls. Holds no privileged key.",
   "scripts": {
     "once": "tsx src/run.ts --once",
     "start": "tsx src/run.ts",

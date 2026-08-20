@@ -5,7 +5,7 @@ import { fmtSig, fmtGrouped, DASH } from "./format";
 import { usdOf, fmtUsd } from "./price";
 import { useSnapshot, useEthUsd } from "./useReads";
 import { readIncomeHistory, type IncomeHistory } from "./history";
-import { AGORA_TAX_BPS, SUITS_SHARE_BPS } from "./chain";
+import { TORII_TAX_BPS, SUITS_SHARE_BPS } from "./chain";
 
 /**
  * The case for staking, made out of things that have already happened.
@@ -44,7 +44,7 @@ export default function StakePitch() {
   const staking = s?.staking;
   const priceWad = s?.pool.priceWad ?? null;
 
-  /** AGORA locked in the vault, and what it is worth. */
+  /** TORII locked in the vault, and what it is worth. */
   const stakedAgora = staking?.totalAssets ?? null;
   const stakedWei =
     stakedAgora !== null && priceWad !== null ? (stakedAgora * priceWad) / 10n ** 18n : null;
@@ -97,9 +97,9 @@ export default function StakePitch() {
           )}
 
           <p className="sub">
-            <b>{AGORA_TAX_BPS / 100}% of every buy and sell</b> goes to the protocol.{" "}
+            <b>{TORII_TAX_BPS / 100}% of every buy and sell</b> goes to the protocol.{" "}
             <b>{s?.reserve.incomeShareBps != null ? Number(s.reserve.incomeShareBps) / 100 : 30}%</b>{" "}
-            of that is paid out as income — {100 - SUITS_SHARE_BPS / 100}% to people who stake AGORA,{" "}
+            of that is paid out as income — {100 - SUITS_SHARE_BPS / 100}% to people who stake TORII,{" "}
             {SUITS_SHARE_BPS / 100}% to staked Suits. The rest stays in the reserve and raises the
             floor for everyone, staked or not.
           </p>
@@ -141,9 +141,9 @@ export default function StakePitch() {
           <Stat
             k="Staked right now"
             value={stakedAgora !== null ? fmtGrouped(stakedAgora, 0) : null}
-            unit="AGORA"
+            unit="TORII"
             usd={usdOf(stakedWei, ethUsd)}
-            note="locked in the stAGORA vault"
+            note="locked in the stTORII vault"
           />
           <Stat
             k="Returned to stakers"
@@ -172,7 +172,7 @@ export default function StakePitch() {
             <div className="field-top">
               <span className="k">If I had staked</span>
               <span className="bal">
-                vault holds {stakedAgora !== null ? fmtGrouped(stakedAgora, 0) : DASH} AGORA
+                vault holds {stakedAgora !== null ? fmtGrouped(stakedAgora, 0) : DASH} TORII
               </span>
             </div>
             <div className="input-wrap">
@@ -182,7 +182,7 @@ export default function StakePitch() {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="10000000"
               />
-              <span className="denom">AGORA</span>
+              <span className="denom">TORII</span>
             </div>
           </div>
 
@@ -242,11 +242,11 @@ export default function StakePitch() {
       <div className="section">
         <Panel label="What you keep while staked">
           <div className="rows">
-            <Row k="Your AGORA">
+            <Row k="Your TORII">
               still yours — the vault custodies it, one share per token
             </Row>
             <Row k="Your floor backing">
-              unchanged — staked AGORA still counts in eligible supply
+              unchanged — staked TORII still counts in eligible supply
             </Row>
             <Row k="Unstaking">
               any time, no lockup, no exit fee
@@ -255,7 +255,7 @@ export default function StakePitch() {
               yours even after you unstake — accrual is settled before any transfer
             </Row>
             <Row k="Paid in">
-              ETH, not more AGORA — so the reward is not diluting you
+              ETH, not more TORII — so the reward is not diluting you
             </Row>
           </div>
           <p className="sub">

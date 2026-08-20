@@ -2,7 +2,7 @@ import { Panel, Stat, Row, Dot, Pill } from "./components";
 import { useSnapshot, useBeefy, useOperatorHoldings, useEthUsd } from "./useReads";
 import { usdOf } from "./price";
 import { fmtSig, fmtGrouped, fmtUnits, DASH } from "./format";
-import { AGORA, explorerAddr, ST_AGORA_DECIMALS } from "./chain";
+import { TORII, explorerAddr, ST_TORII_DECIMALS } from "./chain";
 import { pricedCoverage } from "./beefy";
 
 /**
@@ -26,14 +26,14 @@ import { pricedCoverage } from "./beefy";
  */
 export default function Deployed() {
   const { data: s } = useSnapshot();
-  const operator = s?.reserve.operator ?? AGORA.deployer;
+  const operator = s?.reserve.operator ?? TORII.deployer;
   const beefy = useBeefy(operator);
-  const held = useOperatorHoldings(operator, AGORA.token, AGORA.stakedAgora, s?.pool.priceWad ?? null);
+  const held = useOperatorHoldings(operator, TORII.token, TORII.stakedAgora, s?.pool.priceWad ?? null);
   const ethUsd = useEthUsd();
 
   /** Everything the operator can be seen to hold, deployed or not. */
   const accountedFor =
-    (beefy.total ?? 0n) + (held?.eth ?? 0n) + (held?.agoraWei ?? 0n) + (held?.stAgoraWei ?? 0n);
+    (beefy.total ?? 0n) + (held?.eth ?? 0n) + (held?.toriiWei ?? 0n) + (held?.stToriiWei ?? 0n);
 
   const withdrawn = s?.reserve.cumulativeWithdrawn ?? null;
   const worth = beefy.total;
@@ -124,22 +124,22 @@ export default function Deployed() {
             note="idle in the wallet, not yet deployed"
           />
           <Stat
-            k="Operator AGORA"
-            value={held?.agora != null ? fmtGrouped(held.agora, 0) : null}
-            unit="AGORA"
+            k="Operator TORII"
+            value={held?.torii != null ? fmtGrouped(held.torii, 0) : null}
+            unit="TORII"
             note={
-              held?.agoraWei != null
-                ? `≈ ${fmtSig(held.agoraWei)} ETH at the pool price`
+              held?.toriiWei != null
+                ? `≈ ${fmtSig(held.toriiWei)} ETH at the pool price`
                 : "bought back, or never sold"
             }
           />
           <Stat
-            k="Operator stAGORA"
-            value={held?.stAgora != null ? fmtGrouped(held.stAgora, 0, ST_AGORA_DECIMALS) : null}
-            unit="stAGORA"
+            k="Operator stTORII"
+            value={held?.stTorii != null ? fmtGrouped(held.stTorii, 0, ST_TORII_DECIMALS) : null}
+            unit="stTORII"
             note={
-              held?.stAgoraWei != null
-                ? `staked in the protocol's own vault · ≈ ${fmtSig(held.stAgoraWei)} ETH`
+              held?.stToriiWei != null
+                ? `staked in the protocol's own vault · ≈ ${fmtSig(held.stToriiWei)} ETH`
                 : "staked in the protocol's own vault"
             }
           />
@@ -157,7 +157,7 @@ export default function Deployed() {
             )} The remainder is not necessarily missing — it may have been returned to the
             Treasury with <code>fund()</code>, spent on gas, or moved into a venue this page does
             not scan. What this page can prove is only what it can read, and it reads three places:
-            Beefy, the wallet's ETH, and the wallet's AGORA.
+            Beefy, the wallet's ETH, and the wallet's TORII.
           </p>
         )}
       </div>

@@ -1,5 +1,5 @@
 /**
- * AGORA on BNB Chain — step 1 of 3: deploy before the token exists.
+ * TORII on BNB Chain — step 1 of 3: deploy before the token exists.
  *
  *   npx hardhat run scripts/deploy-bnb.ts --network bscTestnet
  *   npx hardhat run scripts/deploy-bnb.ts --network bsc
@@ -10,10 +10,10 @@
  * hook and there is no fee escrow to claim from. Flap provides the launch and
  * *pushes* the tax into a vault we supply. That changes four things:
  *
- *   - `FeeSink` is replaced by `bnb/AgoraVault`, which Flap's VaultPortal
+ *   - `FeeSink` is replaced by `bnb/ToriiVault`, which Flap's VaultPortal
  *     deploys for us during the launch — so its address cannot be known here.
  *   - The tax rate is **5%**, not 4%. Flap offers 1/3/5/10% only.
- *   - `Distributor` is replaced by `bnb/AgoraDistributor`: the Suits ERC-721 is
+ *   - `Distributor` is replaced by `bnb/ToriiDistributor`: the Suits ERC-721 is
  *     a Robinhood Chain collection with no BNB deployment, so that vault and its
  *     split are gone entirely.
  *   - The ordering constraint moves. On Robinhood the FeeSink had to exist
@@ -43,7 +43,7 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
 
   line();
-  console.log("AGORA on BNB — step 1/3: deploy (token does NOT exist yet)");
+  console.log("TORII on BNB — step 1/3: deploy (token does NOT exist yet)");
   line();
   console.log(`network   ${network.name}  (chainId ${net.chainId})`);
   console.log(`deployer  ${deployer.address}`);
@@ -104,13 +104,13 @@ async function main() {
   const treasuryAddr = await treasury.getAddress();
   console.log(`  Treasury           ${treasuryAddr}`);
 
-  console.log("deploying AgoraVaultFactory…");
+  console.log("deploying ToriiVaultFactory…");
   const factory = await (
-    await ethers.getContractFactory("AgoraVaultFactory")
+    await ethers.getContractFactory("ToriiVaultFactory")
   ).deploy(treasuryAddr, PANCAKE_V2_ROUTER);
   await factory.waitForDeployment();
   const factoryAddr = await factory.getAddress();
-  console.log(`  AgoraVaultFactory  ${factoryAddr}`);
+  console.log(`  ToriiVaultFactory  ${factoryAddr}`);
 
   line();
   console.log("post-deploy state (read from chain)");
@@ -126,7 +126,7 @@ async function main() {
   );
 
   line();
-  console.log("NEXT — step 2: launch AGORA on Flap with this factory");
+  console.log("NEXT — step 2: launch TORII on Flap with this factory");
   line();
   console.log(`Call ${FLAP_VAULT_PORTAL}.newTokenV6WithVault(params) with:`);
   console.log("");
@@ -141,7 +141,7 @@ async function main() {
   console.log(`  vaultFactory   ${factoryAddr}`);
   console.log("  vaultData      0x         // this factory takes no launch-time config");
   console.log("");
-  console.log("Those numbers are not advisory. AgoraVaultFactory._validateBeforeLaunch");
+  console.log("Those numbers are not advisory. ToriiVaultFactory._validateBeforeLaunch");
   console.log("rejects the launch outright if the rate is not 5/5 or vaultBps is not");
   console.log("10000 — so a mis-typed form fails at creation instead of producing a");
   console.log("token that looks correct and underfunds the reserve forever.");
@@ -150,8 +150,8 @@ async function main() {
   console.log("");
   console.log(`  TREASURY=${treasuryAddr}`);
   console.log(`  VAULT_FACTORY=${factoryAddr}`);
-  console.log("  AGORA_TOKEN=<address emitted by the launch>");
-  console.log("  AGORA_VAULT=<VaultCreated.vault from the launch tx>");
+  console.log("  TORII_TOKEN=<address emitted by the launch>");
+  console.log("  TORII_VAULT=<VaultCreated.vault from the launch tx>");
   line();
 }
 

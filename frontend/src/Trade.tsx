@@ -4,7 +4,7 @@ import { Panel, Row, Pill, Dot } from "./components";
 import Chart from "./Chart";
 import { fmtSig, fmtGrouped, bpsToPct, DASH } from "./format";
 import { useSnapshot } from "./useReads";
-import { AGORA, PONS, explorerAddr, readProvider } from "./chain";
+import { TORII, PONS, explorerAddr, readProvider } from "./chain";
 import type { Wallet } from "./eth";
 import {
   readCurveState, quoteBuy, quoteSell, applySlippage, curveBuy, curveSell,
@@ -123,25 +123,25 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
     } finally { setBusy(null); }
   }
 
-  const inDenom = side === "buy" ? "ETH" : "AGORA";
-  const outDenom = side === "buy" ? "AGORA" : "ETH";
+  const inDenom = side === "buy" ? "ETH" : "TORII";
+  const outDenom = side === "buy" ? "TORII" : "ETH";
 
   return (
     <>
       {graduated ? (
         <div className="notice">
-          <b>AGORA has graduated.</b> The bonding curve is closed and every trade now routes
+          <b>TORII has graduated.</b> The bonding curve is closed and every trade now routes
           through the Uniswap v4 pool, priced by <code>StateView.getSlot0</code> rather than by
           the curve. The 4% creator tax still applies — it lives in the hook, not the curve, so
           graduation did not change it.
         </div>
       ) : (
         <div className="notice">
-          <b>Trading on the bonding curve.</b> AGORA has not graduated
+          <b>Trading on the bonding curve.</b> TORII has not graduated
           {curve && <> — <b>{curve.graduationPct.toFixed(2)}%</b> of the 4.2 ETH threshold</>}, so there is no
           Uniswap v4 pool yet and all trades route through the Pons curve at{" "}
-          <a className="link" href={explorerAddr(AGORA.curve)} target="_blank" rel="noreferrer">
-            {AGORA.curve.slice(0, 10)}…
+          <a className="link" href={explorerAddr(TORII.curve)} target="_blank" rel="noreferrer">
+            {TORII.curve.slice(0, 10)}…
           </a>. The v4 path is built and validated; it activates automatically on graduation.
         </div>
       )}
@@ -159,7 +159,7 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
 
       <div className="two">
         <Panel
-          label={`${side === "buy" ? "Buy" : "Sell"} AGORA`}
+          label={`${side === "buy" ? "Buy" : "Sell"} TORII`}
           id={graduated ? "uniswap v4" : "pons v2 curve"}
           right={<Pill><Dot kind={graduated ? "ok" : "warn"} />{graduated ? "graduated" : "curve"}</Pill>}
         >
@@ -229,11 +229,11 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
           {needsApproval ? (
             <>
               <div className="steps">
-                <div className="step"><span className="n">1</span>Approve AGORA for the curve</div>
+                <div className="step"><span className="n">1</span>Approve TORII for the curve</div>
                 <div className="step"><span className="n">2</span>Sell</div>
               </div>
               <button className="btn" onClick={doApprove} disabled={!!busy || !wallet.onCorrectChain}>
-                {busy === "approving" ? "approving…" : "Approve AGORA"}
+                {busy === "approving" ? "approving…" : "Approve TORII"}
               </button>
             </>
           ) : !wallet.account ? (
@@ -246,7 +246,7 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
               onClick={act}
               disabled={!!busy || !quote || !parsed || parsed <= 0n || insufficient}
             >
-              {busy ?? (side === "buy" ? "Buy AGORA" : "Sell AGORA")}
+              {busy ?? (side === "buy" ? "Buy TORII" : "Sell TORII")}
             </button>
           )}
 
@@ -279,7 +279,7 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
           {txHash && (
             <div className="txnote ok">
               confirmed ·{" "}
-              <a className="link" href={`${explorerAddr(AGORA.token).replace("/address/", "/tx/")}`.replace(AGORA.token, txHash)} target="_blank" rel="noreferrer">
+              <a className="link" href={`${explorerAddr(TORII.token).replace("/address/", "/tx/")}`.replace(TORII.token, txHash)} target="_blank" rel="noreferrer">
                 {txHash.slice(0, 18)}…
               </a>
             </div>

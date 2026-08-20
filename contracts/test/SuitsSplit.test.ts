@@ -13,18 +13,18 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
   let bob: HardhatEthersSigner;
   let carol: HardhatEthersSigner;
 
-  let agora: any, suits: any, staking: any, suitsVault: any, distributor: any;
+  let torii: any, suits: any, staking: any, suitsVault: any, distributor: any;
 
   beforeEach(async () => {
     [owner, alice, bob, carol] = await ethers.getSigners();
     for (const s of [owner, alice, bob, carol]) await setBalance(s.address, RICH);
 
-    agora = await (await ethers.getContractFactory("MockAgora")).deploy(SUPPLY);
+    torii = await (await ethers.getContractFactory("MockTorii")).deploy(SUPPLY);
     suits = await (await ethers.getContractFactory("MockSuits")).deploy();
 
     staking = await (
-      await ethers.getContractFactory("StakedAgora")
-    ).deploy(await agora.getAddress(), owner.address);
+      await ethers.getContractFactory("StakedTorii")
+    ).deploy(await torii.getAddress(), owner.address);
 
     suitsVault = await (
       await ethers.getContractFactory("StakedSuits")
@@ -34,14 +34,14 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
       await ethers.getContractFactory("Distributor")
     ).deploy(await staking.getAddress(), await suitsVault.getAddress(), owner.address);
 
-    // Alice: AGORA staker. Bob: Suits holder. Carol: Suits holder.
-    await agora.transfer(alice.address, 1000n * WAD);
+    // Alice: TORII staker. Bob: Suits holder. Carol: Suits holder.
+    await torii.transfer(alice.address, 1000n * WAD);
     await suits.mintMany(bob.address, 1, 3); // ids 1,2,3
     await suits.mintMany(carol.address, 4, 1); // id 4
   });
 
-  const stakeAgora = async (who: HardhatEthersSigner, amt: bigint) => {
-    await agora.connect(who).approve(await staking.getAddress(), amt);
+  const stakeTorii = async (who: HardhatEthersSigner, amt: bigint) => {
+    await torii.connect(who).approve(await staking.getAddress(), amt);
     await staking.connect(who).deposit(amt, who.address);
   };
   const stakeSuits = async (who: HardhatEthersSigner, ids: number[]) => {
@@ -150,11 +150,11 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
   // =========================================================================
   describe("Distributor — the 10/90 split", () => {
     beforeEach(async () => {
-      await stakeAgora(alice, 1000n * WAD);
+      await stakeTorii(alice, 1000n * WAD);
       await stakeSuits(bob, [1]);
     });
 
-    it("defaults to 10% Suits / 90% AGORA", async () => {
+    it("defaults to 10% Suits / 90% TORII", async () => {
       expect(await distributor.suitsBps()).to.equal(1000);
 
       await distributor.distribute({ value: ethers.parseEther("100") });
@@ -181,9 +181,9 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
     });
 
     it("previews the split without moving anything", async () => {
-      const [toSuits, toAgora] = await distributor.preview(ethers.parseEther("100"));
+      const [toSuits, toTorii] = await distributor.preview(ethers.parseEther("100"));
       expect(toSuits).to.equal(ethers.parseEther("10"));
-      expect(toAgora).to.equal(ethers.parseEther("90"));
+      expect(toTorii).to.equal(ethers.parseEther("90"));
       expect(await distributor.cumulativeToSuits()).to.equal(0n);
     });
 
@@ -210,8 +210,8 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
 
   // =========================================================================
   describe("Distributor — empty-sink rerouting", () => {
-    it("sends everything to AGORA when no Suits are staked", async () => {
-      await stakeAgora(alice, 1000n * WAD);
+    it("sends everything to TORII when no Suits are staked", async () => {
+      await stakeTorii(alice, 1000n * WAD);
 
       await expect(distributor.distribute({ value: ethers.parseEther("100") })).to.emit(
         distributor,
@@ -222,7 +222,7 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
       expect(await distributor.cumulativeToSuits()).to.equal(0n);
     });
 
-    it("sends everything to Suits when no AGORA is staked", async () => {
+    it("sends everything to Suits when no TORII is staked", async () => {
       await stakeSuits(bob, [1]);
 
       await expect(distributor.distribute({ value: ethers.parseEther("100") })).to.emit(
@@ -243,7 +243,7 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
     });
 
     it("flushes an idle balance through the same split rule", async () => {
-      await stakeAgora(alice, 1000n * WAD);
+      await stakeTorii(alice, 1000n * WAD);
       await stakeSuits(bob, [1]);
 
       await owner.sendTransaction({
@@ -265,7 +265,7 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
   // =========================================================================
   describe("conservation", () => {
     it("never distributes more or less than it received", async () => {
-      await stakeAgora(alice, 1000n * WAD);
+      await stakeTorii(alice, 1000n * WAD);
       await stakeSuits(bob, [1, 2, 3]);
       await stakeSuits(carol, [4]);
 
@@ -278,14 +278,14 @@ describe("StakedSuits + Distributor (10% NFT slice)", () => {
       }
 
       const toSuits = await distributor.cumulativeToSuits();
-      const toAgora = await distributor.cumulativeToAgora();
-      expect(toSuits + toAgora).to.equal(total);
+      const toTorii = await distributor.cumulativeToAgora();
+      expect(toSuits + toTorii).to.equal(total);
 
       // And every wei is claimable — no dust trapped in either vault.
       const suitsHeld = await ethers.provider.getBalance(await suitsVault.getAddress());
-      const agoraHeld = await ethers.provider.getBalance(await staking.getAddress());
+      const toriiHeld = await ethers.provider.getBalance(await staking.getAddress());
       expect(suitsHeld).to.equal(toSuits);
-      expect(agoraHeld).to.equal(toAgora);
+      expect(toriiHeld).to.equal(toTorii);
     });
   });
 });

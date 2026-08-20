@@ -1,10 +1,10 @@
-# AGORA — frontend
+# TORII — frontend
 
-Dashboard + trade UI for the AGORA endowment token on **Robinhood Chain (chain 4663)**.
+Dashboard + trade UI for the TORII endowment token on **Robinhood Chain (chain 4663)**.
 Design spec: [`../docs/design.md`](../docs/design.md).
 
 > **Naming:** the spec still says **TITHE** throughout — that was the working name. The live
-> token launched as **AGORA** (`0x6853618673D952Fe602616F6f896cC7be8e25fCc`) and the UI is
+> token launched as **TORII** (`0x6853618673D952Fe602616F6f896cC7be8e25fCc`) and the UI is
 > branded accordingly. Same project; the spec rename is outstanding.
 
 ```bash
@@ -22,7 +22,7 @@ The read layer needs no wallet. Trade/stake/redeem need one on chain 4663.
 |---|---|---|
 | Pool price, tick, liquidity | **live** | `StateView.getSlot0(poolId)` |
 | PoolKey / poolId derivation | **live, verified** | matched against a real `Initialize` event |
-| Bonding-curve buy/sell + quotes | **live** | `PonsV2Curve` (AGORA has not graduated) |
+| Bonding-curve buy/sell + quotes | **live** | `PonsV2Curve` (TORII has not graduated) |
 | Tax accrued in hook | **live** | `V2MemeHook.pendingCreatorTax(poolId, currency)` |
 | Tax claimable in escrow | **live** | `V2FeeEscrow.balanceOf(feeSink)` |
 | Cumulative tax history | **live** | `HookFeeCollected` log scan |
@@ -30,14 +30,14 @@ The read layer needs no wallet. Trade/stake/redeem need one on chain 4663.
 | v4 swap path | **coded, dormant** | activates at graduation (4.2 ETH) |
 | NAV, floor, corpus | **stubbed** | needs `Treasury` |
 | Floor history / ratchet chart | **stubbed** | needs `Treasury.FloorUpdated` |
-| Staking, redemption | **stubbed** | needs `stAGORA`, `Redeemer` |
+| Staking, redemption | **stubbed** | needs `stTORII`, `Redeemer` |
 
 Stubbed reads return `null` and render as **"not deployed"** — never `0`. On a page whose
 entire purpose is verifiability, a fake zero is worse than an honest gap.
 
 ## Address wiring (`src/chain.ts`)
 
-`AGORA.token` and `AGORA.curve` are live and verified. `AGORA.feeSink` and `AGORA.treasury`
+`TORII.token` and `TORII.curve` are live and verified. `TORII.feeSink` and `TORII.treasury`
 both currently point at the **deployer EOA** `0x2Fb89C8…39d19`, which is already the on-chain
 creator-fee recipient.
 
@@ -106,7 +106,7 @@ src/
   components.tsx glass panels, Stat that distinguishes 0 from unknown
   Floor.tsx      reserve / floor page
   Trade.tsx      buy + sell
-  Stake.tsx      stAGORA vault (awaiting deployment)
+  Stake.tsx      stTORII vault (awaiting deployment)
   Redeem.tsx     burn-for-NAV (awaiting deployment)
 scripts/
   verify-reads.mjs   standalone reimplementation — independently checks poolId math

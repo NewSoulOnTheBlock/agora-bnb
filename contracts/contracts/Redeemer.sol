@@ -23,7 +23,7 @@ interface IGate {
 
 /**
  * @title Redeemer
- * @notice Burn AGORA, receive a pro-rata share of the corpus at a haircut
+ * @notice Burn TORII, receive a pro-rata share of the corpus at a haircut
  *         (spec §7). This is what turns an accumulating treasury into an actual
  *         price floor.
  *
@@ -32,7 +32,7 @@ interface IGate {
  * ```
  * requestRedeem(amount):
  *     snapshot floorPerToken            // BEFORE the burn — see below
- *     pull AGORA and burn it now        // supply drops now → floor rises now
+ *     pull TORII and burn it now        // supply drops now → floor rises now
  *     enqueue(caller, amount, snapshot)
  *
  * execute(id) after redeemDelay:
@@ -61,7 +61,7 @@ interface IGate {
  *
  * Tokens are destroyed at request time, not at execution. That is what makes
  * the benefit to holders immediate and makes abandoning the queue non-free.
- * A `cancel()` would require re-minting, which AGORA cannot do — its supply is
+ * A `cancel()` would require re-minting, which TORII cannot do — its supply is
  * fixed by the Pons factory and there is no mint function.
  */
 contract Redeemer is Ownable, ReentrancyGuard {
@@ -83,8 +83,8 @@ contract Redeemer is Ownable, ReentrancyGuard {
 
     struct Request {
         address owner;
-        uint128 amount;        // AGORA burned
-        uint128 snapshotFloor; // wei per whole AGORA at request time
+        uint128 amount;        // TORII burned
+        uint128 snapshotFloor; // wei per whole TORII at request time
         uint64 requestedAt;
         bool executed;
     }
@@ -159,7 +159,7 @@ contract Redeemer is Ownable, ReentrancyGuard {
     // -----------------------------------------------------------------------
 
     /**
-     * @notice Burn `amount` AGORA and join the payout queue.
+     * @notice Burn `amount` TORII and join the payout queue.
      * @dev The snapshot is taken BEFORE the burn — see the contract notes.
      */
     function requestRedeem(uint256 amount) external nonReentrant returns (uint256 id) {
@@ -254,7 +254,7 @@ contract Redeemer is Ownable, ReentrancyGuard {
 
     /**
      * @dev Burn if the token supports it, otherwise send to the dead address.
-     *      AGORA is deployed by the Pons factory, so `burn()` is verified to
+     *      TORII is deployed by the Pons factory, so `burn()` is verified to
      *      exist but not something this contract controls. The Treasury excludes
      *      DEAD from `eligibleSupply`, so the fallback is economically identical
      *      — only `totalSupply()` stops being self-describing.

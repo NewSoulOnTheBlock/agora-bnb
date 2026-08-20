@@ -1,5 +1,5 @@
 import { id as topicId, AbiCoder, type Log } from "ethers";
-import { readProvider, V4, AGORA } from "./chain";
+import { readProvider, V4, TORII } from "./chain";
 import { scanLogsBackwards } from "./history";
 import { ponsPoolKey, poolId } from "./poolkey";
 
@@ -53,7 +53,7 @@ export const BUCKETS: { id: Bucket; label: string }[] = [
 
 type Point = { block: number; price: number; ethVolume: number };
 
-function decode(logs: Log[], agoraIsCurrency1: boolean): Point[] {
+function decode(logs: Log[], toriiIsCurrency1: boolean): Point[] {
   const abi = AbiCoder.defaultAbiCoder();
   const out: Point[] = [];
 
@@ -69,8 +69,8 @@ function decode(logs: Log[], agoraIsCurrency1: boolean): Point[] {
       const sqrt = Number(sqrtPriceX96) / Q96;
       const p = sqrt * sqrt; // currency1 per currency0
 
-      // AGORA is currency1 against native ETH, so its price is the reciprocal.
-      const price = agoraIsCurrency1 ? 1 / p : p;
+      // TORII is currency1 against native ETH, so its price is the reciprocal.
+      const price = toriiIsCurrency1 ? 1 / p : p;
       if (!Number.isFinite(price) || price <= 0) continue;
 
       // amount0 is the ETH leg, signed by direction; size is what matters.
@@ -91,7 +91,7 @@ function decode(logs: Log[], agoraIsCurrency1: boolean): Point[] {
  * 12 hours, so three chunks cover a day and a half.
  */
 export async function readCandles(bucket: Bucket, maxChunks = 3): Promise<Candle[]> {
-  const key = ponsPoolKey(AGORA.token);
+  const key = ponsPoolKey(TORII.token);
   const pid = poolId(key);
 
   const logs = await scanLogsBackwards({
@@ -102,9 +102,9 @@ export async function readCandles(bucket: Bucket, maxChunks = 3): Promise<Candle
   });
   if (!logs.length) return [];
 
-  const agoraIsCurrency1 =
-    key.currency1.toLowerCase() === AGORA.token.toLowerCase();
-  const pts = decode(logs, agoraIsCurrency1).sort((a, b) => a.block - b.block);
+  const toriiIsCurrency1 =
+    key.currency1.toLowerCase() === TORII.token.toLowerCase();
+  const pts = decode(logs, toriiIsCurrency1).sort((a, b) => a.block - b.block);
   if (!pts.length) return [];
 
   // Two real block reads anchor the interpolation.

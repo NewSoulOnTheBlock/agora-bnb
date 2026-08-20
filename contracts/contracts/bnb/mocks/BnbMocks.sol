@@ -32,7 +32,7 @@ contract RevertingFundSink {
  * `rateWeiPerToken` is BNB paid per whole token (18dp), so a test can set an
  * exact expected output rather than modelling a curve.
  *
- * `taxBps` reproduces the property that actually matters here: AGORA is a tax
+ * `taxBps` reproduces the property that actually matters here: TORII is a tax
  * token, so the router receives less than `amountIn`. That is why production
  * uses `...SupportingFeeOnTransferTokens`, and this mock exists to keep that
  * assumption honest rather than assumed.
@@ -90,7 +90,7 @@ contract MockPancakeRouter {
 contract MockTaxToken is ERC20 {
     uint16 public taxBps;
 
-    constructor(uint16 taxBps_) ERC20("Mock AGORA", "mAGORA") {
+    constructor(uint16 taxBps_) ERC20("Mock TORII", "mTORII") {
         taxBps = taxBps_;
         _mint(msg.sender, 1_000_000_000 ether);
     }
@@ -116,7 +116,7 @@ contract MockTaxToken is ERC20 {
     }
 }
 
-/// @dev stAGORA stand-in for the distributor tests.
+/// @dev stTORII stand-in for the distributor tests.
 contract MockRewardSink {
     uint256 public supply;
     uint256 public received;

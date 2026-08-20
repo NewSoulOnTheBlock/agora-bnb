@@ -4,11 +4,11 @@ pragma solidity 0.8.24;
 import {VaultFactoryBaseV2} from "../flap/VaultFactoryBaseV2.sol";
 import {IVaultFactoryValidationV2} from "../flap/IVaultFactory.sol";
 import {VaultDataSchema, FieldDescriptor} from "../flap/IVaultSchemasV1.sol";
-import {AgoraVault} from "./AgoraVault.sol";
+import {ToriiVault} from "./ToriiVault.sol";
 
 /**
- * @title AgoraVaultFactory
- * @notice Deploys the AGORA reserve vault when AGORA is launched on Flap.
+ * @title ToriiVaultFactory
+ * @notice Deploys the TORII reserve vault when TORII is launched on Flap.
  *
  * ## Why the launch guard matters more than the deploy
  *
@@ -20,23 +20,23 @@ import {AgoraVault} from "./AgoraVault.sol";
  *
  * `_validateBeforeLaunch` is the same idea applied to BNB. Flap calls it before
  * creating the token, and a `false` return aborts the launch. So rather than
- * trusting whoever fills in the launch form, this factory refuses to let AGORA
+ * trusting whoever fills in the launch form, this factory refuses to let TORII
  * be created with economics that would quietly break the reserve:
  *
- *   - **Tax must be 5% on both sides.** Flap permits 1/3/5/10%; AGORA's design
+ *   - **Tax must be 5% on both sides.** Flap permits 1/3/5/10%; TORII's design
  *     assumes one rate and the Treasury's accounting is built around it.
  *   - **All of the tax must route to the vault.** `vaultBps` below 100% diverts
  *     part of every trade to dividends, deflation or LP — value that never
  *     reaches the Treasury and therefore never backs the redemption floor.
- *   - **Quote must be native BNB**, matching `AgoraVault.vaultQuoteToken()`.
+ *   - **Quote must be native BNB**, matching `ToriiVault.vaultQuoteToken()`.
  *     Misdeclaring this strands tax revenue in a vault that ignores it.
  *
  * A launch that violates any of these fails loudly at creation time instead of
  * producing a token that looks right and underfunds the reserve forever.
  */
-contract AgoraVaultFactory is VaultFactoryBaseV2 {
+contract ToriiVaultFactory is VaultFactoryBaseV2 {
     /**
-     * @notice AGORA's tax rate. 5% — the nearest rate Flap offers to the 4% used
+     * @notice TORII's tax rate. 5% — the nearest rate Flap offers to the 4% used
      *         on Robinhood Chain, which is not selectable here (Flap allows 1%,
      *         3%, 5% or 10% only).
      *
@@ -46,7 +46,7 @@ contract AgoraVaultFactory is VaultFactoryBaseV2 {
      *      example passes `buyTaxRate: 300` for a 3% buy tax. So 5% is 500.
      *
      *      Both sides are checked because Flap permits asymmetric rates — its
-     *      own example launches 3% buy against 10% sell. AGORA is symmetric by
+     *      own example launches 3% buy against 10% sell. TORII is symmetric by
      *      design and the Treasury's accounting assumes a single rate, so a
      *      lopsided launch is rejected rather than quietly accommodated.
      *
@@ -61,7 +61,7 @@ contract AgoraVaultFactory is VaultFactoryBaseV2 {
     /// @notice The whole tax must reach the vault; nothing may be diverted.
     uint16 public constant REQUIRED_VAULT_BPS = 10_000;
 
-    /// @notice AGORA Treasury — the immutable destination of every vault.
+    /// @notice TORII Treasury — the immutable destination of every vault.
     address public immutable treasury;
 
     /// @notice PancakeSwap V2 router the vaults use to sell the token tax leg.
@@ -72,14 +72,14 @@ contract AgoraVaultFactory is VaultFactoryBaseV2 {
     );
 
     constructor(address treasury_, address router_) {
-        require(treasury_ != address(0), "AgoraVaultFactory: zero treasury");
-        require(router_ != address(0), "AgoraVaultFactory: zero router");
+        require(treasury_ != address(0), "ToriiVaultFactory: zero treasury");
+        require(router_ != address(0), "ToriiVaultFactory: zero router");
         treasury = treasury_;
         router = router_;
     }
 
     /**
-     * @notice Deploy a vault for a newly launched AGORA token.
+     * @notice Deploy a vault for a newly launched TORII token.
      * @dev Only the VaultPortal may call this. Without that guard anyone could
      *      mint vaults that look official and point somewhere else.
      *
@@ -92,16 +92,16 @@ contract AgoraVaultFactory is VaultFactoryBaseV2 {
         override
         returns (address vault)
     {
-        require(msg.sender == _getVaultPortal(), "AgoraVaultFactory: not vault portal");
-        require(taxToken != address(0), "AgoraVaultFactory: zero tax token");
-        require(quoteToken == address(0), "AgoraVaultFactory: quote must be native");
+        require(msg.sender == _getVaultPortal(), "ToriiVaultFactory: not vault portal");
+        require(taxToken != address(0), "ToriiVaultFactory: zero tax token");
+        require(quoteToken == address(0), "ToriiVaultFactory: quote must be native");
         vaultData;
 
-        vault = address(new AgoraVault(treasury, taxToken, quoteToken, router));
+        vault = address(new ToriiVault(treasury, taxToken, quoteToken, router));
         emit VaultCreated(vault, taxToken, creator, quoteToken);
     }
 
-    /// @notice Native BNB only — this must agree with `AgoraVault`, because the
+    /// @notice Native BNB only — this must agree with `ToriiVault`, because the
     ///         VaultPortal rejects launches whose quote the factory refuses.
     function isQuoteTokenSupported(address quoteToken) external pure override returns (bool supported) {
         return quoteToken == address(0);
@@ -115,13 +115,13 @@ contract AgoraVaultFactory is VaultFactoryBaseV2 {
         returns (bool success, string memory reason)
     {
         if (data.quoteToken != address(0)) {
-            return (false, "AGORA must launch with native BNB as the quote token");
+            return (false, "TORII must launch with native BNB as the quote token");
         }
         if (data.buyTaxRate != REQUIRED_TAX_BPS || data.sellTaxRate != REQUIRED_TAX_BPS) {
-            return (false, "AGORA requires a 5% tax on both buys and sells");
+            return (false, "TORII requires a 5% tax on both buys and sells");
         }
         if (data.vaultBps != REQUIRED_VAULT_BPS) {
-            return (false, "AGORA requires 100% of the tax to route to the reserve vault");
+            return (false, "TORII requires 100% of the tax to route to the reserve vault");
         }
         return (true, "");
     }
@@ -136,7 +136,7 @@ contract AgoraVaultFactory is VaultFactoryBaseV2 {
     ///      empty by design — see `newVault`.
     function vaultDataSchema() public pure override returns (VaultDataSchema memory schema) {
         schema.description =
-            "No configuration. The AGORA Treasury and the PancakeSwap router are fixed when "
+            "No configuration. The TORII Treasury and the PancakeSwap router are fixed when "
             "the factory is deployed, so no launch-time input can redirect the tax.";
         schema.fields = new FieldDescriptor[](0);
         schema.isArray = false;

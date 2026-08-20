@@ -16,12 +16,12 @@ interface INftRewardSink {
 
 /**
  * @title Distributor
- * @notice Splits protocol yield between staked Suits NFT holders and stAGORA
- *         stakers. Default split: **10% Suits / 90% AGORA**.
+ * @notice Splits protocol yield between staked Suits NFT holders and stTORII
+ *         stakers. Default split: **10% Suits / 90% TORII**.
  *
  * ## Why this contract exists after being folded away
  *
- * `StakedAgora` originally absorbed the Distributor from spec §3.1, on the
+ * `StakedTorii` originally absorbed the Distributor from spec §3.1, on the
  * grounds that with a single ETH-denominated sink a router would only forward
  * value and re-derive accounting the vault already kept. That reasoning held
  * exactly as long as there was one sink. There are now two, and a split has to
@@ -50,10 +50,10 @@ contract Distributor is Ownable, ReentrancyGuard {
     uint256 public constant BPS = 10_000;
 
     /// @notice Hard ceiling on the NFT slice, so governance cannot redirect the
-    ///         whole income stream away from AGORA stakers.
+    ///         whole income stream away from TORII stakers.
     uint16 public constant MAX_SUITS_BPS = 3_000; // 30%
 
-    /// @notice stAGORA vault.
+    /// @notice stTORII vault.
     IRewardSink public immutable stakedAgora;
 
     /// @notice Staked Suits NFT vault.
@@ -65,7 +65,7 @@ contract Distributor is Ownable, ReentrancyGuard {
     uint256 public cumulativeToSuits;
     uint256 public cumulativeToAgora;
 
-    event Distributed(uint256 total, uint256 toSuits, uint256 toAgora);
+    event Distributed(uint256 total, uint256 toSuits, uint256 toTorii);
     event SuitsBpsSet(uint16 previous, uint16 current);
     event ReroutedToAgora(uint256 amount);
     event ReroutedToSuits(uint256 amount);
@@ -75,11 +75,11 @@ contract Distributor is Ownable, ReentrancyGuard {
     error SuitsBpsTooHigh(uint16 requested, uint16 max);
     error ZeroAddress();
 
-    constructor(address stakedAgora_, address stakedSuits_, address owner_) Ownable(owner_) {
-        if (stakedAgora_ == address(0) || stakedSuits_ == address(0) || owner_ == address(0)) {
+    constructor(address stakedTorii_, address stakedSuits_, address owner_) Ownable(owner_) {
+        if (stakedTorii_ == address(0) || stakedSuits_ == address(0) || owner_ == address(0)) {
             revert ZeroAddress();
         }
-        stakedAgora = IRewardSink(stakedAgora_);
+        stakedAgora = IRewardSink(stakedTorii_);
         stakedSuits = INftRewardSink(stakedSuits_);
     }
 
@@ -93,53 +93,53 @@ contract Distributor is Ownable, ReentrancyGuard {
         if (total == 0) revert NothingToDistribute();
 
         bool suitsHasStakers = stakedSuits.totalStaked() != 0;
-        bool agoraHasStakers = stakedAgora.totalSupply() != 0;
+        bool toriiHasStakers = stakedAgora.totalSupply() != 0;
 
-        if (!suitsHasStakers && !agoraHasStakers) revert NoStakersAnywhere();
+        if (!suitsHasStakers && !toriiHasStakers) revert NoStakersAnywhere();
 
         uint256 toSuits = (total * suitsBps) / BPS;
-        uint256 toAgora = total - toSuits;
+        uint256 toTorii = total - toSuits;
 
         // Reroute rather than strand. A sink with no stakers cannot account for
         // the ETH, and holding it here would create a claim nobody can exercise.
         if (!suitsHasStakers && toSuits != 0) {
             emit ReroutedToAgora(toSuits);
-            toAgora += toSuits;
+            toTorii += toSuits;
             toSuits = 0;
         }
-        if (!agoraHasStakers && toAgora != 0) {
-            emit ReroutedToSuits(toAgora);
-            toSuits += toAgora;
-            toAgora = 0;
+        if (!toriiHasStakers && toTorii != 0) {
+            emit ReroutedToSuits(toTorii);
+            toSuits += toTorii;
+            toTorii = 0;
         }
 
         if (toSuits != 0) {
             cumulativeToSuits += toSuits;
             stakedSuits.notifyReward{value: toSuits}();
         }
-        if (toAgora != 0) {
-            cumulativeToAgora += toAgora;
-            stakedAgora.notifyReward{value: toAgora}();
+        if (toTorii != 0) {
+            cumulativeToAgora += toTorii;
+            stakedAgora.notifyReward{value: toTorii}();
         }
 
-        emit Distributed(total, toSuits, toAgora);
+        emit Distributed(total, toSuits, toTorii);
     }
 
     /// @notice How `amount` would split right now, after any rerouting.
-    function preview(uint256 amount) external view returns (uint256 toSuits, uint256 toAgora) {
+    function preview(uint256 amount) external view returns (uint256 toSuits, uint256 toTorii) {
         bool suitsHasStakers = stakedSuits.totalStaked() != 0;
-        bool agoraHasStakers = stakedAgora.totalSupply() != 0;
+        bool toriiHasStakers = stakedAgora.totalSupply() != 0;
 
         toSuits = (amount * suitsBps) / BPS;
-        toAgora = amount - toSuits;
+        toTorii = amount - toSuits;
 
         if (!suitsHasStakers) {
-            toAgora += toSuits;
+            toTorii += toSuits;
             toSuits = 0;
         }
-        if (!agoraHasStakers) {
-            toSuits += toAgora;
-            toAgora = 0;
+        if (!toriiHasStakers) {
+            toSuits += toTorii;
+            toTorii = 0;
         }
     }
 

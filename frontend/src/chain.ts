@@ -78,11 +78,11 @@ export const PONS = {
 } as const;
 
 // VERIFIED on the live curve 2026-08-17: creatorTaxBps() == 400. Not an assumption.
-export const AGORA_TAX_BPS = 400; // 4%
+export const TORII_TAX_BPS = 400; // 4%
 export const CURVE_FEE_BPS = 100; // 1% — curve feeBps()
 
 // ---------------------------------------------------------------------------
-// AGORA. The token and its bonding curve are LIVE. The reserve contracts are not
+// TORII. The token and its bonding curve are LIVE. The reserve contracts are not
 // written yet, so they stay at the zero address and every read against them
 // resolves to `null` — the UI renders an honest "not deployed" instead of zeros.
 // ---------------------------------------------------------------------------
@@ -107,9 +107,9 @@ export const CURVE_FEE_BPS = 100; // 1% — curve feeBps()
  *   sweepFees from feeSink    ALLOWED
  *   sweepFees from the EOA    BLOCKED      (rights genuinely moved)
  *   FeeSink.owner()           == 0x0       (renounced by setCurve)
- *   Treasury.agora/redeemer/distributor all bound
+ *   Treasury.torii/redeemer/distributor all bound
  */
-export const AGORA: {
+export const TORII: {
   token: string; curve: string; deployer: string;
   feeSink: string; treasury: string; stakedAgora: string; redeemer: string;
   stakedSuits: string; distributor: string;
@@ -128,23 +128,23 @@ export const AGORA: {
 };
 
 /**
- * stAGORA does **not** have 18 decimals. It has 21.
+ * stTORII does **not** have 18 decimals. It has 21.
  *
- * `StakedAgora._decimalsOffset()` returns 3 — OpenZeppelin's virtual-share
+ * `StakedTorii._decimalsOffset()` returns 3 — OpenZeppelin's virtual-share
  * defence against the classic 4626 first-depositor donation attack — and
  * ERC-4626 defines `decimals() = underlying decimals + offset`. So one whole
- * stAGORA is `1e21`, and it is still worth exactly one AGORA: the share price
+ * stTORII is `1e21`, and it is still worth exactly one TORII: the share price
  * never legitimately moves, because rewards are ETH and live outside
  * `totalAssets()`.
  *
  * Formatting a share balance through `formatEther` therefore prints it **1000×
- * too large** — a 10,000,000 AGORA stake rendering as "10,000,000,000 stAGORA".
+ * too large** — a 10,000,000 TORII stake rendering as "10,000,000,000 stTORII".
  * Anything that touches a raw share number must scale by this, not by WAD.
  * Nothing on-chain is affected: the reward accumulator divides and multiplies
  * by the same supply, so the offset cancels, and the floor is computed from
- * AGORA's own `totalSupply()`, never the vault's.
+ * TORII's own `totalSupply()`, never the vault's.
  */
-export const ST_AGORA_DECIMALS = 21;
+export const ST_TORII_DECIMALS = 21;
 
 /**
  * The Suits ERC-721 — LIVE and independent of the relaunch.
@@ -209,9 +209,9 @@ export const DEMO_TOKEN =
   (import.meta.env?.VITE_DEMO_TOKEN as string | undefined) ??
   "0xeB7dBef23947F67Ae8141CeCAeD90f8aD29A235C";
 
-/** The token the UI reads. AGORA is live, so demo mode is off. */
+/** The token the UI reads. TORII is live, so demo mode is off. */
 export function activeToken(): { address: string; isDemo: boolean } {
-  if (AGORA.token !== ZERO) return { address: AGORA.token, isDemo: false };
+  if (TORII.token !== ZERO) return { address: TORII.token, isDemo: false };
   return { address: DEMO_TOKEN, isDemo: true };
 }
 

@@ -4,9 +4,9 @@ import { setBalance, impersonateAccount } from "@nomicfoundation/hardhat-network
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 /**
- * AgoraVault — the Flap tax vault for BNB Chain.
+ * ToriiVault — the Flap tax vault for BNB Chain.
  *
- * RUN WITH:  BNB_TEST=1 npx hardhat test test/AgoraVault.test.ts
+ * RUN WITH:  BNB_TEST=1 npx hardhat test test/ToriiVault.test.ts
  *
  * The env flag makes the in-process node report chain 56. Flap's `VaultBase`
  * resolves the Guardian from a hardcoded chainid table and reverts
@@ -44,7 +44,7 @@ async function skipUnlessFlapChain(ctx: Mocha.Context) {
   }
 }
 
-describe("AgoraVault (Flap V3 tax vault)", () => {
+describe("ToriiVault (Flap V3 tax vault)", () => {
   before(async function () {
     await skipUnlessFlapChain(this);
   });
@@ -65,7 +65,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
     router = await (await ethers.getContractFactory("MockPancakeRouter")).deploy(WBNB, WAD / 1000n);
     await setBalance(await router.getAddress(), RICH);
 
-    vault = await (await ethers.getContractFactory("AgoraVault")).deploy(
+    vault = await (await ethers.getContractFactory("ToriiVault")).deploy(
       await treasury.getAddress(),
       await token.getAddress(),
       ethers.ZeroAddress,
@@ -92,7 +92,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
     it("treats a spurious zero-value ping as a silent no-op", async () => {
       await send(WAD);
       // Flap pings the same wallet more than once per dispatch, and anyone may
-      // call receive(). A revert here would make Flap's dispatch of AGORA fail.
+      // call receive(). A revert here would make Flap's dispatch of TORII fail.
       await expect(anyone.sendTransaction({ to: await vault.getAddress(), value: 0 })).to.not.be
         .reverted;
       expect(await vault.accountedQuote()).to.equal(WAD);
@@ -131,7 +131,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
 
     it("reverts when there is nothing to forward", async () => {
       await expect(vault.connect(anyone).forwardQuote()).to.be.revertedWith(
-        "AgoraVault: nothing to forward"
+        "ToriiVault: nothing to forward"
       );
     });
 
@@ -163,7 +163,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
 
     it("does not zero the baseline when the Treasury refuses the funds", async () => {
       const bad = await (await ethers.getContractFactory("RevertingFundSink")).deploy();
-      const v2 = await (await ethers.getContractFactory("AgoraVault")).deploy(
+      const v2 = await (await ethers.getContractFactory("ToriiVault")).deploy(
         await bad.getAddress(),
         await token.getAddress(),
         ethers.ZeroAddress,
@@ -185,7 +185,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
       await token.mint(await vault.getAddress(), TOKENS);
     });
 
-    it("sells AGORA for BNB and forwards the proceeds to the Treasury", async () => {
+    it("sells TORII for BNB and forwards the proceeds to the Treasury", async () => {
       const expected = TOKENS / 1000n; // rate is 0.001 BNB per token
       const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
 
@@ -218,12 +218,12 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
     it("rejects a passed deadline and a zero slippage bound", async () => {
       const past = (await ethers.provider.getBlock("latest"))!.timestamp - 1;
       await expect(vault.connect(anyone).convertAndForward(0, 1n, past)).to.be.revertedWith(
-        "AgoraVault: deadline passed"
+        "ToriiVault: deadline passed"
       );
 
       const ok = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
       await expect(vault.connect(anyone).convertAndForward(0, 0, ok)).to.be.revertedWith(
-        "AgoraVault: minQuoteOut required"
+        "ToriiVault: minQuoteOut required"
       );
     });
 
@@ -231,11 +231,11 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
       const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
       await expect(
         vault.connect(anyone).convertAndForward(TOKENS + 1n, 1n, deadline)
-      ).to.be.revertedWith("AgoraVault: amount exceeds balance");
+      ).to.be.revertedWith("ToriiVault: amount exceeds balance");
     });
 
     it("survives a fee-on-transfer token, which is the realistic case", async () => {
-      // AGORA is itself a tax token: less arrives at the pair than was sent.
+      // TORII is itself a tax token: less arrives at the pair than was sent.
       await token.setTaxBps(500);
       await router.setTaxBps(0);
       const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 600;
@@ -257,7 +257,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
       expect(await vault.description()).to.not.equal("");
 
       const schema = await vault.vaultUISchema();
-      expect(schema.vaultType).to.equal("AgoraReserveVault");
+      expect(schema.vaultType).to.equal("ToriiReserveVault");
       expect(schema.description).to.not.equal("");
 
       const names = schema.methods.map((m: any) => m.name);
@@ -303,7 +303,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
       await send(WAD);
       await expect(
         vault.connect(anyone).emergencyWithdrawNative(rescue.address)
-      ).to.be.revertedWith("AgoraVault: not guardian");
+      ).to.be.revertedWith("ToriiVault: not guardian");
 
       await expect(vault.connect(guardian).emergencyWithdrawNative(rescue.address))
         .to.emit(vault, "EmergencyWithdrawNative")
@@ -326,7 +326,7 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
       await token.mint(await vault.getAddress(), 100n * WAD);
       await expect(
         vault.connect(anyone).emergencyWithdrawToken(await token.getAddress(), rescue.address)
-      ).to.be.revertedWith("AgoraVault: not guardian");
+      ).to.be.revertedWith("ToriiVault: not guardian");
 
       await vault.connect(guardian).emergencyWithdrawToken(await token.getAddress(), rescue.address);
       expect(await token.balanceOf(rescue.address)).to.equal(100n * WAD);
@@ -343,28 +343,28 @@ describe("AgoraVault (Flap V3 tax vault)", () => {
   describe("construction", () => {
     it("refuses an ERC-20 quote, which this vault does not account for", async () => {
       await expect(
-        (await ethers.getContractFactory("AgoraVault")).deploy(
+        (await ethers.getContractFactory("ToriiVault")).deploy(
           await treasury.getAddress(),
           await token.getAddress(),
           await token.getAddress(), // non-native quote
           await router.getAddress()
         )
-      ).to.be.revertedWith("AgoraVault: quote must be native");
+      ).to.be.revertedWith("ToriiVault: quote must be native");
     });
 
     it("refuses zero addresses", async () => {
-      const F = await ethers.getContractFactory("AgoraVault");
+      const F = await ethers.getContractFactory("ToriiVault");
       await expect(
         F.deploy(ethers.ZeroAddress, await token.getAddress(), ethers.ZeroAddress, await router.getAddress())
-      ).to.be.revertedWith("AgoraVault: zero treasury");
+      ).to.be.revertedWith("ToriiVault: zero treasury");
       await expect(
         F.deploy(await treasury.getAddress(), ethers.ZeroAddress, ethers.ZeroAddress, await router.getAddress())
-      ).to.be.revertedWith("AgoraVault: zero tax token");
+      ).to.be.revertedWith("ToriiVault: zero tax token");
     });
   });
 });
 
-describe("AgoraVaultFactory", () => {
+describe("ToriiVaultFactory", () => {
   before(async function () {
     await skipUnlessFlapChain(this);
   });
@@ -403,7 +403,7 @@ describe("AgoraVaultFactory", () => {
     treasury = await (await ethers.getContractFactory("MockFundSink")).deploy();
     token = await (await ethers.getContractFactory("MockTaxToken")).deploy(0);
     router = await (await ethers.getContractFactory("MockPancakeRouter")).deploy(WBNB, WAD / 1000n);
-    factory = await (await ethers.getContractFactory("AgoraVaultFactory")).deploy(
+    factory = await (await ethers.getContractFactory("ToriiVaultFactory")).deploy(
       await treasury.getAddress(),
       await router.getAddress()
     );
@@ -412,7 +412,7 @@ describe("AgoraVaultFactory", () => {
   it("only the VaultPortal may mint vaults", async () => {
     await expect(
       factory.connect(anyone).newVault(await token.getAddress(), ethers.ZeroAddress, anyone.address, "0x")
-    ).to.be.revertedWith("AgoraVaultFactory: not vault portal");
+    ).to.be.revertedWith("ToriiVaultFactory: not vault portal");
   });
 
   it("mints a vault bound to the fixed Treasury when called by the portal", async () => {
@@ -429,7 +429,7 @@ describe("AgoraVaultFactory", () => {
       .find((e: any) => e && e.name === "VaultCreated");
 
     expect(ev).to.not.equal(undefined);
-    const vault = await ethers.getContractAt("AgoraVault", ev.args.vault);
+    const vault = await ethers.getContractAt("ToriiVault", ev.args.vault);
     expect(await vault.treasury()).to.equal(await treasury.getAddress());
     expect(await vault.taxToken()).to.equal(await token.getAddress());
     expect(await vault.vaultQuoteToken()).to.equal(ethers.ZeroAddress);
@@ -475,17 +475,17 @@ describe("AgoraVaultFactory", () => {
   });
 });
 
-describe("AgoraDistributor (Suits removed)", () => {
+describe("ToriiDistributor (Suits removed)", () => {
   let anyone: HardhatEthersSigner;
   let dist: any, sink: any;
 
   beforeEach(async () => {
     [, anyone] = await ethers.getSigners();
     sink = await (await ethers.getContractFactory("MockRewardSink")).deploy();
-    dist = await (await ethers.getContractFactory("AgoraDistributor")).deploy(await sink.getAddress());
+    dist = await (await ethers.getContractFactory("ToriiDistributor")).deploy(await sink.getAddress());
   });
 
-  it("routes the entire amount to stAGORA", async () => {
+  it("routes the entire amount to stTORII", async () => {
     await sink.setSupply(WAD);
     await expect(dist.connect(anyone).distribute({ value: WAD }))
       .to.emit(dist, "Distributed")

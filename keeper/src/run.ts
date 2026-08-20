@@ -6,7 +6,7 @@ import { distributeIncome } from "./tasks/distribute.js";
 import { realizeSurplus } from "./tasks/realize.js";
 
 /**
- * The AGORA keeper.
+ * The TORII keeper.
  *
  * Three jobs, run in order, on a loop:
  *
@@ -66,7 +66,7 @@ async function main() {
   const once = process.argv.includes("--once");
 
   line();
-  console.log("AGORA keeper");
+  console.log("TORII keeper");
   line();
   console.log(`rpc        ${RPC_URL}`);
   console.log(`chain      ${CHAIN_ID}`);

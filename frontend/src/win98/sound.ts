@@ -23,7 +23,7 @@
 
 type Voice = "ding" | "chord" | "error" | "click" | "open" | "close" | "startup";
 
-const KEY = "agora98:sound";
+const KEY = "torii98:sound";
 
 let ctx: AudioContext | null = null;
 let enabled = read();

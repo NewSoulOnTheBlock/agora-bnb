@@ -5,9 +5,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IYieldAdapter} from "../interfaces/IYieldAdapter.sol";
 
-/// @dev Stands in for the Pons-deployed AGORA: plain, fixed-supply, burnable.
-contract MockAgora is ERC20 {
-    constructor(uint256 supply) ERC20("Agora", "AGORA") {
+/// @dev Stands in for the Pons-deployed TORII: plain, fixed-supply, burnable.
+contract MockTorii is ERC20 {
+    constructor(uint256 supply) ERC20("Torii", "TORII") {
         _mint(msg.sender, supply);
     }
 

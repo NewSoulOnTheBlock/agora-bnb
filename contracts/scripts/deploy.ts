@@ -26,7 +26,7 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
 
   line();
-  console.log("AGORA — step 1/3: deploy contracts (token does NOT exist yet)");
+  console.log("TORII — step 1/3: deploy contracts (token does NOT exist yet)");
   line();
   console.log(`network   ${network.name}  (chainId ${net.chainId})`);
   console.log(`deployer  ${deployer.address}`);

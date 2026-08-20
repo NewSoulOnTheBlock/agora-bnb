@@ -108,11 +108,11 @@ export function useBeefy(holder: string | null | undefined, intervalMs = 60_000)
   return { ...state, total: state.data ? totalDeployedWei(state.data) : null };
 }
 
-/** The operator wallet's own ETH and AGORA, for reconciling withdrawals. */
+/** The operator wallet's own ETH and TORII, for reconciling withdrawals. */
 export function useOperatorHoldings(
   holder: string | null | undefined,
-  agoraToken: string,
-  stAgoraVault: string,
+  toriiToken: string,
+  stToriiVault: string,
   priceWad: bigint | null,
   intervalMs = 60_000
 ) {
@@ -122,13 +122,13 @@ export function useOperatorHoldings(
     if (!holder) return;
     let alive = true;
     const go = () =>
-      readOperatorHoldings(holder, agoraToken, stAgoraVault, priceWad)
+      readOperatorHoldings(holder, toriiToken, stToriiVault, priceWad)
         .then((d) => alive && setData(d))
         .catch(() => alive && setData(null));
     go();
     const t = setInterval(go, intervalMs);
     return () => { alive = false; clearInterval(t); };
-  }, [holder, agoraToken, stAgoraVault, priceWad, intervalMs]);
+  }, [holder, toriiToken, stToriiVault, priceWad, intervalMs]);
 
   return data;
 }

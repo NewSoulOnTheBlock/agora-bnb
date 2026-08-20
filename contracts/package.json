@@ -1,7 +1,7 @@
 {
-  "name": "agora-contracts",
+  "name": "torii-contracts",
   "version": "0.1.0",
-  "description": "AGORA \u2014 ETH-denominated Treasury and FeeSink for the redemption floor (Robinhood Chain, 4663)",
+  "description": "TORII \u2014 ETH-denominated Treasury and FeeSink for the redemption floor (Robinhood Chain, 4663)",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",

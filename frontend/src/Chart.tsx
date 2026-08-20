@@ -170,7 +170,7 @@ export default function Chart() {
         </div>
       </div>
 
-      <canvas ref={ref} width={620} height={210} role="img" aria-label="AGORA price chart" />
+      <canvas ref={ref} width={620} height={210} role="img" aria-label="TORII price chart" />
 
       <div className="chart-foot">
         {err ? (

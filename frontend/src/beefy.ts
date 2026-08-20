@@ -402,15 +402,15 @@ export function pricedCoverage(ps: BeefyPosition[]): { priced: number; total: nu
 
 export type OperatorHoldings = {
   eth: bigint | null;
-  agora: bigint | null;
-  /** AGORA valued at the live pool price, in wei. */
-  agoraWei: bigint | null;
-  /** stAGORA shares, raw — 21 decimals, not 18. See `ST_AGORA_DECIMALS`. */
-  stAgora: bigint | null;
-  /** Those shares expressed in AGORA (18dp), by the vault's own accounting. */
-  stAgoraAssets: bigint | null;
+  torii: bigint | null;
+  /** TORII valued at the live pool price, in wei. */
+  toriiWei: bigint | null;
+  /** stTORII shares, raw — 21 decimals, not 18. See `ST_TORII_DECIMALS`. */
+  stTorii: bigint | null;
+  /** Those shares expressed in TORII (18dp), by the vault's own accounting. */
+  stToriiAssets: bigint | null;
   /** And that, valued at the pool price, in wei. */
-  stAgoraWei: bigint | null;
+  stToriiWei: bigint | null;
 };
 
 /**
@@ -420,21 +420,21 @@ export type OperatorHoldings = {
  * `cumulativeWithdrawn` against Beefy alone leaves an unexplained hole — at the
  * time of writing 1.367 ETH withdrawn against 0.0013 ETH in vaults — which
  * invites exactly the wrong conclusion. Most of it is plainly visible as ETH
- * and AGORA sitting in the wallet; showing that turns an alarming gap into an
+ * and TORII sitting in the wallet; showing that turns an alarming gap into an
  * ordinary treasury position.
  *
- * `priceWad` is the AGORA/ETH price the caller already has, passed in rather
+ * `priceWad` is the TORII/ETH price the caller already has, passed in rather
  * than re-read.
  */
 export async function readOperatorHoldings(
   holder: string,
-  agoraToken: string,
-  stAgoraVault: string,
+  toriiToken: string,
+  stToriiVault: string,
   priceWad: bigint | null
 ): Promise<OperatorHoldings> {
   const empty = {
-    eth: null, agora: null, agoraWei: null,
-    stAgora: null, stAgoraAssets: null, stAgoraWei: null,
+    eth: null, torii: null, toriiWei: null,
+    stTorii: null, stToriiAssets: null, stToriiWei: null,
   };
   if (!holder || holder === ZERO) return empty;
 
@@ -443,37 +443,37 @@ export async function readOperatorHoldings(
   const [eth, tokens] = await Promise.all([
     safe(async () => BigInt(await readProvider.getBalance(holder))),
     multiRead([
-      { target: agoraToken, fragment: bal, args: [holder] },
-      { target: stAgoraVault, fragment: bal, args: [holder] },
+      { target: toriiToken, fragment: bal, args: [holder] },
+      { target: stToriiVault, fragment: bal, args: [holder] },
     ]),
   ]);
 
-  const agora = asBig(tokens[0]);
-  const stAgora = asBig(tokens[1]);
+  const torii = asBig(tokens[0]);
+  const stTorii = asBig(tokens[1]);
 
   /**
    * Shares are NOT interchangeable with assets at the raw-integer level.
    *
    * They track one-to-one in *whole* units — rewards are ETH and stay outside
-   * `totalAssets()`, so the share price never moves — but stAGORA carries a
+   * `totalAssets()`, so the share price never moves — but stTORII carries a
    * decimals offset of 3, which makes a raw share number a thousand times
-   * larger than the AGORA it represents. Pricing the raw number, as this used
+   * larger than the TORII it represents. Pricing the raw number, as this used
    * to, inflated the operator's reported holdings 1000× and fed that straight
    * into the "visible holdings account for N%" reconciliation.
    *
    * `convertToAssets` is the vault's own answer, so this stays correct even if
    * the offset or the share price ever changes.
    */
-  const stAgoraAssets =
-    stAgora === null || stAgora === 0n
-      ? stAgora
+  const stToriiAssets =
+    stTorii === null || stTorii === 0n
+      ? stTorii
       : asBig(
           (
             await multiRead([
               {
-                target: stAgoraVault,
+                target: stToriiVault,
                 fragment: "function convertToAssets(uint256) view returns (uint256)",
-                args: [stAgora],
+                args: [stTorii],
               },
             ])
           )[0]
@@ -484,10 +484,10 @@ export async function readOperatorHoldings(
 
   return {
     eth,
-    agora,
-    agoraWei: wei(agora),
-    stAgora,
-    stAgoraAssets,
-    stAgoraWei: wei(stAgoraAssets),
+    torii,
+    toriiWei: wei(torii),
+    stTorii,
+    stToriiAssets,
+    stToriiWei: wei(stToriiAssets),
   };
 }

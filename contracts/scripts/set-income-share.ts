@@ -64,7 +64,7 @@ async function main() {
   console.log(`  → corpus (raises the floor)    ${(1 - bps / 10000).toFixed(4)} ETH`);
   console.log(`  → stakers + staked Suits       ${(bps / 10000).toFixed(4)} ETH`);
   console.log(`      of which staked Suits 10%  ${((bps / 10000) * 0.1).toFixed(4)} ETH`);
-  console.log(`      of which stAGORA      90%  ${((bps / 10000) * 0.9).toFixed(4)} ETH`);
+  console.log(`      of which stTORII      90%  ${((bps / 10000) * 0.9).toFixed(4)} ETH`);
   console.log("");
   console.log("This is NOT retroactive — tax already collected stays corpus.");
   console.log(`  tax collected so far  ${ethers.formatEther(taxSoFar)} ETH`);

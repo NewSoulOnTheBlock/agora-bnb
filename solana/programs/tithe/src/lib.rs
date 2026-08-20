@@ -1,4 +1,4 @@
-//! AGORA on Solana — the Tithe protocol's independent twin.
+//! TORII on Solana — the Tithe protocol's independent twin.
 //!
 //! Not a bridge. Shares no state, no supply and no floor with the EVM
 //! deployment on Robinhood Chain. Same design, re-instantiated.
@@ -10,7 +10,7 @@
 //! | Pons creator fees (ETH) | pump.fun creator fees (SOL) |
 //! | `FeeSink` contract | keeper wallet + `deposit_fees` |
 //! | `Treasury` corpus (ETH) | treasury PDA (lamports) |
-//! | `StakedAgora` (ERC-4626 + pull `claim()`) | stake positions + reward accumulator |
+//! | `StakedTorii` (ERC-4626 + pull `claim()`) | stake positions + reward accumulator |
 //! | `Redeemer` request/execute | `request_redeem` / `execute_redeem` |
 //!
 //! Because pump.fun pays creator fees in SOL, income and corpus are the same
@@ -25,7 +25,7 @@
 //!    below rent exemption and have it reaped — a failure mode Ethereum has no
 //!    equivalent for.
 //!
-//! 2. **Stake positions are not transferable.** EVM `stAGORA` is an ERC-4626
+//! 2. **Stake positions are not transferable.** EVM `stTORII` is an ERC-4626
 //!    token you can send. Paying SOL rewards against a freely transferable SPL
 //!    token would require hooking every transfer to settle the accumulator,
 //!    which plain SPL cannot do. Positions live in PDAs instead.
@@ -210,7 +210,7 @@ pub mod tithe {
         Ok(())
     }
 
-    /// Stake AGORA. Shares are 1:1 with tokens — there is no share price,
+    /// Stake TORII. Shares are 1:1 with tokens — there is no share price,
     /// because rewards are paid in SOL rather than compounded into the vault.
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
         require!(amount > 0, TitheError::ZeroAmount);
@@ -258,7 +258,7 @@ pub mod tithe {
         Ok(())
     }
 
-    /// Withdraw staked AGORA. Accrued SOL stays claimable.
+    /// Withdraw staked TORII. Accrued SOL stays claimable.
     pub fn unstake(ctx: Context<Unstake>, amount: u64) -> Result<()> {
         require!(amount > 0, TitheError::ZeroAmount);
         require!(

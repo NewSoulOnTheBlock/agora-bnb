@@ -4,16 +4,16 @@ import { Panel, Row, Stat, Pill, Dot, Balance } from "./components";
 import StakePitch from "./StakePitch";
 import { AwaitingDeployment } from "./Layout";
 import { fmtGrouped, fmtSig, DASH } from "./format";
-import { AGORA, ZERO, explorerAddr, SUITS_SHARE_BPS, ST_AGORA_DECIMALS } from "./chain";
+import { TORII, ZERO, explorerAddr, SUITS_SHARE_BPS, ST_TORII_DECIMALS } from "./chain";
 import {
-  readStakePosition, approveAgoraForStaking, stakeAgora, unstakeAgora,
-  claimAgoraYield, type StakePosition,
+  readStakePosition, approveToriiForStaking, stakeTorii, unstakeTorii,
+  claimToriiYield, type StakePosition,
 } from "./vault";
 import { useSnapshot } from "./useReads";
 import type { Wallet } from "./eth";
 
-const deployed = AGORA.stakedAgora !== ZERO;
-const agoraLive = AGORA.token !== ZERO;
+const deployed = TORII.stakedAgora !== ZERO;
+const toriiLive = TORII.token !== ZERO;
 
 export default function Stake({ wallet }: { wallet: Wallet }) {
   const { data: s } = useSnapshot();
@@ -33,12 +33,12 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
 
   /**
    * The field means different tokens in the two modes, and they do not share a
-   * scale: `deposit` takes AGORA assets at 18dp, `redeem` takes stAGORA shares
+   * scale: `deposit` takes TORII assets at 18dp, `redeem` takes stTORII shares
    * at 21dp. Parsing both as ether would send a redeem a thousand times too
    * small — the user would type their whole balance and unstake a thousandth
    * of it.
    */
-  const decimals = mode === "stake" ? 18 : ST_AGORA_DECIMALS;
+  const decimals = mode === "stake" ? 18 : ST_TORII_DECIMALS;
 
   const parsed = useMemo(() => {
     const t = amount.trim();
@@ -46,7 +46,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
     try { return parseUnits(t, decimals); } catch { return null; }
   }, [amount, decimals]);
 
-  const balance = mode === "stake" ? pos?.agoraBalance ?? null : pos?.shares ?? null;
+  const balance = mode === "stake" ? pos?.toriiBalance ?? null : pos?.shares ?? null;
   const needsApproval =
     mode === "stake" && parsed !== null && parsed > 0n &&
     pos?.allowance !== null && pos?.allowance !== undefined && pos.allowance < parsed;
@@ -76,9 +76,9 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
     <>
       {!deployed && (
         <AwaitingDeployment
-          what="stAGORA"
-          why="An ERC-4626 vault over AGORA. Stakers receive the protocol's income stream in ETH; passive holders keep the redemption floor."
-          phase="Treasury + FeeSink → launch → stAGORA, Redeemer, StakedSuits, Distributor"
+          what="stTORII"
+          why="An ERC-4626 vault over TORII. Stakers receive the protocol's income stream in ETH; passive holders keep the redemption floor."
+          phase="Treasury + FeeSink → launch → stTORII, Redeemer, StakedSuits, Distributor"
         />
       )}
 
@@ -86,7 +86,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
 
       <div className="two">
         <Panel
-          label={mode === "stake" ? "Stake AGORA" : "Unstake AGORA"}
+          label={mode === "stake" ? "Stake TORII" : "Unstake TORII"}
           id="ERC-4626"
           right={
             <Pill warn={!deployed}>
@@ -106,7 +106,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               <Balance
                 value={balance}
                 decimals={decimals}
-                unit={mode === "stake" ? "AGORA" : "stAGORA"}
+                unit={mode === "stake" ? "TORII" : "stTORII"}
                 onPick={setAmount}
               />
             </div>
@@ -118,7 +118,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={!deployed || !wallet.account}
               />
-              <span className="denom">{mode === "stake" ? "AGORA" : "stAGORA"}</span>
+              <span className="denom">{mode === "stake" ? "TORII" : "stTORII"}</span>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
             <div className="quote">
               <div className="qrow">
                 <span className="qk">Your shares are worth</span>
-                <span className="qv">{fmtGrouped(pos.sharesAsAssets, 4)} AGORA</span>
+                <span className="qv">{fmtGrouped(pos.sharesAsAssets, 4)} TORII</span>
               </div>
               <div className="qrow">
                 <span className="qk">Unclaimed yield (kept on unstake)</span>
@@ -137,11 +137,11 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
 
           {!wallet.account ? (
             <button className="btn" onClick={wallet.connect} disabled={!deployed}>
-              {deployed ? "Connect wallet" : "Awaiting stAGORA"}
+              {deployed ? "Connect wallet" : "Awaiting stTORII"}
             </button>
           ) : needsApproval ? (
-            <button className="btn" disabled={!canSubmit} onClick={() => run("approve", approveAgoraForStaking)}>
-              {busy === "approve" ? "Approving…" : "Approve AGORA"}
+            <button className="btn" disabled={!canSubmit} onClick={() => run("approve", approveToriiForStaking)}>
+              {busy === "approve" ? "Approving…" : "Approve TORII"}
             </button>
           ) : (
             <button
@@ -150,8 +150,8 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
               onClick={() =>
                 run(mode, (sg) =>
                   mode === "stake"
-                    ? stakeAgora(sg, parsed!, wallet.account!)
-                    : unstakeAgora(sg, parsed!, wallet.account!)
+                    ? stakeTorii(sg, parsed!, wallet.account!)
+                    : unstakeTorii(sg, parsed!, wallet.account!)
                 )
               }
             >
@@ -166,7 +166,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
             className="btn ghost"
             style={{ marginTop: 8 }}
             disabled={!deployed || !wallet.account || !!busy || !(pos?.pendingYield && pos.pendingYield > 0n)}
-            onClick={() => run("claim", claimAgoraYield)}
+            onClick={() => run("claim", claimToriiYield)}
           >
             {busy === "claim"
               ? "Claiming…"
@@ -179,8 +179,8 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           {tx && <div className="txnote">Confirmed · {tx.slice(0, 18)}…</div>}
 
           <p className="sub">
-            Eligible supply for income is simply <code>stAGORA.totalSupply()</code>. The alternative —
-            accruing to every holder through a transfer hook — is not even possible here: AGORA is deployed
+            Eligible supply for income is simply <code>stTORII.totalSupply()</code>. The alternative —
+            accruing to every holder through a transfer hook — is not even possible here: TORII is deployed
             by the Pons factory with no hooks and no way to add them.
           </p>
         </Panel>
@@ -189,14 +189,14 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
           <div className="grid c2">
             <Stat
               k="Your position"
-              value={pos?.shares != null ? fmtGrouped(pos.shares, 2, ST_AGORA_DECIMALS) : null}
-              unit="stAGORA"
+              value={pos?.shares != null ? fmtGrouped(pos.shares, 2, ST_TORII_DECIMALS) : null}
+              unit="stTORII"
               note={pos?.pendingYield != null ? `${fmtSig(pos.pendingYield)} ETH unclaimed` : undefined}
             />
             <Stat
               k="Total staked"
               value={s?.staking.totalAssets != null ? fmtGrouped(s.staking.totalAssets, 0) : null}
-              unit="AGORA"
+              unit="TORII"
             />
           </div>
 
@@ -222,10 +222,10 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
                   ? `${formatEther(s.reserve.pendingIncome)} ETH`
                   : "unavailable"}
               </Row>
-              <Row k="stAGORA contract" na={!deployed}>
+              <Row k="stTORII contract" na={!deployed}>
                 {deployed ? (
-                  <a className="rv" href={explorerAddr(AGORA.stakedAgora)} target="_blank" rel="noreferrer">
-                    {AGORA.stakedAgora.slice(0, 14)}…
+                  <a className="rv" href={explorerAddr(TORII.stakedAgora)} target="_blank" rel="noreferrer">
+                    {TORII.stakedAgora.slice(0, 14)}…
                   </a>
                 ) : "unavailable"}
               </Row>
@@ -234,7 +234,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
             <p className="sub">
               Rewards are ETH and stay <em>outside</em> <code>totalAssets()</code>, so the share price never
               moves — shares track deposits one-to-one and yield accrues separately. Inflating the share
-              price with ETH income would make <code>convertToAssets</code> report AGORA the vault does not
+              price with ETH income would make <code>convertToAssets</code> report TORII the vault does not
               hold.
             </p>
           </Panel>
@@ -268,9 +268,9 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
         </div>
       </div>
 
-      {!agoraLive && (
+      {!toriiLive && (
         <div className="notice" style={{ marginTop: 18 }}>
-          <b>AGORA has not been relaunched yet.</b> Balances read as unavailable because no token address
+          <b>TORII has not been relaunched yet.</b> Balances read as unavailable because no token address
           is configured. Everything above is wired against the deployed ABIs — filling in{" "}
           <code>src/chain.ts</code> from the output of <code>bind.ts</code> activates it.
         </div>

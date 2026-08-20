@@ -19,7 +19,7 @@ const {
  * (shell history persists it). `.env` is gitignored at the repo root.
  *
  * Preferred, in order:
- *   1. A hardware wallet, or an encrypted keystore (`cast wallet import agora`)
+ *   1. A hardware wallet, or an encrypted keystore (`cast wallet import torii`)
  *      with a one-off signing step.
  *   2. A freshly generated deploy-only key funded with just enough gas, kept in
  *      `.env`, and treated as disposable after deployment. Nothing in these
@@ -86,9 +86,9 @@ const config: HardhatUserConfig = {
       accounts,
     },
     /**
-     * BNB Chain. The AGORA deployment here is NOT a port of the Robinhood Chain
+     * BNB Chain. The TORII deployment here is NOT a port of the Robinhood Chain
      * one: there is no Pons, so the tax comes from Flap instead, `FeeSink` is
-     * replaced by `bnb/AgoraVault`, the rate is 5% rather than 4% (Flap offers
+     * replaced by `bnb/ToriiVault`, the rate is 5% rather than 4% (Flap offers
      * 1/3/5/10% only), and the Suits vault is dropped entirely because that
      * collection has no BNB deployment.
      *

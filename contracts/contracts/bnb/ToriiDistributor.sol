@@ -9,13 +9,13 @@ interface IRewardSink {
 }
 
 /**
- * @title AgoraDistributor
- * @notice Forwards earmarked income to stAGORA. The BNB Chain deployment's
+ * @title ToriiDistributor
+ * @notice Forwards earmarked income to stTORII. The BNB Chain deployment's
  *         replacement for `Distributor`.
  *
  * ## What changed, and what fell out of it
  *
- * The Robinhood Chain `Distributor` split income between two sinks — stAGORA and
+ * The Robinhood Chain `Distributor` split income between two sinks — stTORII and
  * staked Suits — with a governable `suitsBps` and a reroute path for whichever
  * sink happened to have no stakers. None of that survives here: the Suits
  * ERC-721 is a Robinhood Chain collection with no BNB deployment, so there is no
@@ -33,13 +33,13 @@ interface IRewardSink {
  *
  * ## What deliberately did not change
  *
- * The `NoStakers` guard stays. If stAGORA has no stakers, `notifyReward` cannot
+ * The `NoStakers` guard stays. If stTORII has no stakers, `notifyReward` cannot
  * account for the ETH, and accepting it anyway would create a claim nobody can
  * exercise. Reverting leaves the income earmarked in the Treasury — recoverable,
  * and distributable the moment somebody stakes — rather than stranded here or
  * quietly reclassified as corpus.
  */
-contract AgoraDistributor is ReentrancyGuard {
+contract ToriiDistributor is ReentrancyGuard {
     /// @notice The single, immutable destination for all distributed income.
     IRewardSink public immutable stakedAgora;
 
@@ -51,13 +51,13 @@ contract AgoraDistributor is ReentrancyGuard {
     error NoStakers();
     error ZeroAddress();
 
-    constructor(address stakedAgora_) {
-        if (stakedAgora_ == address(0)) revert ZeroAddress();
-        stakedAgora = IRewardSink(stakedAgora_);
+    constructor(address stakedTorii_) {
+        if (stakedTorii_ == address(0)) revert ZeroAddress();
+        stakedAgora = IRewardSink(stakedTorii_);
     }
 
     /**
-     * @notice Forward the attached BNB to stAGORA. Permissionless.
+     * @notice Forward the attached BNB to stTORII. Permissionless.
      * @dev The destination is fixed at construction and no argument names one,
      *      so an open caller can only push value along the one path it was
      *      always going to take.
@@ -79,14 +79,14 @@ contract AgoraDistributor is ReentrancyGuard {
      *      chains. With one sink the answer is always "all of it", but a caller
      *      should not have to special-case which chain it is talking to.
      */
-    function preview(uint256 amount) external pure returns (uint256 toAgora) {
+    function preview(uint256 amount) external pure returns (uint256 toTorii) {
         return amount;
     }
 
     /// @dev Plain transfers are accepted but do nothing until `flush()`.
     receive() external payable {}
 
-    /// @notice Push any idle balance through to stAGORA. Permissionless.
+    /// @notice Push any idle balance through to stTORII. Permissionless.
     function flush() external returns (uint256 amount) {
         amount = address(this).balance;
         if (amount == 0) revert NothingToDistribute();

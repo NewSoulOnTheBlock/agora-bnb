@@ -24,7 +24,7 @@ async function main() {
   }
 
   line();
-  console.log("AGORA — step 3/3: bind contracts to the launched token");
+  console.log("TORII — step 3/3: bind contracts to the launched token");
   line();
   console.log(`network   ${network.name} (chainId ${net.chainId})`);
   console.log(`token     ${TOKEN}`);
@@ -99,7 +99,7 @@ async function main() {
     await tx.wait();
     console.log(`Treasury.setAgora  ✓ ${tx.hash}`);
   } else {
-    console.log(`Treasury.agora already set: ${await treasury.agora()}`);
+    console.log(`Treasury.torii already set: ${await treasury.agora()}`);
   }
 
   if ((await feeSink.curve()) === ethers.ZeroAddress) {
@@ -118,15 +118,15 @@ async function main() {
   const ownerIsSigner = owner.toLowerCase() === signer.address.toLowerCase();
 
   line();
-  console.log("DEPLOYING StakedAgora + Redeemer");
+  console.log("DEPLOYING StakedTorii + Redeemer");
   line();
 
   const staking = await (
-    await ethers.getContractFactory("StakedAgora")
+    await ethers.getContractFactory("StakedTorii")
   ).deploy(TOKEN, owner);
   await staking.waitForDeployment();
   const stakingAddr = await staking.getAddress();
-  console.log(`StakedAgora  ${stakingAddr}  (${await staking.symbol()})`);
+  console.log(`StakedTorii  ${stakingAddr}  (${await staking.symbol()})`);
 
   const redeemer = await (
     await ethers.getContractFactory("Redeemer")
@@ -174,7 +174,7 @@ async function main() {
   await distributor.waitForDeployment();
   const distributorAddr = await distributor.getAddress();
   console.log(`Distributor  ${distributorAddr}`);
-  console.log(`  split: ${await distributor.suitsBps()} bps to staked Suits, remainder to stAGORA`);
+  console.log(`  split: ${await distributor.suitsBps()} bps to staked Suits, remainder to stTORII`);
 
   // The Redeemer is the ONLY address the Treasury will ever pay.
   if (ownerIsSigner) {
@@ -207,10 +207,10 @@ async function main() {
     console.log("    is left off by default.");
   }
 
-  // Staked AGORA is CUSTODIED, not owned — it must stay in eligibleSupply so
+  // Staked TORII is CUSTODIED, not owned — it must stay in eligibleSupply so
   // stakers keep their floor backing. Deliberately NOT added to the exclusions.
-  console.log(`\nnote: StakedAgora is intentionally NOT added to Treasury exclusions —`);
-  console.log(`      it custodies user AGORA rather than owning it, so stakers`);
+  console.log(`\nnote: StakedTorii is intentionally NOT added to Treasury exclusions —`);
+  console.log(`      it custodies user TORII rather than owning it, so stakers`);
   console.log(`      must keep their floor backing.`);
 
   // ---------------------------------------------------------------------
@@ -240,7 +240,7 @@ async function main() {
   console.log(`  distributor: "${distributorAddr}",`);
   console.log("");
   console.log("Yield is distributed by calling Distributor.distribute() with ETH.");
-  console.log("It splits 10% to staked Suits and 90% to stAGORA, and reroutes the");
+  console.log("It splits 10% to staked Suits and 90% to stTORII, and reroutes the");
   console.log("whole amount if one side has no stakers rather than stranding it.");
   console.log("");
   console.log("Then make ONE small trade and run FeeSink.collect() to prove ETH");

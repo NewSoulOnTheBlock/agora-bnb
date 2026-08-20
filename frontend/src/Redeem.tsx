@@ -3,15 +3,15 @@ import { formatEther, parseEther } from "ethers";
 import { Panel, Row, Stat, Pill, Dot, Balance } from "./components";
 import { AwaitingDeployment } from "./Layout";
 import { fmtGrouped, fmtSig, DASH } from "./format";
-import { AGORA, ZERO, explorerAddr } from "./chain";
+import { TORII, ZERO, explorerAddr } from "./chain";
 import {
   readStakePosition, readRedeemerAllowance, readMyRequests, quoteRedeem,
-  approveAgoraForRedeemer, requestRedeem, executeRedeem, type RedeemRequest,
+  approveToriiForRedeemer, requestRedeem, executeRedeem, type RedeemRequest,
 } from "./vault";
 import { useSnapshot } from "./useReads";
 import type { Wallet } from "./eth";
 
-const deployed = AGORA.redeemer !== ZERO;
+const deployed = TORII.redeemer !== ZERO;
 
 function when(ts: number): string {
   const d = ts * 1000 - Date.now();
@@ -39,7 +39,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
       readRedeemerAllowance(wallet.account),
       readMyRequests(wallet.account),
     ]);
-    setBalance(p.agoraBalance);
+    setBalance(p.toriiBalance);
     setAllowance(a);
     setQueue(q);
   }, [wallet.account]);
@@ -87,14 +87,14 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
       {!deployed && (
         <AwaitingDeployment
           what="Redeemer"
-          why="Burning AGORA for a pro-rata share of the corpus is what turns an accumulating treasury into an actual price floor. Until it ships, the corpus is one-way."
+          why="Burning TORII for a pro-rata share of the corpus is what turns an accumulating treasury into an actual price floor. Until it ships, the corpus is one-way."
           phase="Treasury + FeeSink → launch → Redeemer"
         />
       )}
 
       <div className="two">
         <Panel
-          label="Burn AGORA for reserve"
+          label="Burn TORII for reserve"
           id={`${haircutPct}% haircut`}
           right={
             <Pill warn={!deployed || rd?.requestsPaused === true}>
@@ -106,7 +106,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
           <div className="field">
             <div className="field-top">
               <span className="k">Amount to burn</span>
-              <Balance value={balance} decimals={18} unit="AGORA" onPick={setAmount} />
+              <Balance value={balance} decimals={18} unit="TORII" onPick={setAmount} />
             </div>
             <div className="input-wrap">
               <input
@@ -116,13 +116,13 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={!deployed || !wallet.account}
               />
-              <span className="denom">AGORA</span>
+              <span className="denom">TORII</span>
             </div>
           </div>
 
           <div className="quote">
             <div className="qrow">
-              <span className="qk">Floor per AGORA</span>
+              <span className="qk">Floor per TORII</span>
               <span className="qv">
                 {r?.floorPerTokenWad != null ? `${fmtSig(r.floorPerTokenWad)} ETH` : DASH}
               </span>
@@ -146,8 +146,8 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
               {deployed ? "Connect wallet" : "Awaiting Redeemer"}
             </button>
           ) : needsApproval ? (
-            <button className="btn" disabled={!!busy} onClick={() => run("approve", approveAgoraForRedeemer)}>
-              {busy === "approve" ? "Approving…" : "Approve AGORA"}
+            <button className="btn" disabled={!!busy} onClick={() => run("approve", approveToriiForRedeemer)}>
+              {busy === "approve" ? "Approving…" : "Approve TORII"}
             </button>
           ) : (
             <button
@@ -167,7 +167,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
           <p className="sub">
             <b>The burn happens immediately and cannot be cancelled.</b> Your tokens are destroyed when
             you queue, not when you claim — which is what makes the supply drop, and the floor rise for
-            everyone else, right away. Re-minting is impossible: AGORA's supply is fixed by the Pons
+            everyone else, right away. Re-minting is impossible: TORII's supply is fixed by the Pons
             factory.
           </p>
         </Panel>
@@ -175,7 +175,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
         <div>
           <div className="grid c2">
             <Stat
-              k="Floor per AGORA"
+              k="Floor per TORII"
               value={r?.floorPerTokenWad != null ? fmtSig(r.floorPerTokenWad) : null}
               unit="ETH"
             />
@@ -197,7 +197,7 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
             ) : (
               <div className="rows">
                 {queue.map((q) => (
-                  <Row key={q.id} k={`#${q.id} · ${fmtGrouped(q.amount, 0)} AGORA`}>
+                  <Row key={q.id} k={`#${q.id} · ${fmtGrouped(q.amount, 0)} TORII`}>
                     {q.executed ? (
                       <span className="muted">claimed</span>
                     ) : q.ready ? (
@@ -239,12 +239,12 @@ export default function Redeem({ wallet }: { wallet: Wallet }) {
                 {rd?.epochRemaining != null ? `${formatEther(rd.epochRemaining)} ETH` : "unavailable"}
               </Row>
               <Row k="Burned to date" na={rd?.totalBurned == null}>
-                {rd?.totalBurned != null ? `${fmtGrouped(rd.totalBurned, 0)} AGORA` : "unavailable"}
+                {rd?.totalBurned != null ? `${fmtGrouped(rd.totalBurned, 0)} TORII` : "unavailable"}
               </Row>
               <Row k="Redeemer contract" na={!deployed}>
                 {deployed ? (
-                  <a className="rv" href={explorerAddr(AGORA.redeemer)} target="_blank" rel="noreferrer">
-                    {AGORA.redeemer.slice(0, 14)}…
+                  <a className="rv" href={explorerAddr(TORII.redeemer)} target="_blank" rel="noreferrer">
+                    {TORII.redeemer.slice(0, 14)}…
                   </a>
                 ) : "unavailable"}
               </Row>

@@ -21,7 +21,7 @@ async function main() {
   const t = await ethers.getContractAt("Treasury", process.env.TREASURY!, ethers.provider);
   const dist = await ethers.getContractAt("Distributor", await t.distributor(), ethers.provider);
 
-  const agoraVault = await ethers.getContractAt("StakedAgora", await dist.stakedAgora(), signer);
+  const toriiVault = await ethers.getContractAt("StakedTorii", await dist.stakedAgora(), signer);
   const suitsVault = await ethers.getContractAt("StakedSuits", await dist.stakedSuits(), signer);
 
   const before = await ethers.provider.getBalance(signer.address);
@@ -34,20 +34,20 @@ async function main() {
   console.log(`  wallet            ${signer.address}`);
   console.log(`  balance           ${eth(before)} ETH`);
 
-  const [fromAgora, fromSuits] = await Promise.all([
-    agoraVault.pendingYield(signer.address),
+  const [fromTorii, fromSuits] = await Promise.all([
+    toriiVault.pendingYield(signer.address),
     suitsVault.pendingYield(signer.address),
   ]);
-  console.log(`  claimable stAGORA ${eth(fromAgora)} ETH`);
+  console.log(`  claimable stTORII ${eth(fromTorii)} ETH`);
   console.log(`  claimable Suits   ${eth(fromSuits)} ETH`);
 
-  if (fromAgora === 0n && fromSuits === 0n) {
+  if (fromTorii === 0n && fromSuits === 0n) {
     console.log("\nNothing to claim.");
     return;
   }
 
   for (const [label, vault, amount] of [
-    ["stAGORA", agoraVault, fromAgora],
+    ["stTORII", toriiVault, fromTorii],
     ["Suits", suitsVault, fromSuits],
   ] as const) {
     if (amount === 0n) continue;

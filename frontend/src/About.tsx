@@ -2,7 +2,7 @@ import { formatEther } from "ethers";
 import { Panel, Row } from "./components";
 import { fmtSig, fmtGrouped, DASH } from "./format";
 import {
-  AGORA, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_MARKET, AGORA_TAX_BPS,
+  TORII, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_MARKET, TORII_TAX_BPS,
   SUITS_STAKING_ENABLED,
 } from "./chain";
 import { useSnapshot } from "./useReads";
@@ -26,7 +26,7 @@ export default function About() {
   const suitsPct = s?.suits.shareBps != null ? Number(s.suits.shareBps) / 100 : 10;
   const haircutPct = rd?.haircutBps != null ? Number(rd.haircutBps) / 100 : null;
   const delayHrs = rd?.redeemDelay != null ? Number(rd.redeemDelay) / 3600 : null;
-  const taxPct = AGORA_TAX_BPS / 100;
+  const taxPct = TORII_TAX_BPS / 100;
 
   // Worked example, computed from the live numbers so it can never drift.
   const ex = 1; // 1 ETH traded
@@ -41,7 +41,7 @@ export default function About() {
       <div className="hero">
         <Panel label="In one sentence">
           <p className="lede">
-            Every time someone buys or sells AGORA, a slice of that trade is taken and put into a
+            Every time someone buys or sells TORII, a slice of that trade is taken and put into a
             shared pot. Part of the pot pays people who lock up their tokens. The rest just sits
             there, growing — and you can always hand your tokens back for a share of it.
           </p>
@@ -54,7 +54,7 @@ export default function About() {
         <Panel>
           <ol className="steps big-steps">
             <li className="step">
-              <b>Someone trades.</b> Every buy and every sell of AGORA pays a{" "}
+              <b>Someone trades.</b> Every buy and every sell of TORII pays a{" "}
               <b>{taxPct}% fee</b>. If you buy 1 ETH worth, about {taxPct} of every 100 goes to the
               protocol instead of to you. This is the only thing that funds everything below — no
               new tokens are ever printed.
@@ -76,7 +76,7 @@ export default function About() {
             </li>
             <li className="step">
               <b>Income goes to people who commit.</b> {100 - suitsPct}% to people who stake their
-              AGORA, {suitsPct}% to people who stake a Suits NFT. Paid in ETH. You claim it whenever
+              TORII, {suitsPct}% to people who stake a Suits NFT. Paid in ETH. You claim it whenever
               you like — it does not expire.
             </li>
           </ol>
@@ -86,7 +86,7 @@ export default function About() {
       {/* ------------------------------------------------------------------ */}
       <div className="section">
         <p className="label">
-          If someone trades 1 ETH of AGORA <span className="id">live numbers, not an illustration</span>
+          If someone trades 1 ETH of TORII <span className="id">live numbers, not an illustration</span>
         </p>
         <Panel>
           <div className="rows">
@@ -94,7 +94,7 @@ export default function About() {
             <Row k="→ into the pot" na={exCorpus == null}>
               {exCorpus != null ? `${exCorpus.toFixed(4)} ETH — raises what every token is worth` : DASH}
             </Row>
-            <Row k="→ to AGORA stakers" na={exStakers == null}>
+            <Row k="→ to TORII stakers" na={exStakers == null}>
               {exStakers != null ? `${exStakers.toFixed(4)} ETH` : DASH}
             </Row>
             <Row k="→ to staked Suits" na={exSuits == null}>
@@ -120,14 +120,14 @@ export default function About() {
           </Panel>
           <Panel label="Stake">
             <p className="sub" style={{ marginTop: 0 }}>
-              Lock AGORA into the staking vault and receive a share of all income, paid in <b>ETH</b>,
+              Lock TORII into the staking vault and receive a share of all income, paid in <b>ETH</b>,
               not in more tokens. Unstake whenever you want — any income you already earned stays
               yours even after you leave.
             </p>
           </Panel>
           <Panel label="Redeem">
             <p className="sub" style={{ marginTop: 0 }}>
-              Hand your AGORA back and take your share of the pot in ETH. Your tokens are destroyed,
+              Hand your TORII back and take your share of the pot in ETH. Your tokens are destroyed,
               which makes every remaining token worth slightly more.
             </p>
           </Panel>
@@ -172,7 +172,7 @@ export default function About() {
               <b>Suits staking is currently unavailable.</b> The collection only lets approved
               contracts move its tokens, and this staking vault has not been approved by the
               collection's owner. Until that changes, no Suit can be staked — and the {suitsPct}%
-              share is paid to AGORA stakers instead. Nothing is lost or stuck; the vault works the
+              share is paid to TORII stakers instead. Nothing is lost or stuck; the vault works the
               moment the collection approves it.
             </div>
           )}
@@ -221,7 +221,7 @@ export default function About() {
             </Row>
             <Row k="The token price can fall">
               The reserve tracks what has been collected. It says nothing about what people will pay
-              for AGORA on the open market
+              for TORII on the open market
             </Row>
             <Row k={`The ${taxPct}% fee is on both sides`}>
               Buying and selling each cost {taxPct}%, so a quick round trip loses about{" "}
@@ -249,13 +249,13 @@ export default function About() {
         <Panel>
           <div className="rows">
             {([
-              ["AGORA token", AGORA.token],
-              ["Treasury (the pot)", AGORA.treasury],
-              ["Fee collector", AGORA.feeSink],
-              ["Staking vault", AGORA.stakedAgora],
-              ["Suits staking", AGORA.stakedSuits],
-              ["Redemption", AGORA.redeemer],
-              ["Income splitter", AGORA.distributor],
+              ["TORII token", TORII.token],
+              ["Treasury (the pot)", TORII.treasury],
+              ["Fee collector", TORII.feeSink],
+              ["Staking vault", TORII.stakedAgora],
+              ["Suits staking", TORII.stakedSuits],
+              ["Redemption", TORII.redeemer],
+              ["Income splitter", TORII.distributor],
             ] as const).map(([label, addr]) => (
               <Row key={label} k={label}>
                 <a className="rv" href={explorerAddr(addr)} target="_blank" rel="noreferrer">
@@ -270,7 +270,7 @@ export default function About() {
               {r?.floorPerTokenWad != null ? `${fmtSig(r.floorPerTokenWad)} ETH` : DASH}
             </Row>
             <Row k="Tokens in circulation" na={r?.eligibleSupply == null}>
-              {r?.eligibleSupply != null ? `${fmtGrouped(r.eligibleSupply, 0)} AGORA` : DASH}
+              {r?.eligibleSupply != null ? `${fmtGrouped(r.eligibleSupply, 0)} TORII` : DASH}
             </Row>
           </div>
         </Panel>

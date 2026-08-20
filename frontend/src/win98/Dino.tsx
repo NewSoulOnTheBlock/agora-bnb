@@ -20,7 +20,7 @@ const GROUND = 128;
 const GRAVITY = 0.55;
 const JUMP_V = -9.4;
 const START_SPEED = 4.2;
-const HI_KEY = "agora98:dino-hi";
+const HI_KEY = "torii98:dino-hi";
 
 type Cactus = { x: number; w: number; h: number };
 

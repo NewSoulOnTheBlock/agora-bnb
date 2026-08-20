@@ -6,7 +6,7 @@
 > All addresses and pool parameters are **verified on-chain** — see Appendix A (§14).
 > **Yield venue:** **Beefy Finance** — confirmed live on chain 4663, but see §4 for a severe capacity limit.
 > **Status:** design only, not built. Written 2026-08-17.
-> **Related:** [`agora-equity-reserve-design.md`](./agora-equity-reserve-design.md) (Olympus hard-floor pattern,
+> **Related:** [`torii-equity-reserve-design.md`](./torii-equity-reserve-design.md) (Olympus hard-floor pattern,
 > USDG numeraire, ERC-8056/Chainlink oracle discipline); `memebrokers-evm/` (Hardhat 2 + Solidity 0.8.24 + OZ).
 
 ---
@@ -146,7 +146,7 @@ Reuse the Memebrokers Hardhat 2 / Solidity 0.8.24 / OZ `Ownable` + `ReentrancyGu
 
 > **Rewritten 2026-08-18.** Earlier drafts treated the tokenized-stock/USDG vaults as a
 > thesis-aligned curiosity and recommended a USDG core with a `weth-usdg` sleeve. That is
-> inverted. **Equity exposure is the goal**, not a sleeve — AGORA is meant to be a reserve
+> inverted. **Equity exposure is the goal**, not a sleeve — TORII is meant to be a reserve
 > backed by a basket of tokenized stocks, and everything below is written toward that.
 >
 > This section states what that costs, because the cost is real and mostly architectural.
@@ -211,7 +211,7 @@ is fractions of a share each. Precise dollar sizing needs a price feed the chain
 verifiably have — which is itself the point.
 
 Against a corpus already past **0.2 ETH** and compounding on every trade, the arithmetic is
-blunt: **AGORA outgrows every stock vault on this chain combined, quickly.** Spec's own
+blunt: **TORII outgrows every stock vault on this chain combined, quickly.** Spec's own
 `vaultCapBps ≤ 2000` rule — never more than 20% of a vault's TVL — caps a MSFT/USDG deposit at
 roughly 40 USDG of exposure today. That is not a treasury allocation; it is a rounding error.
 
@@ -254,7 +254,7 @@ Beefy **is** live on chain 4663 (confirmed via `api.beefy.finance/tvl`). But:
    collapses the APY, and exiting is impossible without severe slippage. Depositing the corpus as designed
    is not physically available.
 3. **The tokenized-stock/USDG vaults are the most thesis-aligned** (equity exposure + USDG leg, echoing
-   AGORA) **and the most starved** — a $500 vault cannot take a treasury allocation.
+   TORII) **and the most starved** — a $500 vault cannot take a treasury allocation.
 
 ### 4.3 Policy that survives these facts
 
@@ -337,7 +337,7 @@ Non-negotiable rules:
    token backing itself makes the floor self-referentially inflatable. Mark at zero, and exclude the same
    balances from the denominator so numerator and denominator agree.
 2. **Never value ERC-8056 assets off raw `balanceOf`.** Tokenized stocks hold `balanceOf` constant and move
-   value via `uiMultiplier()`. Use `balanceOfUI()` / Chainlink — the AGORA trap, and directly relevant
+   value via `uiMultiplier()`. Use `balanceOfUI()` / Chainlink — the TORII trap, and directly relevant
    because the stock/USDG Beefy vaults hold these.
 3. **`getPricePerFullShare()` is not a safe redemption price on its own.** LP/CLM share prices are
    manipulable within a block (donation and flash-loan vectors) and can legitimately fall. Feed redemption
@@ -429,7 +429,7 @@ realizeSurplus():
     // high-water mark unchanged; IL below the mark simply pays nothing
 ```
 
-This is the same pattern as AGORA's Rebalancer trimming ERC-8056 multiplier-driven NAV surplus — worth
+This is the same pattern as TORII's Rebalancer trimming ERC-8056 multiplier-driven NAV surplus — worth
 sharing the implementation.
 
 Two Beefy-specific wrinkles:
@@ -476,7 +476,7 @@ textbook shape of an investment contract, and moves closer if the corpus holds t
 
 Levers that reduce (never eliminate) exposure:
 - **No discretionary management** — adapters, caps and weights governance-set and non-discretionary.
-- **Gate the income and redemption contracts, not the token.** The AGORA spec ships a dormant ERC-1404
+- **Gate the income and redemption contracts, not the token.** The TORII spec ships a dormant ERC-1404
   `GATE` on the token itself — **do not copy that here**, and in fact §8.1 makes it impossible. A transfer
   gate needs a transfer hook, which would forfeit the plain-ERC-20 win. Since the security-like behaviour
   lives in `stTITH` and `Redeemer`, put any allowlist or geofence there. TITHE stays freely composable; the

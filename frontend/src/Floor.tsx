@@ -3,7 +3,7 @@ import { Panel, Stat, Row, Dot, Pill } from "./components";
 import { useSnapshot, useTaxHistory, useFloorHistory, useBeefy, useEthUsd } from "./useReads";
 import { usdOf, fmtUsd } from "./price";
 import { fmtSig, fmtGrouped, bpsToPct, signedPct, shortAddr, DASH } from "./format";
-import { V4, PONS, AGORA, ZERO, explorerAddr, AGORA_TAX_BPS, ETH_USD_FEED, GMGN_URL } from "./chain";
+import { V4, PONS, TORII, ZERO, explorerAddr, TORII_TAX_BPS, ETH_USD_FEED, GMGN_URL } from "./chain";
 import { readCurveState, type CurveState } from "./curve";
 
 export default function Floor() {
@@ -20,7 +20,7 @@ export default function Floor() {
 
   // The operator wallet is what holds the deployed positions, so that is the
   // address to scan — the Treasury itself never touches Beefy today.
-  const beefy = useBeefy(s?.reserve.operator ?? AGORA.deployer);
+  const beefy = useBeefy(s?.reserve.operator ?? TORII.deployer);
 
   const ethUsd = useEthUsd();
 
@@ -29,7 +29,7 @@ export default function Floor() {
     s?.reserve.navWad != null && beefy.total != null
       ? s.reserve.navWad + beefy.total
       : s?.reserve.navWad ?? null;
-  const floor = useFloorHistory(AGORA.treasury !== ZERO);
+  const floor = useFloorHistory(TORII.treasury !== ZERO);
 
   const cumulativeTax = tax.data?.length ? tax.data[tax.data.length - 1].cumulativeTax : null;
 
@@ -49,10 +49,10 @@ export default function Floor() {
 
         {curve && !curve.graduated && (
           <div className="notice">
-            <b>AGORA is live on the Pons bonding curve.</b> Market price, the 4% creator tax and the
+            <b>TORII is live on the Pons bonding curve.</b> Market price, the 4% creator tax and the
             graduation figures below are read from the curve at{" "}
-            <a className="link" href={explorerAddr(AGORA.curve)} target="_blank" rel="noreferrer">
-              {AGORA.curve.slice(0, 10)}…
+            <a className="link" href={explorerAddr(TORII.curve)} target="_blank" rel="noreferrer">
+              {TORII.curve.slice(0, 10)}…
             </a>. The reserve contracts are deployed and wired; the reserve reads <b>0</b> because no
             taxed trade has settled yet. A zero here is a measurement, not a gap.
           </div>
@@ -154,7 +154,7 @@ export default function Floor() {
             <Stat
               k="Eligible supply"
               value={s?.reserve.eligibleSupply != null ? fmtGrouped(s.reserve.eligibleSupply, 0) : null}
-              unit="AGORA"
+              unit="TORII"
               note="excl. burned + protocol-held"
             />
           </div>
@@ -174,7 +174,7 @@ export default function Floor() {
               value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
               unit="ETH"
               usd={usdOf(s?.reserve.cumulativeIncomeDistributed, ethUsd)}
-              note="90% stAGORA · 10% staked Suits"
+              note="90% stTORII · 10% staked Suits"
             />
             <Stat
               k="Tax to income"
@@ -220,13 +220,13 @@ export default function Floor() {
             <Stat
               k="Staked"
               value={s?.staking.totalAssets != null ? fmtGrouped(s.staking.totalAssets, 0) : null}
-              unit="AGORA"
+              unit="TORII"
               usd={
                 s?.staking.totalAssets != null && s?.pool.priceWad != null
                   ? usdOf((s.staking.totalAssets * s.pool.priceWad) / 10n ** 18n, ethUsd)
                   : null
               }
-              note="locked in the stAGORA vault"
+              note="locked in the stTORII vault"
             />
             <Stat
               k="ETH price"
@@ -292,7 +292,7 @@ export default function Floor() {
               <Row k="tick / liquidity">
                 {s?.pool.tick ?? DASH} / {s?.pool.liquidity?.toString() ?? DASH}
               </Row>
-              <Row k="Creator tax (set at launch)">{bpsToPct(AGORA_TAX_BPS)} · cap {bpsToPct(PONS.maxCreatorTaxBps)}</Row>
+              <Row k="Creator tax (set at launch)">{bpsToPct(TORII_TAX_BPS)} · cap {bpsToPct(PONS.maxCreatorTaxBps)}</Row>
               <Row k="Pool fee → creator share">
                 {bpsToPct(s?.fees.hookFeeBps ?? PONS.hookFeeBps)} → {bpsToPct(PONS.creatorFeeShareBps)}
               </Row>
@@ -307,14 +307,14 @@ export default function Floor() {
               <Row k="PoolManager">
                 <a className="rv" href={explorerAddr(V4.poolManager)} target="_blank" rel="noreferrer">{shortAddr(V4.poolManager)}</a>
               </Row>
-              <Row k="Treasury" na={AGORA.treasury === ZERO}>
-                {AGORA.treasury === ZERO ? "not deployed" : shortAddr(AGORA.treasury)}
+              <Row k="Treasury" na={TORII.treasury === ZERO}>
+                {TORII.treasury === ZERO ? "not deployed" : shortAddr(TORII.treasury)}
               </Row>
-              <Row k="stAGORA" na={AGORA.stakedAgora === ZERO}>
-                {AGORA.stakedAgora === ZERO ? "not deployed" : shortAddr(AGORA.stakedAgora)}
+              <Row k="stTORII" na={TORII.stakedAgora === ZERO}>
+                {TORII.stakedAgora === ZERO ? "not deployed" : shortAddr(TORII.stakedAgora)}
               </Row>
-              <Row k="Redeemer" na={AGORA.redeemer === ZERO}>
-                {AGORA.redeemer === ZERO ? "not deployed" : shortAddr(AGORA.redeemer)}
+              <Row k="Redeemer" na={TORII.redeemer === ZERO}>
+                {TORII.redeemer === ZERO ? "not deployed" : shortAddr(TORII.redeemer)}
               </Row>
               <Row k="ETH/USD feed" na={!ETH_USD_FEED}>
                 {ETH_USD_FEED ?? "unset — USD figures intentionally withheld"}

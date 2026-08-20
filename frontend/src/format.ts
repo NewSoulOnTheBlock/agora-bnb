@@ -20,7 +20,7 @@ export function fmt(v: bigint | number | string | null | undefined, maxFrac = 6)
  * Raw bigint → grouped decimal with fixed places, e.g. 1,234.56
  *
  * `decimals` defaults to 18 because almost everything here is WAD, but it is
- * not optional in spirit: stAGORA carries 21 (see `ST_AGORA_DECIMALS`), and a
+ * not optional in spirit: stTORII carries 21 (see `ST_TORII_DECIMALS`), and a
  * share balance formatted as WAD prints a thousand times too large.
  */
 export function fmtGrouped(v: bigint | null | undefined, frac = 2, decimals = 18): string {

@@ -1,14 +1,14 @@
-# Agora
+# Torii
 
 **The on-chain economy for collective conviction.**
 
-Agora is a decentralized protocol designed to turn community participation into coordinated capital.
+Torii is a decentralized protocol designed to turn community participation into coordinated capital.
 
-At its core, Agora combines a native asset, protocol-owned treasury, on-chain liquidity, staking, bonding, and decentralized governance into a single economic system. The protocol is designed to progressively accumulate and deploy capital on behalf of its participants, creating an autonomous economic foundation for a community to build upon.
+At its core, Torii combines a native asset, protocol-owned treasury, on-chain liquidity, staking, bonding, and decentralized governance into a single economic system. The protocol is designed to progressively accumulate and deploy capital on behalf of its participants, creating an autonomous economic foundation for a community to build upon.
 
-Agora is not simply a token, a DAO, or a treasury.
+Torii is not simply a token, a DAO, or a treasury.
 
-Agora is an on-chain collective with its own economy.
+Torii is an on-chain collective with its own economy.
 
 ---
 
@@ -18,23 +18,23 @@ The internet made it possible for people to coordinate socially at global scale.
 
 Blockchains make it possible to coordinate economically at global scale.
 
-Agora exists to combine the two.
+Torii exists to combine the two.
 
 A community with shared conviction can coordinate attention, ideas, labor, and capital. Historically, however, those resources have been fragmented across individuals and organizations.
 
-Agora creates a shared economic layer where participants can collectively accumulate capital, govern its deployment, and build an ecosystem around it.
+Torii creates a shared economic layer where participants can collectively accumulate capital, govern its deployment, and build an ecosystem around it.
 
 The fundamental thesis is:
 
 > A sufficiently coordinated community can become its own economic institution.
 
-Agora provides the infrastructure to make that institution programmable.
+Torii provides the infrastructure to make that institution programmable.
 
 ---
 
-## The Agora Economy
+## The Torii Economy
 
-Agora is built around a simple economic loop:
+Torii is built around a simple economic loop:
 
 ```
 Participation → Capital → Treasury → Deployment → Growth → Participation
@@ -55,13 +55,13 @@ Every component of the protocol exists to strengthen this loop.
 
 ## Core Components
 
-### AGORA
+### TORII
 
-AGORA is the native asset of the Agora ecosystem.
+TORII is the native asset of the Torii ecosystem.
 
 It serves as the primary coordination and participation asset within the protocol.
 
-AGORA can be used throughout the system for:
+TORII can be used throughout the system for:
 
 - Staking
 - Governance
@@ -70,15 +70,15 @@ AGORA can be used throughout the system for:
 - Access to protocol mechanisms
 - Coordinating community initiatives
 
-The purpose of AGORA is not simply to represent ownership of a company.
+The purpose of TORII is not simply to represent ownership of a company.
 
 It represents participation in an on-chain economic network.
 
 ### The Treasury
 
-The Agora Treasury is the foundation of the protocol.
+The Torii Treasury is the foundation of the protocol.
 
-Rather than immediately distributing all economic activity outside the system, Agora is designed to accumulate assets within a protocol-controlled Treasury.
+Rather than immediately distributing all economic activity outside the system, Torii is designed to accumulate assets within a protocol-controlled Treasury.
 
 The Treasury can contain:
 
@@ -88,7 +88,7 @@ The Treasury can contain:
 - Strategic ecosystem assets
 - Other assets approved by governance
 
-The Treasury acts as the collective balance sheet of Agora.
+The Treasury acts as the collective balance sheet of Torii.
 
 Its purpose is to provide the protocol with an increasingly powerful pool of capital that can be deployed according to the interests of the collective.
 
@@ -107,15 +107,15 @@ More Economic Activity
        ↺
 ```
 
-The long-term objective is to make Agora increasingly capable of funding its own growth.
+The long-term objective is to make Torii increasingly capable of funding its own growth.
 
 ### Protocol-Owned Liquidity
 
 Liquidity is infrastructure.
 
-Agora is designed to progressively build liquidity that is owned and controlled by the protocol itself.
+Torii is designed to progressively build liquidity that is owned and controlled by the protocol itself.
 
-Instead of relying entirely on temporary external liquidity incentives, Agora can acquire and maintain liquidity positions through protocol mechanisms.
+Instead of relying entirely on temporary external liquidity incentives, Torii can acquire and maintain liquidity positions through protocol mechanisms.
 
 This creates a permanent economic resource for the ecosystem.
 
@@ -125,13 +125,13 @@ Protocol-owned liquidity can:
 - Support efficient trading
 - Strengthen the Treasury
 - Reduce dependence on mercenary liquidity
-- Provide long-term infrastructure for AGORA
+- Provide long-term infrastructure for TORII
 
 Liquidity is therefore treated as an asset of the protocol, not simply a service rented from the market.
 
 ### Bonding
 
-Bonding allows participants to provide approved assets to the Agora Treasury in exchange for AGORA under predefined terms.
+Bonding allows participants to provide approved assets to the Torii Treasury in exchange for TORII under predefined terms.
 
 A bond can accept assets such as:
 
@@ -147,12 +147,12 @@ Participant
      ↓
 Approved Asset
      ↓
-Agora Treasury
+Torii Treasury
      ↓
-   AGORA
+   TORII
 ```
 
-Bonding allows Agora to transform token issuance into a mechanism for accumulating productive assets.
+Bonding allows Torii to transform token issuance into a mechanism for accumulating productive assets.
 
 Instead of simply distributing tokens in exchange for capital, the protocol receives assets that strengthen its balance sheet.
 
@@ -160,25 +160,25 @@ Bond parameters, pricing, vesting, and supported assets are determined by protoc
 
 ### Staking
 
-Staking allows participants to commit AGORA to the protocol for an extended period.
+Staking allows participants to commit TORII to the protocol for an extended period.
 
 In exchange, participants may receive a staked representation of their position and participate in protocol rewards according to the active monetary policy.
 
 ```
-AGORA
+TORII
   ↓
 Staking
   ↓
-Staked AGORA
+Staked TORII
 ```
 
-Staking is designed to align participants with the long-term development of Agora.
+Staking is designed to align participants with the long-term development of Torii.
 
 The objective is to encourage participants to think beyond short-term market activity and instead participate in the growth of the underlying economic network.
 
 ### Monetary Policy
 
-Agora treats token issuance as an economic policy rather than an arbitrary emissions schedule.
+Torii treats token issuance as an economic policy rather than an arbitrary emissions schedule.
 
 The protocol can govern parameters such as:
 
@@ -193,13 +193,13 @@ The protocol can govern parameters such as:
 
 These mechanisms are designed to evolve as the protocol evolves.
 
-The goal is to create a monetary system capable of responding to the needs of the Agora economy.
+The goal is to create a monetary system capable of responding to the needs of the Torii economy.
 
 ---
 
 ## Governance
 
-Agora governance controls the collective direction of the protocol.
+Torii governance controls the collective direction of the protocol.
 
 Governance can determine how the Treasury is used and how the economic system evolves.
 
@@ -236,7 +236,7 @@ Governance is collective capital allocation.
 
 ## The Collective
 
-Agora is built around a simple idea:
+Torii is built around a simple idea:
 
 > Capital becomes more powerful when people coordinate around it.
 
@@ -248,7 +248,7 @@ The protocol creates a shared economic foundation.
 - The Treasury provides resources.
 - The ecosystem turns those resources into new opportunities.
 
-Agora therefore acts as a coordination layer between:
+Torii therefore acts as a coordination layer between:
 
 ```
 Capital + People + Ideas + Execution
@@ -258,14 +258,14 @@ The objective is to create an environment where the collective can continuously 
 
 ---
 
-## The Agora Flywheel
+## The Torii Flywheel
 
 The entire protocol can be understood as one economic flywheel.
 
 ```
               PARTICIPATION
                     ↓
-                 AGORA
+                 TORII
                     ↓
         ┌──── STAKING ────┐
         │                 │
@@ -292,7 +292,7 @@ The stronger each component becomes, the stronger the entire system becomes.
 
 ## A New Type of On-Chain Institution
 
-Agora is designed to occupy a space between a protocol, a treasury, a community, and an economic institution.
+Torii is designed to occupy a space between a protocol, a treasury, a community, and an economic institution.
 
 It does not require a traditional corporate structure to coordinate capital.
 
@@ -316,7 +316,7 @@ This creates the possibility of an institution whose balance sheet, monetary sys
 
 ### 01 — Own the Infrastructure
 
-Agora should own as much of its economic infrastructure as possible.
+Torii should own as much of its economic infrastructure as possible.
 
 ### 02 — Compound the Treasury
 
@@ -324,7 +324,7 @@ Capital should be deployed with the objective of strengthening the long-term eco
 
 ### 03 — Align Participants
 
-Protocol mechanisms should reward behavior that contributes to the longevity of Agora.
+Protocol mechanisms should reward behavior that contributes to the longevity of Torii.
 
 ### 04 — Govern Capital
 
@@ -332,7 +332,7 @@ The community should have meaningful control over the collective balance sheet.
 
 ### 05 — Build for Permanence
 
-Agora should optimize for durable economic infrastructure rather than temporary incentives.
+Torii should optimize for durable economic infrastructure rather than temporary incentives.
 
 ### 06 — Permissionless by Default
 
@@ -350,7 +350,7 @@ At a high level:
 
 ```
                  ┌──────────────┐
-                 │   AGORA      │
+                 │   TORII      │
                  │    Asset     │
                  └──────┬───────┘
                         │
@@ -385,7 +385,7 @@ At a high level:
 
 ## Security
 
-Agora is an on-chain financial protocol.
+Torii is an on-chain financial protocol.
 
 Smart contracts should be developed with security as the highest priority.
 
@@ -407,7 +407,7 @@ No mechanism should be considered safe simply because it has been implemented be
 
 ### Phase I — Foundation
 
-- Core AGORA token
+- Core TORII token
 - Treasury contracts
 - Staking
 - Governance
@@ -430,7 +430,7 @@ No mechanism should be considered safe simply because it has been implemented be
 - Community proposals
 - On-chain capital allocation
 
-### Phase IV — The Agora Economy
+### Phase IV — The Torii Economy
 
 - Permissionless ecosystem participation
 - Autonomous treasury strategies
@@ -446,7 +446,7 @@ The roadmap is intentionally designed around a single objective:
 
 ## Contributing
 
-Agora is an open protocol.
+Torii is an open protocol.
 
 Contributions can take many forms:
 
@@ -466,15 +466,15 @@ The protocol becomes more valuable as more people contribute to the network.
 
 ## Philosophy
 
-Agora takes its name from the ancient concept of a shared public gathering place—a space where people meet, exchange ideas, conduct commerce, and participate in collective life.
+Torii takes its name from the ancient concept of a shared public gathering place—a space where people meet, exchange ideas, conduct commerce, and participate in collective life.
 
 The blockchain allows that concept to be rebuilt as an economic primitive.
 
-The Agora is the marketplace.
+The Torii is the marketplace.
 
 The Treasury is the collective balance sheet.
 
-AGORA is the native economic unit.
+TORII is the native economic unit.
 
 Governance is collective decision-making.
 

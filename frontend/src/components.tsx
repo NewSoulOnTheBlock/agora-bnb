@@ -12,7 +12,7 @@ import { DASH, fmtGrouped } from "./format";
  * holds and "max" never leaves dust behind.
  *
  * `decimals` is required rather than defaulted: the one balance on this site
- * that is not 18dp is stAGORA, and that is precisely the field where a wrong
+ * that is not 18dp is stTORII, and that is precisely the field where a wrong
  * default would be least visible.
  */
 export function Balance({
