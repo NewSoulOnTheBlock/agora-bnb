@@ -8,6 +8,12 @@ import { useDrag, withDrag } from "./win98/useDrag";
 import TaxWatch from "./win98/TaxWatch";
 import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
 import { MyComputer, NetworkNeighborhood, Notepad } from "./win98/Explorer";
+import { Fortune } from "./win98/Fortune";
+import { Gomoku } from "./win98/Gomoku";
+import { Hongbao } from "./win98/Hongbao";
+import { Penguin } from "./win98/Penguin";
+import { Mahjong } from "./win98/Mahjong";
+import { CURVE_TRADE_URL } from "./curve";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
 import { TORII, EXPLORER, GMGN_URL, RPC_URL } from "./chain";
 
@@ -225,17 +231,17 @@ export default function Layout({
   const [maximised, setMaximised] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "close" | "about" | "bin" | "copied" | "dolphin">(null);
+  const [dialog, setDialog] = useState<null | "close" | "about" | "bin" | "copied">(null);
   const mainDrag = useDrag(!maximised);
   const gameDrag = useDrag();
   const padDrag = useDrag();
 
   const [gameOpen, setGameOpen] = useState(false);
   const [padOpen, setPadOpen] = useState(false);
-  const [tip, setTip] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
   const [win, setWin] = useState<
     null | "sysprops" | "update" | "queue" | "mycomputer" | "network" | "notepad"
+    | "fortune" | "gomoku" | "hongbao" | "penguin" | "mahjong"
   >(null);
   const [crt, setCrt] = useState(() => {
     try { return localStorage.getItem("torii98:crt") === "on"; } catch { return false; }
@@ -470,6 +476,73 @@ export default function Layout({
           </span>
         </button>
 
+        {/* 求籤 — divination at a shrine, which is what this token is named
+            after. The draw comes off a real block hash, so it is the one toy
+            here whose randomness can be checked. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("fortune"); }}
+          title="求籤 — draw a fortune stick"
+        >
+          <PixelIcon name="sticks" size={32} />
+          <span>
+            Fortune
+            <span className="hanzi">求籤</span>
+          </span>
+        </button>
+
+        {/* 五子棋 — the game people actually play on paper. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("gomoku"); }}
+          title="五子棋 — five in a row"
+        >
+          <PixelIcon name="gomoku" size={32} />
+          <span>
+            Gomoku
+            <span className="hanzi">五子棋</span>
+          </span>
+        </button>
+
+        {/* 紅包 — the pot, in the most legible wrapper there is. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("hongbao"); }}
+          title="紅包 — the red envelope"
+        >
+          <PixelIcon name="hongbao" size={32} />
+          <span>
+            Red Envelope
+            <span className="hanzi">紅包</span>
+          </span>
+        </button>
+
+        {/* 企鵝 — the messenger every machine of this era had open. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("penguin"); }}
+          title="企鵝 — ask the shrine"
+        >
+          <PixelIcon name="penguin" size={32} />
+          <span>
+            Messenger
+            <span className="hanzi">企鵝</span>
+          </span>
+        </button>
+
+        {/* 上海麻將 — the one game that is both a Windows classic and Chinese. */}
+        <button
+          className="desk-icon"
+          onClick={() => { play("open"); setWin("mahjong"); }}
+          title="上海麻將 — Mahjong solitaire"
+        >
+          <PixelIcon name="mahjong" size={32} />
+          <span>
+            Mahjong
+            <span className="hanzi">上海麻將</span>
+          </span>
+        </button>
+
         <button
           className="desk-icon"
           onClick={() => { play("open"); setGameOpen(true); }}
@@ -482,26 +555,27 @@ export default function Layout({
           </span>
         </button>
 
-        {/* The dolphin. Hover for the warning, click for the dialog. It does
-            nothing and that is the joke — but it is a real Win98 tooltip and a
-            real modal, not a picture of one. */}
-        <span
-          className="tip-host"
-          onMouseEnter={() => setTip("Totally not a virus.\nTrust me… I'm a dolphin.")}
-          onMouseLeave={() => setTip(null)}
-        >
-          <button className="desk-icon" onClick={() => { play("ding"); setDialog("dolphin"); }}>
-            <PixelIcon name="dolphin" size={32} />
-            <span>
-              dolphin.exe
-              <span className="hanzi">海豚</span>
-            </span>
-          </button>
-          {tip && <span className="tip">{tip}</span>}
-        </span>
-
         {/* A shortcut off the desktop, the way a browser bookmark sat on one.
             GMGN is where the chart actually lives now that TORII has graduated. */}
+        {/* Flap — where TORII is actually traded while it is still on the
+            curve. The Trade tab can price the curve but cannot send an order to
+            it yet, so this is the honest route out. Cut to a circle, which also
+            crops the watermark that sat in the corner of the supplied file. */}
+        <a
+          className="desk-icon"
+          href={CURVE_TRADE_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="Buy and sell TORII on Flap"
+          onClick={() => play("click")}
+        >
+          <img className="round-icon" src="/flap-64.png" width={32} height={32} alt="" />
+          <span>
+            Flap
+            <span className="hanzi">交易所</span>
+          </span>
+        </a>
+
         <a
           className="desk-icon"
           href={GMGN_URL}
@@ -797,20 +871,6 @@ export default function Layout({
         </div>
       )}
 
-      {dialog === "dolphin" && (
-        <Dialog title="dolphin.exe" icon="dolphin" onClose={() => setDialog(null)}>
-          <p style={{ margin: 0 }}>
-            <b>Totally not a virus.</b>
-          </p>
-          <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
-            Trust me… I'm a dolphin.
-          </p>
-          <p style={{ margin: "8px 0 0", color: "#4a3a5e" }}>
-            This program does nothing at all, which is more than can be said for most things that
-            ask you to trust them.
-          </p>
-        </Dialog>
-      )}
 
       {/* ---- desktop context menu ---- */}
       {ctx && (
@@ -841,6 +901,13 @@ export default function Layout({
       {win === "mycomputer" && <MyComputer onClose={() => { play("close"); setWin(null); }} />}
       {win === "network" && <NetworkNeighborhood onClose={() => { play("close"); setWin(null); }} />}
       {win === "notepad" && <Notepad onClose={() => { play("close"); setWin(null); }} />}
+      {win === "fortune" && (
+        <Fortune account={wallet.account} onClose={() => { play("close"); setWin(null); }} />
+      )}
+      {win === "gomoku" && <Gomoku onClose={() => { play("close"); setWin(null); }} />}
+      {win === "hongbao" && <Hongbao onClose={() => { play("close"); setWin(null); }} />}
+      {win === "penguin" && <Penguin onClose={() => { play("close"); setWin(null); }} />}
+      {win === "mahjong" && <Mahjong onClose={() => { play("close"); setWin(null); }} />}
 
       {/* ---- start menu ---- */}
       {startOpen && (
@@ -874,6 +941,26 @@ export default function Layout({
               <PixelIcon name="network" size={24} />
               Network Neighborhood
             </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("fortune"); setStartOpen(false); }}>
+              <PixelIcon name="sticks" size={24} />
+              求籤 Fortune
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("gomoku"); setStartOpen(false); }}>
+              <PixelIcon name="gomoku" size={24} />
+              五子棋 Gomoku
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("hongbao"); setStartOpen(false); }}>
+              <PixelIcon name="hongbao" size={24} />
+              紅包 Red Envelope
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("mahjong"); setStartOpen(false); }}>
+              <PixelIcon name="mahjong" size={24} />
+              上海麻將 Mahjong
+            </button>
+            <button role="menuitem" onClick={() => { play("open"); setWin("penguin"); setStartOpen(false); }}>
+              <PixelIcon name="penguin" size={24} />
+              企鵝 Messenger
+            </button>
             <button role="menuitem" disabled aria-disabled="true">
               <PixelIcon name="folder" size={24} />
               NFTs <span className="soon-tag">soon</span>
@@ -890,14 +977,20 @@ export default function Layout({
               <PixelIcon name="dino" size={24} />
               No Internet
             </button>
-            <button role="menuitem" onClick={() => { play("ding"); setDialog("dolphin"); setStartOpen(false); }}>
-              <PixelIcon name="dolphin" size={24} />
-              dolphin.exe
-            </button>
             <button role="menuitem" onClick={() => { play("click"); setDialog("bin"); setStartOpen(false); }}>
               <PixelIcon name="recycle" size={24} />
               Recycle Bin
             </button>
+            <a
+              role="menuitem"
+              href={CURVE_TRADE_URL}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => { play("click"); setStartOpen(false); }}
+            >
+              <img className="round-icon" src="/flap-64.png" width={24} height={24} alt="" />
+              Trade on Flap
+            </a>
             <a
               role="menuitem"
               href={GMGN_URL}

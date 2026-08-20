@@ -324,9 +324,15 @@ body {
    classic 七言 length.
 
    Set as text, not as an image, so it is selectable and translatable. */
+/* Positioned ON the pillars. Without an explicit left/right an absolutely
+   positioned element falls back to its static position — which put both
+   couplets in the gate's top-left corner, on top of the desktop icons. */
+.cn-couplet.left { left: 2%; }
+.cn-couplet.right { right: 2%; }
+
 .cn-couplet {
   position: absolute;
-  top: 92px;
+  top: calc(min(1420px, 98vw) / 7 * 0.78 + 62px);
   width: 26px;
   writing-mode: vertical-rl;
   text-orientation: upright;
@@ -354,6 +360,12 @@ body {
 }
 .cn-lion.left { left: -10px; }
 .cn-lion.right { right: -10px; }
+
+/* Below this the pillars sit under the desktop icons, so the inscription would
+   be read through them. Scenery yields to navigation. */
+@media (max-width: 1780px) {
+  .cn-couplet { display: none; }
+}
 
 /* 灯笼 — lanterns hanging from the eaves. Pure CSS: a squashed circle for the
    body, a gold cap above and a tassel below. */
@@ -1744,7 +1756,7 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
 }
 
 /* --------------------------------------------------------------------------
-   22 · The runner, and the dolphin
+   22 · The runner
    Two jokes, both load-bearing for the aesthetic and neither load-bearing for
    the protocol.
    -------------------------------------------------------------------------- */
@@ -2094,4 +2106,320 @@ details.proof > summary:focus-visible { outline: 1px dotted var(--black); outlin
   background: var(--cn-cinnabar);
   border-radius: 2px;
   vertical-align: middle;
+}
+
+
+/* ==========================================================================
+   求籤 · 五子棋 · 紅包 — the Chinese desktop
+   ========================================================================== */
+
+/* ---- 求籤 — the fortune tube ---- */
+.fortune { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+.tube {
+  position: relative;
+  width: 62px;
+  height: 96px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transform-origin: 50% 100%;
+}
+.tube-body {
+  width: 46px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: var(--cn-gold);
+  background: linear-gradient(90deg, #6d0d14 0 16%, var(--cn-cinnabar) 16% 52%, var(--cn-vermillion) 52% 66%, #7d0c14 66% 100%);
+  box-shadow: inset 0 0 0 2px rgba(36, 22, 17, 0.6);
+}
+/* The sticks lean out of the mouth of the tube at different angles, which is
+   what makes it read as a bundle rather than as a box with lines on it. */
+.tube .stick {
+  position: absolute;
+  bottom: 54px;
+  width: 4px;
+  height: 40px;
+  background: linear-gradient(180deg, #e8d9a8, #b99b52);
+  box-shadow: 0 0 0 1px rgba(36, 22, 17, 0.5);
+  transform-origin: 50% 100%;
+}
+.tube .stick.s1 { left: 20px; transform: rotate(-13deg); }
+.tube .stick.s2 { left: 29px; transform: rotate(1deg); height: 46px; }
+.tube .stick.s3 { left: 38px; transform: rotate(12deg); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tube.shaking { animation: shakeTube 0.24s linear infinite; }
+}
+@keyframes shakeTube {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
+}
+
+.grade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 22px;
+  background: linear-gradient(180deg, #3b1108, #250a05);
+  border: 2px solid var(--cn-gold);
+}
+.grade .hz { font-size: 30px; line-height: 1; letter-spacing: 8px; text-indent: 8px; }
+.grade .rm { font-size: 10px; opacity: 0.75; color: var(--cn-paper); }
+/* The grade colours the plaque, so the answer is legible before it is read. */
+.grade.bad  .hz { color: #ff6a4d; }
+.grade.mid  .hz { color: var(--cn-paper); }
+.grade.good .hz { color: var(--cn-gold); }
+.grade.best .hz { color: var(--cn-gold); text-shadow: 0 0 14px rgba(232, 181, 48, 0.8); }
+
+.stick-no { font-family: var(--mono); font-size: 11px; opacity: 0.8; }
+
+.slip {
+  width: 100%;
+  background: var(--white);
+  box-shadow: var(--well);
+  padding: 12px 14px;
+  text-align: center;
+}
+.slip-hz { font-size: 16px; letter-spacing: 3px; line-height: 1.7; }
+.slip-en { margin-top: 8px; font-size: 12px; line-height: 1.5; color: #4a3a2a; }
+
+/* ---- 五子棋 — the board ---- */
+.gomoku { display: flex; flex-direction: column; }
+
+/* The goban is a grid of buttons, and the LINES are the gaps between them —
+   a background gradient rather than 169 borders, so the board stays one plane. */
+.goban {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 0;
+  aspect-ratio: 1;
+  width: 100%;
+  padding: 8px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(100% / 13 - 1px), rgba(36,22,17,0.45) calc(100% / 13 - 1px) calc(100% / 13)),
+    repeating-linear-gradient(0deg, transparent 0 calc(100% / 13 - 1px), rgba(36,22,17,0.45) calc(100% / 13 - 1px) calc(100% / 13)),
+    linear-gradient(160deg, #e6c98a, #d3ad76 60%, #c79f5e);
+  background-color: #dcbb7a;
+  box-shadow: var(--well);
+}
+.goban.over { opacity: 0.85; }
+
+.pt {
+  all: unset;
+  position: relative;
+  aspect-ratio: 1;
+  cursor: pointer;
+  display: block;
+}
+.pt:disabled { cursor: default; }
+/* Stones are drawn on the ::after so the button box can stay the click target
+   while the stone overhangs the line intersection the way a real one does. */
+.pt.b::after, .pt.w::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(36, 22, 17, 0.5);
+}
+.pt.b::after { background: radial-gradient(circle at 34% 30%, #5c5c5c, #0d0d0d 70%); }
+.pt.w::after { background: radial-gradient(circle at 34% 30%, #ffffff, #cfc6b4 75%); }
+.pt.last::before {
+  content: "";
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  z-index: 2;
+  box-shadow: 0 0 0 2px var(--cn-cinnabar);
+}
+.pt:not(:disabled):hover::after {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: rgba(36, 22, 17, 0.22);
+}
+
+.go-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.go-msg.won b { color: var(--cn-jade); }
+.go-msg.lost b { color: var(--cn-cinnabar); }
+
+/* ---- 紅包 — the envelope ---- */
+.hongbao { display: flex; flex-direction: column; align-items: center; }
+
+.envelope {
+  all: unset;
+  position: relative;
+  width: 190px;
+  height: 260px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #d51527 0%, var(--cn-cinnabar) 45%, #8d0a18 100%);
+  box-shadow: 0 3px 0 rgba(36, 22, 17, 0.55), inset 0 0 0 2px rgba(232, 181, 48, 0.35);
+}
+/* The flap: a gold arc across the top third, which is the whole silhouette. */
+.envelope::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 78px;
+  background: linear-gradient(180deg, #e8b530, #b9861d);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  box-shadow: 0 2px 0 rgba(36, 22, 17, 0.35);
+  transition: transform 420ms ease, opacity 420ms ease;
+  transform-origin: 50% 0;
+}
+.envelope.open::before { transform: rotateX(150deg); opacity: 0.75; }
+
+.envelope .seal {
+  position: relative;
+  z-index: 1;
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  color: #fff6e6;
+  background: #8d0a18;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px var(--cn-gold), 0 2px 0 rgba(36, 22, 17, 0.5);
+  /* 福 is hung upside down on purpose: 福倒了 sounds like 福到了, "luck has
+     arrived". Getting this the right way up would be the mistake. */
+  transform: rotate(180deg);
+}
+.envelope .tap {
+  position: absolute;
+  bottom: 16px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 246, 230, 0.85);
+}
+.envelope.open .tap { display: none; }
+
+@media (max-width: 560px) {
+  .envelope { width: 150px; height: 210px; }
+  .grade .hz { font-size: 24px; }
+  .slip-hz { font-size: 14px; letter-spacing: 2px; }
+}
+
+
+/* ==========================================================================
+   企鵝 · 上海麻將
+   ========================================================================== */
+
+/* ---- 企鵝 — the messenger ---- */
+.qq { display: flex; flex-direction: column; }
+
+.qq-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #8c1c13, #5d120c);
+  color: var(--cn-paper);
+  box-shadow: var(--out);
+}
+.qq-name { font-size: 13px; }
+.qq-status { font-size: 10px; color: var(--cn-jade); margin-left: 6px; }
+.qq-sig { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+
+.qq-log {
+  height: 250px;
+  overflow-y: auto;
+  background: var(--white);
+  box-shadow: var(--well);
+  margin: 6px 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qq-msg { display: flex; flex-direction: column; gap: 2px; max-width: 85%; }
+.qq-msg.me { align-self: flex-end; align-items: flex-end; }
+.qq-who { font-size: 10px; opacity: 0.6; }
+
+.qq-bubble {
+  /* Replies are multi-line and mix 漢字 with figures, so the newlines in the
+     source are the layout — `pre-wrap` rather than a stack of <p>s. */
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 7px 10px;
+  background: var(--light);
+  box-shadow: var(--out);
+}
+.qq-msg.me .qq-bubble { background: #f6e2b0; }
+.qq-msg.pending .qq-bubble { opacity: 0.6; font-style: italic; }
+
+.qq-asks { display: flex; flex-wrap: wrap; gap: 4px; }
+.qq-asks .mini { font-size: 11px; }
+
+/* ---- 上海麻將 — the turtle ---- */
+.mahjong { display: flex; flex-direction: column; }
+
+.mj-board {
+  position: relative;
+  height: 330px;
+  background: linear-gradient(160deg, #1d5c3f, #14402c);
+  box-shadow: var(--well);
+  overflow: auto;
+}
+
+.mj-tile {
+  all: unset;
+  position: absolute;
+  width: 34px;
+  height: 42px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #fdf6e3, #e8dcc0);
+  /* The right and bottom edges are the tile's thickness — that plus the
+     per-layer pixel offset is what makes the stack read as 3D. */
+  border: 1px solid #6b5b3e;
+  box-shadow: 2px 3px 0 rgba(20, 14, 8, 0.45), inset 1px 1px 0 #fffdf6;
+}
+.mj-tile.locked { cursor: default; filter: brightness(0.9); }
+.mj-tile:not(.locked):hover { background: linear-gradient(160deg, #fffdf2, #f2e9d2); }
+.mj-tile.picked {
+  background: linear-gradient(160deg, #ffe9a8, #f3cf6a);
+  border-color: var(--cn-cinnabar);
+}
+.mj-tile.hint { border-color: var(--cn-jade); box-shadow: 0 0 0 2px var(--cn-jade), 2px 3px 0 rgba(20,14,8,0.45); }
+
+.mj-face {
+  font-size: 26px;
+  line-height: 1;
+  color: #1d1208;
+  /* Fonts that actually carry the Mahjong block, in the order they are likely
+     to be present. Without this the tiles fall back to boxes. */
+  font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2",
+               "DejaVu Sans", "Arial Unicode MS", sans-serif;
+}
+
+.mj-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .mj-board { height: 260px; }
+  .qq-log { height: 200px; }
 }

@@ -417,25 +417,6 @@ export const dino: IconMap = [
 ];
 
 /** Trust me. */
-export const dolphin: IconMap = [
-  "                ",
-  "      kkkk      ",
-  "    kkccccck    ",
-  "   kcccccccck   ",
-  "  kccwkcccccck  ",
-  " kcccccccccccck ",
-  "kccccccccccccckk",
-  "kcccccccccccckk ",
-  " kkcccccccccck  ",
-  "   kkcccccckk   ",
-  "  kk kkccckk    ",
-  " kk    kkkk     ",
-  "kk       kk     ",
-  "          kk    ",
-  "                ",
-  "                ",
-];
-
 /** A launchpad we did not build. */
 export const rocket: IconMap = [
   "                ",
@@ -456,9 +437,117 @@ export const rocket: IconMap = [
   "                ",
 ];
 
+/** 籤筒 — the bamboo tube of fortune sticks you shake at a temple. */
+export const sticks: IconMap = [
+  "                ",
+  "     y  y  y    ",
+  "     y  y  y    ",
+  "     y  y  y    ",
+  "      y y y     ",
+  "      y y y     ",
+  "   kkkkkkkkkk   ",
+  "   kooooooook   ",
+  "   korrrrrrok   ",
+  "   korRRRRrok   ",
+  "   korRRRRrok   ",
+  "   korRRRRrok   ",
+  "   korrrrrrok   ",
+  "   kooooooook   ",
+  "   kkkkkkkkkk   ",
+  "                ",
+];
+
+/** 紅包 — the red envelope. Gold seal, black character window. */
+export const hongbao: IconMap = [
+  "                ",
+  "  kkkkkkkkkkkk  ",
+  "  kRRRRRRRRRRk  ",
+  "  kRRRRRRRRRRk  ",
+  "  kRRRROORRRRk  ",
+  "  kRRROOOORRRk  ",
+  "  kRROOOOOORRk  ",
+  "  kRROOkkOORRk  ",
+  "  kRROOkkOORRk  ",
+  "  kRROOOOOORRk  ",
+  "  kRRROOOORRRk  ",
+  "  kRRRROORRRRk  ",
+  "  kRRRRRRRRRRk  ",
+  "  kRRRRRRRRRRk  ",
+  "  kkkkkkkkkkkk  ",
+  "                ",
+];
+
+/** 五子棋 — a board with one black stone and one white. */
+export const gomoku: IconMap = [
+  "                ",
+  " oooooooooooooo ",
+  " oOOOOOOOOOOOOo ",
+  " oOkkOOOOOOOOOo ",
+  " oOkkkkOOOOOOOo ",
+  " oOkkkkOOOOOOOo ",
+  " oOOkkOOOOOOOOo ",
+  " oOOOOOOOOOOOOo ",
+  " oOOOOOOOOOOOOo ",
+  " oOOOOOOOwwOOOo ",
+  " oOOOOOOwwwwOOo ",
+  " oOOOOOOwwwwOOo ",
+  " oOOOOOOOwwOOOo ",
+  " oOOOOOOOOOOOOo ",
+  " oooooooooooooo ",
+  "                ",
+];
+
+/**
+ * 企鵝 — a penguin in a red scarf.
+ *
+ * Drawn from scratch, not traced. The nostalgia this is reaching for belongs to
+ * a specific messenger whose penguin is a registered trademark, and copying a
+ * company's mark onto a financial product is not a thing to do for a joke. A
+ * penguin in a scarf is nobody's property; the era it evokes does the work.
+ */
+export const penguin: IconMap = [
+  "                ",
+  "     kkkkkk     ",
+  "    kwwwwwwk    ",
+  "   kwwkwwkwwk   ",
+  "   kwwkwwkwwk   ",
+  "   kwwwwwwwwk   ",
+  "   kwwOOOOwwk   ",
+  "    kwwwwwwk    ",
+  "   kRRRRRRRRk   ",
+  "  kkwwwwwwwwkk  ",
+  "  kwwwwwwwwwwk  ",
+  "  kwwwwwwwwwwk  ",
+  "  kwwwwwwwwwwk  ",
+  "   kkwwwwwwkk   ",
+  "   kOOk  kOOk   ",
+  "    kk    kk    ",
+];
+
+/** 麻將 — a tile face with the red centre of 中. */
+export const mahjong: IconMap = [
+  "                ",
+  "  kkkkkkkkkkkk  ",
+  "  kwwwwwwwwwwk  ",
+  "  kwsssssssswk  ",
+  "  kwsRRRRRRswk  ",
+  "  kwsRwwwwRswk  ",
+  "  kwsRwRRwRswk  ",
+  "  kwsRwRRwRswk  ",
+  "  kwsRwRRwRswk  ",
+  "  kwsRwwwwRswk  ",
+  "  kwsRRRRRRswk  ",
+  "  kwsssssssswk  ",
+  "  kwwwwwwwwwwk  ",
+  "  kggggggggggk  ",
+  "  kkkkkkkkkkkk  ",
+  "                ",
+];
+
 export const ICONS = {
   computer, coins, chart, lock, tie, flame, help, info, warning, error, network, folder,
-  floppy, key, globe, hourglass, recycle, harddrive, dino, dolphin, rocket,
+  floppy, key, globe, hourglass, recycle, harddrive, dino, rocket, penguin, mahjong,
+  sticks, hongbao, gomoku,
 } as const;
 
 export type IconName = keyof typeof ICONS;
