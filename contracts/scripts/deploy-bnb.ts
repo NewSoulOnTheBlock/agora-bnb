@@ -57,13 +57,35 @@ async function main() {
     );
   }
 
-  // A router with no code would not fail until the first post-graduation swap,
-  // by which time the tax leg is already piling up unsellable.
+  // A wrong router would not fail until the first post-graduation swap, by
+  // which time the tax leg is already piling up unsellable.
+  //
+  // Checking for bytecode is NOT enough, and testnet is the proof: the BSC
+  // mainnet router address holds an unrelated contract on chain 97, so a
+  // code-presence check passes on an address that is not a router at all. The
+  // only honest test is behavioural — a real router answers WETH().
   const routerCode = await ethers.provider.getCode(PANCAKE_V2_ROUTER);
   if (routerCode === "0x") {
     throw new Error(`No contract at PANCAKE_ROUTER ${PANCAKE_V2_ROUTER} on chain ${net.chainId}.`);
   }
+  let wrapped: string;
+  try {
+    const router = new ethers.Contract(
+      PANCAKE_V2_ROUTER, ["function WETH() view returns (address)"], ethers.provider
+    );
+    wrapped = await router.WETH();
+  } catch {
+    throw new Error(
+      `PANCAKE_ROUTER ${PANCAKE_V2_ROUTER} has code on chain ${net.chainId} but does not ` +
+        `answer WETH() — it is not a PancakeSwap V2 router. On bscTestnet use ` +
+        `0xD99D1c33F9fC3444f8101754aBC46c52416550D1.`
+    );
+  }
+  if (wrapped === ethers.ZeroAddress) {
+    throw new Error(`PANCAKE_ROUTER ${PANCAKE_V2_ROUTER} returned a zero WETH() address.`);
+  }
   console.log(`router    ${PANCAKE_V2_ROUTER}  (${(routerCode.length - 2) / 2} bytes)`);
+  console.log(`          ↳ WETH() ${wrapped}  — the vault builds its swap path from this`);
 
   const owner = process.env.TREASURY_OWNER?.trim() || deployer.address;
   const ownerIsDeployer = owner.toLowerCase() === deployer.address.toLowerCase();
