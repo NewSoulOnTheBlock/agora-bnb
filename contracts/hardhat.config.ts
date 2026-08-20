@@ -125,21 +125,26 @@ const config: HardhatUserConfig = {
    * for that entry and the URLs are what matter.
    */
   etherscan: {
-    apiKey: {
-      bsc: ETHERSCAN_API_KEY ?? "",
-      bscTestnet: ETHERSCAN_API_KEY ?? "",
-      robinhood: "blockscout-needs-no-key",
-    },
-    customChains: [
-      {
-        network: "robinhood",
-        chainId: 4663,
-        urls: {
-          apiURL: "https://robinhoodchain.blockscout.com/api",
-          browserURL: "https://robinhoodchain.blockscout.com",
-        },
-      },
-    ],
+    /**
+     * A PLAIN STRING, not a per-network map. This is the whole switch between
+     * API versions and it is not documented anywhere obvious:
+     *
+     *   hardhat-verify/internal/etherscan.js:58
+     *     const isV2 = typeof apiKey === "string";
+     *
+     * Given an object, the plugin falls back to the per-chain **V1** endpoints,
+     * which Etherscan has deprecated — verification then fails with "You are
+     * using a deprecated V1 endpoint". Given a string, it posts to
+     * api.etherscan.io/v2/api with `chainid`, which is what works today.
+     *
+     * The cost of the string form is that it applies to every network: line 34
+     * routes anything with a known chainId to the Etherscan V2 URL, so a
+     * Blockscout `customChains` entry cannot coexist with it. Robinhood Chain
+     * verification therefore is not configured here — Blockscout takes uploads
+     * directly at robinhoodchain.blockscout.com/contract-verification, and the
+     * live 4663 contracts are already deployed and unaffected.
+     */
+    apiKey: ETHERSCAN_API_KEY ?? "",
   },
   sourcify: { enabled: false },
   paths: {
