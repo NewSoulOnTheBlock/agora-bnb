@@ -3,8 +3,13 @@
  *
  *   npx hardhat run scripts/bind-bnb.ts --network bsc
  *
- * Requires in .env: TREASURY, AGORA_TOKEN, AGORA_VAULT, and optionally
- * VAULT_FACTORY (checked, not used).
+ * Requires in .env: TREASURY, AGORA_TOKEN, AGORA_VAULT.
+ *
+ * VAULT_FACTORY is NOT read here. The vault is validated directly instead — it
+ * must pay this Treasury and be bound to this token — which is the property
+ * that actually matters. Trusting the factory address would prove less: a vault
+ * from someone else's factory satisfies the same interface while routing the
+ * tax somewhere else entirely.
  *
  * ## The step that quietly breaks the economics
  *
