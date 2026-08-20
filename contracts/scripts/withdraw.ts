@@ -1,7 +1,7 @@
 /**
  * Withdraw corpus ETH from the Treasury to the operator wallet.
  *
- *   WITHDRAW_ETH=0.17 npx hardhat run scripts/withdraw.ts --network robinhood
+ *   WITHDRAW_ETH=0.11 npx hardhat run scripts/withdraw.ts --network robinhood
  *
  * Dry run by default. Set WITHDRAW_EXECUTE=1 to actually send.
  *
