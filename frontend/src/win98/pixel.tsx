@@ -115,7 +115,7 @@ export const lock: IconMap = [
   "                ",
 ];
 
-/** A shirt and necktie — Suits. */
+/** A shirt and necktie. */
 export const tie: IconMap = [
   "                ",
   "   kk      kk   ",

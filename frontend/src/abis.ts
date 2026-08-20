@@ -23,13 +23,13 @@ export const FEE_ESCROW_ABI = [
   "function balanceOfToken(address recipient, address token) view returns (uint256)",
 ];
 
-export const PONS_TOKEN_ABI = [
+export const LAUNCH_TOKEN_ABI = [
   "function name() view returns (string)",
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
   "function totalSupply() view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
-  // Pons-specific: lets the UI detect graduation state without any of our contracts.
+  // Launchpad-specific: lets the UI detect graduation without any of our contracts.
   "function curve() view returns (address)",
   "function launchFactory() view returns (address)",
 ];
@@ -115,36 +115,9 @@ export const REDEEMER_ABI = [
   "event RedeemExecuted(uint256 indexed id, address indexed owner, uint256 amount, uint256 payFloor, uint256 paid)",
 ];
 
-export const STAKED_SUITS_ABI = [
-  "function totalStaked() view returns (uint256)",
-  "function stakedCount(address) view returns (uint256)",
-  "function stakerOf(uint256 tokenId) view returns (address)",
-  "function pendingYield(address account) view returns (uint256)",
-  "function cumulativeRewards() view returns (uint256)",
-  "function cumulativeClaimed() view returns (uint256)",
-  "function suits() view returns (address)",
-  "function stake(uint256[] tokenIds)",
-  "function unstake(uint256[] tokenIds)",
-  "function claim() returns (uint256)",
-];
-
 export const DISTRIBUTOR_ABI = [
-  "function suitsBps() view returns (uint16)",
-  "function cumulativeToSuits() view returns (uint256)",
   "function cumulativeToAgora() view returns (uint256)",
-  "function preview(uint256 amount) view returns (uint256 toSuits, uint256 toTorii)",
+  "function preview(uint256 amount) view returns (uint256 toTorii)",
   "function distribute() payable",
 ];
 
-/** Suits ERC-721. NOT Enumerable — there is no tokenOfOwnerByIndex. */
-export const SUITS_ABI = [
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function totalSupply() view returns (uint256)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function ownerOf(uint256 tokenId) view returns (address)",
-  "function tokenURI(uint256 tokenId) view returns (string)",
-  "function isApprovedForAll(address owner, address operator) view returns (bool)",
-  "function getTransferValidator() view returns (address)",
-  "function setApprovalForAll(address operator, bool approved)",
-];

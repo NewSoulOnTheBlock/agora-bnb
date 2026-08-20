@@ -182,7 +182,7 @@ export default function Floor() {
               value={s?.reserve.cumulativeIncomeDistributed != null ? fmtSig(s.reserve.cumulativeIncomeDistributed) : null}
               unit="BNB"
               usd={usdOf(s?.reserve.cumulativeIncomeDistributed, ethUsd)}
-              note="100% stTORII — no Suits vault on this chain"
+              note="100% to stTORII — the only income sink"
             />
             <Stat
               k="Tax to income"

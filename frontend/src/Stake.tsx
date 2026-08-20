@@ -4,7 +4,7 @@ import { Panel, Row, Stat, Pill, Dot, Balance } from "./components";
 import StakePitch from "./StakePitch";
 import { AwaitingDeployment } from "./Layout";
 import { fmtGrouped, fmtSig, DASH } from "./format";
-import { TORII, ZERO, explorerAddr, SUITS_SHARE_BPS, ST_TORII_DECIMALS } from "./chain";
+import { TORII, ZERO, explorerAddr, ST_TORII_DECIMALS } from "./chain";
 import {
   readStakePosition, approveToriiForStaking, stakeTorii, unstakeTorii,
   claimToriiYield, type StakePosition,
@@ -78,7 +78,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
         <AwaitingDeployment
           what="stTORII"
           why="An ERC-4626 vault over TORII. Stakers receive the protocol's income stream in BNB; passive holders keep the redemption floor."
-          phase="Treasury + FeeSink → launch → stTORII, Redeemer, StakedSuits, Distributor"
+          phase="Treasury + ToriiVault → launch → stTORII, Redeemer, Distributor"
         />
       )}
 
@@ -215,7 +215,7 @@ export default function Stake({ wallet }: { wallet: Wallet }) {
                   : "unavailable"}
               </Row>
               <Row k="Your share of income">
-                {(10000 - SUITS_SHARE_BPS) / 100}% — staked Suits take {SUITS_SHARE_BPS / 100}%
+                100% — stakers are the only sink for income on this chain
               </Row>
               <Row k="Awaiting distribution" na={s?.reserve.pendingIncome == null}>
                 {s?.reserve.pendingIncome != null

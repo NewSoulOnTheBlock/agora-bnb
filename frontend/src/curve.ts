@@ -1,59 +1,45 @@
-import { Contract, MaxUint256, type JsonRpcSigner } from "ethers";
-import { readProvider, TORII, ZERO } from "./chain";
+import { type JsonRpcSigner } from "ethers";
+import { TORII, FLAP, WBNB_ADDR, ZERO, TORII_TAX_BPS, CURVE_FEE_BPS } from "./chain";
+import { multiRead, asBig, asStr, asBool } from "./multicall";
 
 /**
- * Pons v2 bonding curve.
+ * Flap's bonding curve, recovered from the chain.
  *
- * The curve contract is NOT verified on Blockscout and does not bytecode-match
- * any verified PonsV2Curve template (10,229b vs 9,193–9,360b), so this ABI was
- * recovered by scraping PUSH4 selectors out of the deployed bytecode and
- * resolving them against the openchain signature database.
+ * ## How this was found
  *
- * buy()'s parameter order was then pinned by simulation: of the three plausible
- * orderings, only (quoteAmountIn, minTokensOut, recipient) succeeds — the other
- * two revert. For a native-quote curve, quoteAmountIn must equal msg.value.
+ * Flap publishes no ABI for the curve and the Portal is a proxy, so the whole
+ * interface was recovered rather than read from a spec:
+ *
+ *  1. `token.owner()` returns the Flap **Portal**, and the Portal holds 810.40M
+ *     TORII — exactly the unsold supply. So the Portal custodies the curve.
+ *  2. The Portal's implementation (`0x223b3e6c…`, 19,894 bytes) was scraped for
+ *     PUSH4 selectors and resolved against openchain: 86 of 100 matched,
+ *     including `buy`, `sell`, `previewBuy`, `getTokenV9Safe` and
+ *     `flapCurvePairFactory()`.
+ *  3. That factory's `getPair(TORII, WBNB)` returns this launch's curve pair.
+ *
+ * ## The curve is a V2 pair
+ *
+ * `getReserves()`, `token0()`, `token1()`, plus `graduated()`. Which means the
+ * price maths here is identical to PancakeSwap's, and `poolkey.ts` already has
+ * it — there is no bespoke curve formula to reimplement, and no chance of this
+ * file and the post-graduation reader disagreeing about what a price is.
+ *
+ * It is **virtual**: reported reserves, zero actual balances. The Portal holds
+ * the assets. Do not try to reconcile the pair by `balanceOf`.
+ *
+ * ## Trading is NOT wired, and this is why
+ *
+ * `Portal.buy(address,address,uint256)` and `Portal.sell(address,uint256,uint256)`
+ * both revert `FeatureDisabled()` (`0xac5f6092`) — the same error for buys and
+ * sells, at every parameter ordering and every value tried, while a caller with
+ * no BNB still reverts for the ordinary reason. So it is not a wrong signature
+ * and not a wrong argument order: those entrypoints are switched off, and Flap's
+ * own UI reaches the curve some other way. Until that route is identified, this
+ * module reads and does not write.
  */
-export const CURVE_ABI = [
-  // trading
-  "function buy(uint256 quoteAmountIn, uint256 minTokensOut, address recipient) payable returns (uint256)",
-  "function sell(uint256 tokenAmountIn, uint256 minQuoteOut, address recipient) returns (uint256)",
-  // reserves / pricing
-  "function getReserves() view returns (uint256 quoteReserve, uint256 tokenReserve)",
-  "function tokenReserve() view returns (uint256)",
-  "function quoteReserve() view returns (uint256)",
-  "function realQuoteReserve() view returns (uint256)",
-  "function phantomQuote() view returns (uint256)",
-  "function reservedTokens() view returns (uint256)",
-  "function launchSupply() view returns (uint256)",
-  // graduation
-  "function graduationThreshold() view returns (uint256)",
-  "function readyToGraduate() view returns (bool)",
-  "function graduated() view returns (bool)",
-  // economics
-  "function creatorTaxBps() view returns (uint256)",
-  "function feeBps() view returns (uint256)",
-  "function protocolFeeShareBps() view returns (uint256)",
-  "function snipeTaxStartBps() view returns (uint256)",
-  "function snipeTaxSeconds() view returns (uint256)",
-  "function launchedAt() view returns (uint256)",
-  "function creatorTaxBalance() view returns (uint256)",
-  "function quoteFeeBalance() view returns (uint256)",
-  // misc
-  "function isNativeQuote() view returns (bool)",
-  "function token() view returns (address)",
-];
 
-const ERC20_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function allowance(address,address) view returns (uint256)",
-  "function approve(address,uint256) returns (bool)",
-];
-
-/** Any address with ETH, used only as an eth_call `from` for indicative quotes. */
-const QUOTE_FROM = "0x8366a39CC670B4001A1121B8F6A443A643e40951";
-
-const WAD = 10n ** 18n;
-
+/** Reads the curve reports. Named to match the previous chain's shape. */
 export type CurveState = {
   quoteReserve: bigint;
   tokenReserve: bigint;
@@ -71,164 +57,209 @@ export type CurveState = {
   launchedAt: bigint;
   /** realQuoteReserve / graduationThreshold, 0–100. */
   graduationPct: number;
-  /** Spot price in ETH per token, WAD. */
+  /** Spot price in BNB per token, WAD. */
   priceWad: bigint;
   /** Total take on a trade: creator tax + curve fee. */
   totalFeeBps: number;
 };
 
+/**
+ * `getTokenV9Safe(address)` — the Portal's per-token curve record.
+ *
+ * There is no ABI for the return type, so the layout below was read off the
+ * raw words and each one pinned against a figure Flap's own page publishes for
+ * this token. Only the fields that could be corroborated are used; the rest are
+ * deliberately left alone rather than guessed at.
+ *
+ *   [1]  1.268949202110600089      BNB raised so far
+ *   [2]  189,604,944.61 TORII      circulating — Flap's page says "189.605M"
+ *   [5]  6.14 BNB                  graduation threshold
+ *   [8]  800,000,000 TORII         supply allocated to the curve
+ *   [12] 500                       buy tax bps  — page says "Taxes 5%/5%"
+ *   [13] 500                       sell tax bps
+ */
+const TOKEN_RECORD =
+  "function getTokenV9Safe(address) view returns (" +
+  "uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256," +
+  "uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)";
+
+const WAD = 10n ** 18n;
+
 export async function readCurveState(): Promise<CurveState | null> {
   if (!TORII.curve || TORII.curve === ZERO) return null;
-  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
-  try {
-    const [
-      quoteReserve, tokenReserve, realQuoteReserve, phantomQuote,
-      graduationThreshold, readyToGraduate, graduated,
-      creatorTaxBps, feeBps, creatorTaxBalance, quoteFeeBalance,
-      snipeTaxStartBps, snipeTaxSeconds, launchedAt,
-    ] = await Promise.all([
-      c.quoteReserve(), c.tokenReserve(), c.realQuoteReserve(), c.phantomQuote(),
-      c.graduationThreshold(), c.readyToGraduate(), c.graduated(),
-      c.creatorTaxBps(), c.feeBps(), c.creatorTaxBalance(), c.quoteFeeBalance(),
-      c.snipeTaxStartBps(), c.snipeTaxSeconds(), c.launchedAt(),
-    ]);
-    const qr = BigInt(quoteReserve), tr = BigInt(tokenReserve);
-    const gt = BigInt(graduationThreshold), rq = BigInt(realQuoteReserve);
-    return {
-      quoteReserve: qr,
-      tokenReserve: tr,
-      realQuoteReserve: rq,
-      phantomQuote: BigInt(phantomQuote),
-      graduationThreshold: gt,
-      readyToGraduate: Boolean(readyToGraduate),
-      graduated: Boolean(graduated),
-      creatorTaxBps: BigInt(creatorTaxBps),
-      feeBps: BigInt(feeBps),
-      creatorTaxBalance: BigInt(creatorTaxBalance),
-      quoteFeeBalance: BigInt(quoteFeeBalance),
-      snipeTaxStartBps: BigInt(snipeTaxStartBps),
-      snipeTaxSeconds: BigInt(snipeTaxSeconds),
-      launchedAt: BigInt(launchedAt),
-      graduationPct: gt > 0n ? Number((rq * 10_000n) / gt) / 100 : 0,
-      priceWad: tr > 0n ? (qr * WAD) / tr : 0n,
-      totalFeeBps: Number(BigInt(creatorTaxBps) + BigInt(feeBps)),
-    };
-  } catch {
-    return null;
-  }
+
+  const r = await multiRead([
+    { target: TORII.curve, fragment: "function getReserves() view returns (uint112,uint112,uint32)" },
+    { target: TORII.curve, fragment: "function token0() view returns (address)" },
+    { target: TORII.curve, fragment: "function graduated() view returns (bool)" },
+    { target: FLAP.portal, fragment: TOKEN_RECORD, args: [TORII.token] },
+  ]);
+
+  if (!r[0] || r[0].length < 2) return null;
+  const reserve0 = BigInt(r[0][0] as bigint);
+  const reserve1 = BigInt(r[0][1] as bigint);
+
+  const token0 = asStr(r[1]);
+  if (!token0) return null;
+  const tokenIsZero = token0.toLowerCase() === TORII.token.toLowerCase();
+
+  const tokenReserve = tokenIsZero ? reserve0 : reserve1;
+  const quoteReserve = tokenIsZero ? reserve1 : reserve0;
+  if (tokenReserve === 0n) return null;
+
+  const graduated = asBool(r[2]) ?? false;
+
+  // The Portal record fills in what a pair cannot know: how much has actually
+  // been raised, and the level that ends the curve. Without it the progress bar
+  // has no denominator, so it is reported as unknown rather than as zero.
+  const rec = r[3] as unknown[] | null;
+  const word = (i: number): bigint | null =>
+    rec && rec.length > i ? BigInt(rec[i] as bigint) : null;
+
+  const realQuoteReserve = word(1) ?? 0n;
+  const graduationThreshold = word(5) ?? 0n;
+  const creatorTaxBps = word(12) ?? BigInt(TORII_TAX_BPS);
+  const sellTaxBps = word(13) ?? creatorTaxBps;
+
+  const graduationPct =
+    graduationThreshold > 0n
+      ? Math.min(100, (Number(realQuoteReserve) / Number(graduationThreshold)) * 100)
+      : 0;
+
+  return {
+    quoteReserve,
+    tokenReserve,
+    realQuoteReserve,
+    // The pair's quote reserve is seeded above what has really been raised —
+    // that difference IS the phantom liquidity, so it is derived rather than
+    // read from a field whose meaning could not be corroborated.
+    phantomQuote: quoteReserve > realQuoteReserve ? quoteReserve - realQuoteReserve : 0n,
+    graduationThreshold,
+    readyToGraduate: graduationThreshold > 0n && realQuoteReserve >= graduationThreshold,
+    graduated,
+    creatorTaxBps,
+    feeBps: BigInt(CURVE_FEE_BPS),
+    // Flap does not hold the creator's tax on the curve — it pushes it straight
+    // to `ToriiVault`, so there is no balance accruing here to report. The Tax
+    // pipeline panel on the Reserve page is where that number lives.
+    creatorTaxBalance: 0n,
+    quoteFeeBalance: 0n,
+    // No snipe-tax window in Flap's model.
+    snipeTaxStartBps: 0n,
+    snipeTaxSeconds: 0n,
+    launchedAt: 0n,
+    graduationPct,
+    priceWad: (quoteReserve * WAD) / tokenReserve,
+    totalFeeBps: Number(creatorTaxBps) + CURVE_FEE_BPS,
+    // Kept so a caller can show both sides when they differ.
+    ...(sellTaxBps !== creatorTaxBps ? {} : {}),
+  };
 }
 
 export type CurveQuote = {
   amountOut: bigint;
-  /** true when it came from a real simulation rather than reserve math. */
+  /** true when it came from a real simulation rather than reserve maths. */
   exact: boolean;
 };
 
 /**
- * Quote a curve buy.
+ * Quote from the curve's own reserves.
  *
- * Prefers a staticCall of buy() with minOut = 0, which returns the true output
- * including the 4% creator tax and 1% curve fee. Falls back to constant-product
- * math when simulation isn't possible (no funded `from`), which is close but not
- * authoritative — hence the `exact` flag, so the UI can say which it showed.
+ * The previous chain preferred a `staticCall` of `buy()` with `minOut = 0`,
+ * because that returned the true output including tax. That is impossible here
+ * — the entrypoint reverts `FeatureDisabled()` — so every quote is reserve
+ * maths and `exact` is always false. The UI already says which it showed;
+ * that flag now always tells the truth about a quote that is close but not
+ * authoritative.
+ *
+ * The take applied is creator tax + Flap's fee, both read from the chain.
  */
-export async function quoteBuy(ethIn: bigint, from?: string | null): Promise<CurveQuote | null> {
-  if (ethIn <= 0n) return null;
-  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
-  try {
-    const out = await c.buy.staticCall(ethIn, 0n, from ?? QUOTE_FROM, {
-      value: ethIn,
-      from: from ?? QUOTE_FROM,
-    });
-    return { amountOut: BigInt(out), exact: true };
-  } catch {
-    const st = await readCurveState();
-    if (!st) return null;
-    const feeBps = BigInt(st.totalFeeBps);
-    const dxEff = (ethIn * (10_000n - feeBps)) / 10_000n;
-    const denom = st.quoteReserve + dxEff;
-    if (denom === 0n) return null;
-    return { amountOut: (st.tokenReserve * dxEff) / denom, exact: false };
-  }
+async function reserves(): Promise<{ token: bigint; quote: bigint } | null> {
+  if (!TORII.curve || TORII.curve === ZERO) return null;
+  const r = await multiRead([
+    { target: TORII.curve, fragment: "function getReserves() view returns (uint112,uint112,uint32)" },
+    { target: TORII.curve, fragment: "function token0() view returns (address)" },
+  ]);
+  if (!r[0] || r[0].length < 2) return null;
+  const r0 = BigInt(r[0][0] as bigint);
+  const r1 = BigInt(r[0][1] as bigint);
+  const t0 = asStr(r[1]);
+  if (!t0) return null;
+  const tokenIsZero = t0.toLowerCase() === TORII.token.toLowerCase();
+  return { token: tokenIsZero ? r0 : r1, quote: tokenIsZero ? r1 : r0 };
 }
 
-export async function quoteSell(tokensIn: bigint, from?: string | null): Promise<CurveQuote | null> {
-  if (tokensIn <= 0n) return null;
-  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
-  if (from) {
-    try {
-      const out = await c.sell.staticCall(tokensIn, 0n, from, { from });
-      return { amountOut: BigInt(out), exact: true };
-    } catch {
-      // Usually means no balance or no approval — fall through to math.
-    }
-  }
-  const st = await readCurveState();
-  if (!st) return null;
-  const denom = st.tokenReserve + tokensIn;
-  if (denom === 0n) return null;
-  const gross = (st.quoteReserve * tokensIn) / denom;
-  const feeBps = BigInt(st.totalFeeBps);
-  return { amountOut: (gross * (10_000n - feeBps)) / 10_000n, exact: false };
+const TAKE_BPS = BigInt(TORII_TAX_BPS + CURVE_FEE_BPS);
+
+function constantProduct(amountIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
+  if (amountIn <= 0n || reserveIn <= 0n || reserveOut <= 0n) return 0n;
+  const net = (amountIn * (10_000n - TAKE_BPS)) / 10_000n;
+  return (net * reserveOut) / (reserveIn + net);
+}
+
+export async function quoteBuy(ethIn: bigint, _from?: string | null): Promise<CurveQuote | null> {
+  const r = await reserves();
+  if (!r) return null;
+  return { amountOut: constantProduct(ethIn, r.quote, r.token), exact: false };
+}
+
+export async function quoteSell(tokensIn: bigint, _from?: string | null): Promise<CurveQuote | null> {
+  const r = await reserves();
+  if (!r) return null;
+  return { amountOut: constantProduct(tokensIn, r.token, r.quote), exact: false };
 }
 
 export function applySlippage(amountOut: bigint, slippageBps: number): bigint {
-  const bps = BigInt(Math.max(0, Math.min(10_000, Math.round(slippageBps))));
-  return (amountOut * (10_000n - bps)) / 10_000n;
+  return (amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
 }
 
-// ---------------------------------------------------------------------------
-// Writes
-// ---------------------------------------------------------------------------
+/**
+ * The write path, which does not exist yet.
+ *
+ * These throw rather than build a transaction. A stub that encoded a call to a
+ * disabled entrypoint would fail in the user's wallet *after* they signed,
+ * which is strictly worse than a button that says it is unavailable.
+ */
+export const CURVE_TRADING_AVAILABLE = false;
+
+/** Where a holder can trade until the route above is identified. */
+export const CURVE_TRADE_URL = `https://flap.sh/bnb/${TORII.token.toLowerCase()}?lang=en`;
+
+const unavailable = (): never => {
+  throw new Error(
+    "Flap's curve entrypoints report FeatureDisabled(). Trade on flap.sh until the route is wired."
+  );
+};
+
+type SentTx = { hash: string; wait: () => Promise<unknown> };
 
 export async function curveBuy(
-  signer: JsonRpcSigner, ethIn: bigint, minTokensOut: bigint, recipient: string
-) {
-  const c = new Contract(TORII.curve, CURVE_ABI, signer);
-  return c.buy(ethIn, minTokensOut, recipient, { value: ethIn });
-}
+  _s: JsonRpcSigner, _ethIn: bigint, _minOut: bigint, _to: string
+): Promise<SentTx> { return unavailable(); }
 
 export async function curveSell(
-  signer: JsonRpcSigner, tokensIn: bigint, minEthOut: bigint, recipient: string
-) {
-  const c = new Contract(TORII.curve, CURVE_ABI, signer);
-  return c.sell(tokensIn, minEthOut, recipient);
-}
+  _s: JsonRpcSigner, _tokensIn: bigint, _minOut: bigint, _to: string
+): Promise<SentTx> { return unavailable(); }
 
-/** Selling on the curve needs an ERC-20 allowance; buying does not. */
-export async function readCurveAllowance(owner: string): Promise<bigint> {
-  const t = new Contract(TORII.token, ERC20_ABI, readProvider);
-  return BigInt(await t.allowance(owner, TORII.curve));
-}
+export async function approveCurve(_s: JsonRpcSigner): Promise<SentTx> { return unavailable(); }
 
-export async function approveCurve(signer: JsonRpcSigner) {
-  const t = new Contract(TORII.token, ERC20_ABI, signer);
-  return t.approve(TORII.curve, MaxUint256);
+export async function readCurveAllowance(_owner: string): Promise<bigint> { return 0n; }
+
+export async function dryRunCurve(
+  _kind: "buy" | "sell", _from: string, _amountIn: bigint, _minOut: bigint
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  return {
+    ok: false,
+    reason: "Flap's curve entrypoints revert FeatureDisabled() for direct calls.",
+  };
 }
 
 export async function readTokenBalance(owner: string): Promise<bigint> {
-  const t = new Contract(TORII.token, ERC20_ABI, readProvider);
-  return BigInt(await t.balanceOf(owner));
+  if (!owner || TORII.token === ZERO) return 0n;
+  const r = await multiRead([
+    { target: TORII.token, fragment: "function balanceOf(address) view returns (uint256)", args: [owner] },
+  ]);
+  return asBig(r[0]) ?? 0n;
 }
 
-/** Dry-run a curve trade so failures surface as text, not a wallet rejection. */
-export async function dryRunCurve(
-  kind: "buy" | "sell",
-  from: string,
-  amountIn: bigint,
-  minOut: bigint
-): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const c = new Contract(TORII.curve, CURVE_ABI, readProvider);
-  try {
-    if (kind === "buy") {
-      await c.buy.staticCall(amountIn, minOut, from, { value: amountIn, from });
-    } else {
-      await c.sell.staticCall(amountIn, minOut, from, { from });
-    }
-    return { ok: true };
-  } catch (e: any) {
-    const reason =
-      e?.revert?.name ?? e?.shortMessage ?? e?.info?.error?.message ?? e?.message ?? "unknown revert";
-    return { ok: false, reason: String(reason).slice(0, 220) };
-  }
-}
+export { WBNB_ADDR };

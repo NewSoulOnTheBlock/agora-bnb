@@ -193,7 +193,6 @@ const NODES: Node[] = [
   { name: "REDEEMER", addr: TORII.redeemer, role: "burn TORII, join the queue" },
   { name: "STTORII", addr: TORII.stakedAgora, role: "ERC-4626 vault · BNB rewards" },
   { name: "DISTRIBUTOR", addr: TORII.distributor, role: "splits income 90 / 10" },
-  { name: "STAKEDSUITS", addr: TORII.stakedSuits, role: "NFT staking · blocked by the collection" },
   { name: "ADAPTER", addr: "0x0B57a02cd732A4942DefD1c67F83097a24DBDbEe", role: "Beefy sleeve · queued, not active" },
   { name: "CURVE", addr: TORII.curve, role: "the bonding curve · closed" },
 ];
@@ -297,10 +296,6 @@ THINGS THAT ARE TRUE AND EASY TO MISS
 
   - Staking rewards are BNB and stay outside the vault's
     totalAssets(), so the share price never moves.
-
-  - Suits staking is unavailable: the collection only
-    permits allowlisted operators to move tokens, and the
-    vault is not on that list.
 
   - Deployed capital sits outside nav(). A contract should
     not count an asset it does not custody.

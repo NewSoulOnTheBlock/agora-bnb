@@ -1,10 +1,7 @@
 import { formatEther } from "ethers";
 import { Panel, Row } from "./components";
 import { fmtSig, fmtGrouped, DASH } from "./format";
-import {
-  TORII, explorerAddr, SUITS_NFT, SUITS_SUPPLY, SUITS_MARKET, TORII_TAX_BPS,
-  SUITS_STAKING_ENABLED,
-} from "./chain";
+import { TORII, explorerAddr, TORII_TAX_BPS } from "./chain";
 import { useSnapshot } from "./useReads";
 
 /**
@@ -23,7 +20,6 @@ export default function About() {
 
   const incomePct = r?.incomeShareBps != null ? Number(r.incomeShareBps) / 100 : null;
   const corpusPct = incomePct != null ? 100 - incomePct : null;
-  const suitsPct = s?.suits.shareBps != null ? Number(s.suits.shareBps) / 100 : 10;
   const haircutPct = rd?.haircutBps != null ? Number(rd.haircutBps) / 100 : null;
   const delayHrs = rd?.redeemDelay != null ? Number(rd.redeemDelay) / 3600 : null;
   const taxPct = TORII_TAX_BPS / 100;
@@ -33,8 +29,9 @@ export default function About() {
   const exTax = ex * (taxPct / 100);
   const exCorpus = incomePct != null ? exTax * (1 - incomePct / 100) : null;
   const exIncome = incomePct != null ? exTax * (incomePct / 100) : null;
-  const exSuits = exIncome != null ? exIncome * (suitsPct / 100) : null;
-  const exStakers = exIncome != null ? exIncome - exSuits! : null;
+  // Every wei of income goes to TORII stakers here: `ToriiDistributor` on BNB
+  // has no second sink at all, so there is no split to model.
+  const exStakers = exIncome;
 
   return (
     <>
@@ -75,9 +72,8 @@ export default function About() {
               )}
             </li>
             <li className="step">
-              <b>Income goes to people who commit.</b> {100 - suitsPct}% to people who stake their
-              TORII, {suitsPct}% to people who stake a Suits NFT. Paid in BNB. You claim it whenever
-              you like — it does not expire.
+              <b>Income goes to people who commit.</b> All of it, to people who stake their TORII.
+              Paid in BNB. You claim it whenever you like — it does not expire.
             </li>
           </ol>
         </Panel>
@@ -96,9 +92,6 @@ export default function About() {
             </Row>
             <Row k="→ to TORII stakers" na={exStakers == null}>
               {exStakers != null ? `${exStakers.toFixed(4)} BNB` : DASH}
-            </Row>
-            <Row k="→ to staked Suits" na={exSuits == null}>
-              {exSuits != null ? `${exSuits.toFixed(4)} BNB, split across every staked Suit` : DASH}
             </Row>
           </div>
           <p className="sub">
@@ -165,41 +158,6 @@ export default function About() {
 
       {/* ------------------------------------------------------------------ */}
       <div className="section">
-        <p className="label">Suits <span className="id">{SUITS_SUPPLY} of them, that's all there will ever be</span></p>
-        <Panel>
-          {!SUITS_STAKING_ENABLED && (
-            <div className="notice" style={{ marginTop: 0 }}>
-              <b>Suits staking is currently unavailable.</b> The collection only lets approved
-              contracts move its tokens, and this staking vault has not been approved by the
-              collection's owner. Until that changes, no Suit can be staked — and the {suitsPct}%
-              share is paid to TORII stakers instead. Nothing is lost or stuck; the vault works the
-              moment the collection approves it.
-            </div>
-          )}
-          <p className="sub" style={{ marginTop: SUITS_STAKING_ENABLED ? 0 : 12 }}>
-            Suits is a separate NFT collection. Staking one {SUITS_STAKING_ENABLED ? "earns" : "would earn"}{" "}
-            <b>{suitsPct}%</b> of all protocol income, split evenly across every Suit staked — the
-            fewer staked, the bigger each share. Every Suit earns the same; there is no rarity bonus.
-          </p>
-          <div className="rows" style={{ marginTop: 12 }}>
-            <Row k="Supply">{SUITS_SUPPLY}, fully minted — none can ever be created</Row>
-            <Row k="Staked right now" na={s?.suits.totalStaked == null}>
-              {s?.suits.totalStaked != null ? `${s.suits.totalStaked} of ${SUITS_SUPPLY}` : DASH}
-            </Row>
-            <Row k="Where to get one">
-              <a className="rv" href={SUITS_MARKET} target="_blank" rel="noreferrer">OpenSea ↗</a>
-            </Row>
-            <Row k="Collection">
-              <a className="rv" href={explorerAddr(SUITS_NFT)} target="_blank" rel="noreferrer">
-                {SUITS_NFT.slice(0, 14)}…
-              </a>
-            </Row>
-          </div>
-        </Panel>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      <div className="section">
         <p className="label">What could go wrong <span className="id">read this part</span></p>
 
         <div className="notice danger">
@@ -231,10 +189,6 @@ export default function About() {
               A single wallet can currently change the payout settings and move reserve funds. Check
               who holds it before committing anything you cannot lose
             </Row>
-            <Row k="Staked Suits rely on the NFT's rules">
-              The Suits collection can restrict transfers. If its owner tightened those rules,
-              staked NFTs could get stuck — that collection is not controlled by this protocol
-            </Row>
           </div>
           <p className="sub">
             None of this is advice. It is a description of how the contracts behave. Everything here
@@ -253,7 +207,6 @@ export default function About() {
               ["Treasury (the pot)", TORII.treasury],
               ["Fee collector", TORII.feeSink],
               ["Staking vault", TORII.stakedAgora],
-              ["Suits staking", TORII.stakedSuits],
               ["Redemption", TORII.redeemer],
               ["Income splitter", TORII.distributor],
             ] as const).map(([label, addr]) => (

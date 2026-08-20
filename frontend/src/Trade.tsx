@@ -142,7 +142,7 @@ export default function Trade({ wallet }: { wallet: Wallet }) {
           PancakeSwap pair yet and all trades route through the Flap curve at{" "}
           <a className="link" href={explorerAddr(TORII.curve)} target="_blank" rel="noreferrer">
             {TORII.curve.slice(0, 10)}…
-          </a>. The v4 path is built and validated; it activates automatically on graduation.
+          </a>. The PancakeSwap path is built and validated; it activates automatically on graduation.
         </div>
       )}
 

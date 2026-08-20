@@ -1,10 +1,6 @@
-import { Contract } from "ethers";
 import {
-  readProvider, PANCAKE, TORII, ZERO, activeToken, SUITS_NFT,
+  readProvider, PANCAKE, TORII, ZERO, activeToken,
 } from "./chain";
-import {
-  STAKED_SUITS_ABI, DISTRIBUTOR_ABI, SUITS_ABI,
-} from "./abis";
 import { pairFor, priceFromReserves, type Pair } from "./poolkey";
 import { multiRead, asBig, asStr, asBool } from "./multicall";
 
@@ -344,59 +340,6 @@ export async function readRedeemer(): Promise<RedeemInfo> {
 }
 
 // ---------------------------------------------------------------------------
-// Suits NFT staking. The collection is LIVE even while the vault is not, so
-// collection reads and vault reads are reported separately.
-// ---------------------------------------------------------------------------
-
-export type SuitsInfo = {
-  /** The ERC-721 itself — live regardless of the relaunch. */
-  collection: {
-    name: string | null;
-    totalSupply: bigint | null;
-    transferValidator: string | null;
-  };
-  vaultDeployed: boolean;
-  totalStaked: bigint | null;
-  cumulativeRewards: bigint | null;
-  cumulativeClaimed: bigint | null;
-  shareBps: bigint | null;
-};
-
-export async function readSuits(): Promise<SuitsInfo> {
-  const nft = new Contract(SUITS_NFT, SUITS_ABI, readProvider);
-  const [name, totalSupply, transferValidator] = await Promise.all([
-    safe(() => nft.name() as Promise<string>),
-    safe(async () => BigInt(await nft.totalSupply())),
-    safe(() => nft.getTransferValidator() as Promise<string>),
-  ]);
-  const collection = { name, totalSupply, transferValidator };
-
-  if (!deployed(TORII.stakedSuits)) {
-    return {
-      collection, vaultDeployed: false, totalStaked: null,
-      cumulativeRewards: null, cumulativeClaimed: null, shareBps: null,
-    };
-  }
-
-  const v = new Contract(TORII.stakedSuits, STAKED_SUITS_ABI, readProvider);
-  const [totalStaked, cumulativeRewards, cumulativeClaimed] = await Promise.all([
-    safe(async () => BigInt(await v.totalStaked())),
-    safe(async () => BigInt(await v.cumulativeRewards())),
-    safe(async () => BigInt(await v.cumulativeClaimed())),
-  ]);
-
-  const shareBps = deployed(TORII.distributor)
-    ? await safe(async () =>
-        BigInt(await new Contract(TORII.distributor, DISTRIBUTOR_ABI, readProvider).suitsBps())
-      )
-    : null;
-
-  return { collection, vaultDeployed: true, totalStaked, cumulativeRewards, cumulativeClaimed, shareBps };
-}
-
-// ---------------------------------------------------------------------------
-// Composite snapshot
-// ---------------------------------------------------------------------------
 
 export type Snapshot = {
   blockNumber: number | null;
@@ -407,7 +350,6 @@ export type Snapshot = {
   reserve: Reserve;
   staking: Staking;
   redeem: RedeemInfo;
-  suits: SuitsInfo;
   /** price / floor − 1, as a percentage. Null until both sides are known. */
   premiumPct: number | null;
   fetchedAt: number;
@@ -417,13 +359,12 @@ export async function readSnapshot(): Promise<Snapshot> {
   const { address, isDemo } = activeToken();
   const blockNumber = await safe(() => readProvider.getBlockNumber());
   const pool = await readPoolState(address);
-  const [token, fees, reserve, staking, redeem, suits] = await Promise.all([
+  const [token, fees, reserve, staking, redeem] = await Promise.all([
     readTokenInfo(address, pool.initialised),
     readFeePipeline(pool.id, TORII.feeSink),
     readReserve(),
     readStaking(),
     readRedeemer(),
-    readSuits(),
   ]);
 
   let premiumPct: number | null = null;
@@ -433,7 +374,7 @@ export async function readSnapshot(): Promise<Snapshot> {
   }
 
   return {
-    blockNumber, token, isDemo, pool, fees, reserve, staking, redeem, suits,
+    blockNumber, token, isDemo, pool, fees, reserve, staking, redeem,
     premiumPct, fetchedAt: Date.now(),
   };
 }

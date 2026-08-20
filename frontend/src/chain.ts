@@ -15,7 +15,7 @@ import { JsonRpcProvider, FetchRequest } from "ethers";
  *   Uniswap v4 + StateView          PancakeSwap V2 pairs
  *   FeeSink pulls tax               ToriiVault is pushed tax
  *   4% creator tax                  5% (Flap offers 1/3/5/10 only)
- *   Suits ERC-721 staking           — no BNB deployment, dropped
+ *   Suits ERC-721 staking           — removed entirely
  *
  * Everything verified live against chain 56 on 2026-08-20; each address below
  * says what was checked rather than only where it came from.
@@ -195,9 +195,37 @@ export const WBNB_USDT_PAIR = "0x16b9a82891338f9bA80E2D6970FddA79D1eb0daE";
  */
 export const FLAP = {
   vaultPortal: "0x90497450f2a706f1951b5bdda52B4E5d16f34C06",
+  /**
+   * The Portal is also the curve's custodian: it holds **810.40M TORII**, which
+   * is exactly the unsold supply (1B total less the 189.6M circulating that
+   * Flap's own page reports). It is shared across every Flap launch — 1,792 BNB
+   * sits in it — so per-token state is keyed by token address, not by contract.
+   */
   portal: "0xe2cE6ab80874Fa9Fa2aAE65D277Dd6B8e65C9De0",
   guardian: "0x9e27098dcD8844bcc6287a557E0b4D09C86B8a4b",
+  /** Deploys one curve pair per launch. `getPair(token, WBNB)` finds ours. */
+  curvePairFactory: "0x4db4fcfebbf3f0cbd20efff444b133b96abda2d6",
 } as const;
+
+/**
+ * Flap's bonding curve, and the happy accident in its shape.
+ *
+ * The curve is not a bespoke contract with a bespoke ABI. It is a **Uniswap
+ * V2-shaped pair** — `getReserves()`, `token0()`, `token1()` — with
+ * `graduated()` added. So the same reader that prices the PancakeSwap pair
+ * after graduation prices the Flap curve before it, with no second code path.
+ *
+ * It is *virtual*: it reports reserves but custodies nothing. Its real TORII,
+ * WBNB and BNB balances are all zero; the Portal holds the assets and the pair
+ * is the accounting. That matters only if you try to reconcile it by balance —
+ * do not.
+ *
+ * Verified live: token0 = TORII, token1 = WBNB, `graduated() == false`, and
+ * reserves of 927,028,019 TORII against 7.3322 WBNB. That prices TORII at
+ * 7.909e-9 BNB, which at $653 is **$5.16e-6** — matching the price and the ~$5K
+ * market cap on Flap's own page for this token.
+ */
+export const FLAP_CURVE_PAIR = "0xE0b14e22aC4d23449AB700729AdB204DBc8Ce669";
 
 /**
  * 5%, not 4%.
@@ -246,18 +274,13 @@ export const CURVE_FEE_BPS = 100;
 export const TORII: {
   token: string; curve: string; deployer: string;
   feeSink: string; treasury: string; stakedAgora: string; redeemer: string;
-  stakedSuits: string; distributor: string;
+  distributor: string;
 } = {
   /** 神社 · TORII. `Treasury.agora()` and `Vault.taxToken()` both name it. */
   token: "0x5830D9306B7EDf396C1f3fc023fDDcc75Ae97777",
 
-  /**
-   * Flap's bonding curve. Not yet known to the frontend: the token has NOT
-   * graduated — `PancakeFactory.getPair` still returns address(0) for the
-   * TORII/WBNB pair — so trading is entirely on Flap's own contract, which is
-   * per-launch and not derivable from the token address.
-   */
-  curve: (import.meta.env?.VITE_TORII_CURVE as string) || ZERO,
+  /** Flap's curve pair for this launch. See `FLAP_CURVE_PAIR`. */
+  curve: "0xE0b14e22aC4d23449AB700729AdB204DBc8Ce669",
 
   deployer: "0x442a46D9364abf5CE274956cC7563B1189541cF7",
 
@@ -270,9 +293,6 @@ export const TORII: {
   /** stTORII — ERC-4626 over TORII. 21 decimals, see below. */
   stakedAgora: "0x47c5608b9cA68Fd78F2bBAf89f29cc23887b55d6",
   redeemer: "0xcF4894339cD07c9577e870ae213f4e9bd71e3fb1",
-
-  /** Permanently zero on BNB — the Suits collection is a 4663 contract. */
-  stakedSuits: ZERO,
 
   /** `bnb/ToriiDistributor`. No `treasury()` getter: it has no owner and no
    *  second sink, so there is nothing for it to be bound to. */
@@ -314,26 +334,6 @@ export const TORII_WBNB_PAIR = "0x38dfBf0cd27270375a7D9A7588a794B4e0995bCf";
  */
 export const ST_TORII_DECIMALS = 21;
 
-// ---------------------------------------------------------------------------
-// Suits — not on this chain
-// ---------------------------------------------------------------------------
-/**
- * The Suits collection lives on chain 4663 and has no BNB deployment, so the
- * whole NFT side is off here: no tab, no folder, no share of income.
- *
- * `ToriiDistributor` on BNB reflects that in the contract rather than only in
- * the UI — losing the second sink removed the split, `suitsBps`, the reroute
- * logic and `Ownable` with it, so that contract has no privileged caller at
- * all. `SUITS_SHARE_BPS` is therefore 0 and stakers receive the whole income
- * share, not 90% of it.
- */
-export const SUITS_STAKING_ENABLED = false;
-export const SUITS_SHARE_BPS = 0;
-export const SUITS_NFT = ZERO;
-export const SUITS_SUPPLY = 0;
-export const SUITS_VALIDATOR = ZERO;
-export const SUITS_MARKET = "";
-
 /** No demo token on this chain: nothing is live to point at yet. */
 export const DEMO_TOKEN = ZERO;
 
@@ -353,10 +353,17 @@ export function activeToken(): { address: string; isDemo: boolean } {
  */
 export const ETH_USD_FEED: string | null = null;
 
-/** Where people actually look at the chart. DexScreener covers BSC. */
+/**
+ * The chart people actually look at. GMGN covers BSC, and it is what the
+ * desktop icon has always pointed at — the name is GMGN on both chains.
+ *
+ * Deliberately not DexScreener: it indexes the PancakeSwap pair, and TORII has
+ * not graduated, so there is no pair for it to show. GMGN tracks the Flap
+ * bonding curve too, which is where every trade is happening today.
+ */
 export const GMGN_URL = TORII.token !== ZERO
-  ? `https://dexscreener.com/bsc/${TORII.token.toLowerCase()}`
-  : "https://dexscreener.com/bsc";
+  ? `https://gmgn.ai/bsc/token/${TORII.token.toLowerCase()}`
+  : "https://gmgn.ai/bsc";
 
 // ---------------------------------------------------------------------------
 // Beefy

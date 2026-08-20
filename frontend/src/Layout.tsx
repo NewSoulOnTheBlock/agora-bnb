@@ -9,14 +9,14 @@ import TaxWatch from "./win98/TaxWatch";
 import { SystemProperties, WindowsUpdate, PrintQueue } from "./win98/Windows";
 import { MyComputer, NetworkNeighborhood, Notepad } from "./win98/Explorer";
 import { isEnabled as soundOn, setEnabled as setSoundOn, play } from "./win98/sound";
-import { TORII, EXPLORER, SUITS_STAKING_ENABLED, GMGN_URL, RPC_URL } from "./chain";
+import { TORII, EXPLORER, GMGN_URL, RPC_URL } from "./chain";
 
 /** The endpoint, as a hostname. Derived so the status bar cannot go stale. */
 const RPC_HOST = (() => {
   try { return new URL(RPC_URL).host; } catch { return RPC_URL; }
 })();
 
-export type Tab = "about" | "floor" | "deployed" | "trade" | "stake" | "suits" | "redeem";
+export type Tab = "about" | "floor" | "deployed" | "trade" | "stake" | "redeem";
 
 /**
  * The tab list is unchanged from the previous theme — same ids, same order,
@@ -33,16 +33,6 @@ export const TABS: {
   { id: "deployed", label: "Deployed", icon: "harddrive", hanzi: "部署" },
   { id: "trade", label: "Trade", icon: "chart", hanzi: "交易" },
   { id: "stake", label: "Stake", icon: "lock", hanzi: "質押" },
-  {
-    id: "suits", label: "Suits", icon: "tie", hanzi: "西裝",
-    disabled: !SUITS_STAKING_ENABLED,
-    // Hidden rather than greyed while the collection's operator allowlist
-    // blocks the vault. A permanently dead tab is worse than no tab — it
-    // advertises a feature nobody can use. `DISABLED_TABS` still guards the
-    // route, so a pasted `#suits` hash cannot reach it either.
-    hidden: !SUITS_STAKING_ENABLED,
-    why: "Suits staking is unavailable: the collection only permits allowlisted operators to move tokens, and this vault is not on that list.",
-  },
   { id: "redeem", label: "Redeem", icon: "flame", hanzi: "贖回" },
 ];
 
@@ -79,7 +69,6 @@ const TITLES: Record<Tab, string> = {
   deployed: "Deployed capital",
   trade: "Trade",
   stake: "Stake",
-  suits: "Suits",
   redeem: "Redeem",
 };
 
@@ -323,7 +312,6 @@ export default function Layout({
       `treasury     ${TORII.treasury}`,
       `stakedAgora  ${TORII.stakedAgora}`,
       `redeemer     ${TORII.redeemer}`,
-      `stakedSuits  ${TORII.stakedSuits}`,
       `distributor  ${TORII.distributor}`,
     ].join("\n");
 

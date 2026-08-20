@@ -5,7 +5,7 @@ import { fmtSig, fmtGrouped, DASH } from "./format";
 import { usdOf, fmtUsd } from "./price";
 import { useSnapshot, useEthUsd } from "./useReads";
 import { readIncomeHistory, type IncomeHistory } from "./history";
-import { TORII_TAX_BPS, SUITS_SHARE_BPS } from "./chain";
+import { TORII_TAX_BPS } from "./chain";
 
 /**
  * The case for staking, made out of things that have already happened.
@@ -99,9 +99,8 @@ export default function StakePitch() {
           <p className="sub">
             <b>{TORII_TAX_BPS / 100}% of every buy and sell</b> goes to the protocol.{" "}
             <b>{s?.reserve.incomeShareBps != null ? Number(s.reserve.incomeShareBps) / 100 : 30}%</b>{" "}
-            of that is paid out as income — {100 - SUITS_SHARE_BPS / 100}% to people who stake TORII,{" "}
-            {SUITS_SHARE_BPS / 100}% to staked Suits. The rest stays in the reserve and raises the
-            floor for everyone, staked or not.
+            of that is paid out as income, all of it to people who stake TORII. The rest stays in
+            the reserve and raises the floor for everyone, staked or not.
           </p>
 
           <div className="rows mini">
